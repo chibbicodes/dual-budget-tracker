@@ -23,6 +23,11 @@ export class StorageService {
         // Perform migrations if needed
       }
 
+      // Ensure new fields exist (migration for backward compatibility)
+      if (!data.income) {
+        data.income = []
+      }
+
       return data
     } catch (error) {
       console.error('Error loading data from localStorage:', error)

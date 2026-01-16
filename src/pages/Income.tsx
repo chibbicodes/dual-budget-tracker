@@ -5,7 +5,7 @@ import BudgetBadge from '../components/BudgetBadge'
 import Modal from '../components/Modal'
 import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar } from 'lucide-react'
 import type { BudgetType, Income as IncomeType } from '../types'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
 
 type BudgetFilter = 'all' | BudgetType
 
@@ -354,7 +354,7 @@ export default function Income() {
                       {formatCurrency(income.expectedAmount || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.expectedDate ? format(new Date(income.expectedDate), 'MMM d, yyyy') : '-'}
+                      {income.expectedDate ? format(parseISO(income.expectedDate), 'MMM d, yyyy') : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                       <button

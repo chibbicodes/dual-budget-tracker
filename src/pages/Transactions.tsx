@@ -16,6 +16,7 @@ import { format, parseISO } from 'date-fns'
 import type { Transaction, BudgetType, Account } from '../types'
 
 type BudgetFilter = 'household' | 'business' | 'all'
+type TransactionTypeFilter = 'all' | 'income' | 'expense'
 
 export default function Transactions() {
   const {
@@ -29,12 +30,15 @@ export default function Transactions() {
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>('all')
   const [searchText, setSearchText] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set())
+  const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [csvData, setCsvData] = useState<string[][]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
@@ -71,6 +75,13 @@ export default function Transactions() {
       transactions = transactions.filter((t) => t.categoryId === categoryFilter)
     }
 
+    // Apply transaction type filter
+    if (transactionTypeFilter === 'income') {
+      transactions = transactions.filter((t) => t.amount > 0)
+    } else if (transactionTypeFilter === 'expense') {
+      transactions = transactions.filter((t) => t.amount < 0)
+    }
+
     // Apply date range filter
     if (startDate) {
       transactions = transactions.filter((t) => t.date >= startDate)
@@ -97,6 +108,7 @@ export default function Transactions() {
     budgetFilter,
     accountFilter,
     categoryFilter,
+    transactionTypeFilter,
     startDate,
     endDate,
     searchText,
@@ -114,7 +126,7 @@ export default function Transactions() {
     return accounts
   }, [appData.accounts, currentView, budgetFilter])
 
-  // Get filtered categories for dropdown
+  // Get filtered categories for dropdown organized by bucket
   const availableCategories = useMemo(() => {
     let categories = appData.categories
     if (currentView !== 'combined') {
@@ -123,7 +135,23 @@ export default function Transactions() {
     if (budgetFilter !== 'all') {
       categories = categories.filter((c) => c.budgetType === budgetFilter)
     }
-    return categories.filter((c) => c.isActive)
+    const activeCategories = categories.filter((c) => c.isActive)
+
+    // Group by bucket and sort alphabetically within each bucket
+    const grouped: { [bucketId: string]: typeof activeCategories } = {}
+    activeCategories.forEach((cat) => {
+      if (!grouped[cat.bucketId]) {
+        grouped[cat.bucketId] = []
+      }
+      grouped[cat.bucketId].push(cat)
+    })
+
+    // Sort categories within each bucket alphabetically
+    Object.keys(grouped).forEach((bucketId) => {
+      grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+    })
+
+    return grouped
   }, [appData.categories, currentView, budgetFilter])
 
   const handleAddTransaction = (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -154,9 +182,53 @@ export default function Transactions() {
     setBudgetFilter('all')
     setAccountFilter('all')
     setCategoryFilter('all')
+    setTransactionTypeFilter('all')
     setSearchText('')
     setStartDate('')
     setEndDate('')
+  }
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (selectedTransactionIds.size === filteredTransactions.length) {
+      setSelectedTransactionIds(new Set())
+    } else {
+      setSelectedTransactionIds(new Set(filteredTransactions.map((t) => t.id)))
+    }
+  }
+
+  const handleSelectTransaction = (id: string) => {
+    const newSelected = new Set(selectedTransactionIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedTransactionIds(newSelected)
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedTransactionIds.size === 0) return
+
+    if (confirm(`Are you sure you want to delete ${selectedTransactionIds.size} transaction(s)?`)) {
+      selectedTransactionIds.forEach((id) => {
+        deleteTransaction(id)
+      })
+      setSelectedTransactionIds(new Set())
+    }
+  }
+
+  const handleOpenBulkEdit = () => {
+    if (selectedTransactionIds.size === 0) return
+    setIsBulkEditModalOpen(true)
+  }
+
+  const handleBulkEdit = (updates: Partial<Transaction>) => {
+    selectedTransactionIds.forEach((id) => {
+      updateTransaction(id, updates)
+    })
+    setSelectedTransactionIds(new Set())
+    setIsBulkEditModalOpen(false)
   }
 
   // CSV Import handlers
@@ -472,11 +544,41 @@ export default function Transactions() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Categories</option>
-              {availableCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
+              {Object.entries(availableCategories).map(([bucketId, categories]) => {
+                const bucketName = bucketId === 'needs' ? 'Needs' :
+                                   bucketId === 'wants' ? 'Wants' :
+                                   bucketId === 'savings' ? 'Savings' :
+                                   bucketId === 'operating' ? 'Operating' :
+                                   bucketId === 'growth' ? 'Growth' :
+                                   bucketId === 'compensation' ? 'Compensation' :
+                                   bucketId === 'tax_reserve' ? 'Tax Reserve' :
+                                   bucketId === 'business_savings' ? 'Business Savings' : bucketId
+                return (
+                  <optgroup key={bucketId} label={bucketName}>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
+          </div>
+
+          {/* Transaction Type Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Transaction Type
+            </label>
+            <select
+              value={transactionTypeFilter}
+              onChange={(e) => setTransactionTypeFilter(e.target.value as TransactionTypeFilter)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Transactions</option>
+              <option value="income">Income Only</option>
+              <option value="expense">Expenses Only</option>
             </select>
           </div>
 
@@ -525,6 +627,33 @@ export default function Transactions() {
         </div>
       </div>
 
+      {/* Bulk Actions */}
+      {selectedTransactionIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-blue-900">
+              {selectedTransactionIds.size} transaction{selectedTransactionIds.size !== 1 ? 's' : ''} selected
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleOpenBulkEdit}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                Bulk Edit
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Transactions Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {filteredTransactions.length === 0 ? (
@@ -542,6 +671,14 @@ export default function Transactions() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedTransactionIds.size === filteredTransactions.length && filteredTransactions.length > 0}
+                      onChange={handleSelectAll}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
@@ -572,6 +709,14 @@ export default function Transactions() {
 
                   return (
                     <tr key={transaction.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedTransactionIds.has(transaction.id)}
+                          onChange={() => handleSelectTransaction(transaction.id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <p className="text-sm text-gray-900">
                           {format(new Date(transaction.date), 'MMM d, yyyy')}
@@ -686,6 +831,22 @@ export default function Transactions() {
             defaultBudgetType={selectedTransaction.budgetType}
           />
         )}
+      </Modal>
+
+      {/* Bulk Edit Modal */}
+      <Modal
+        isOpen={isBulkEditModalOpen}
+        onClose={() => setIsBulkEditModalOpen(false)}
+        title={`Bulk Edit ${selectedTransactionIds.size} Transactions`}
+        size="lg"
+      >
+        <BulkEditForm
+          transactionCount={selectedTransactionIds.size}
+          accounts={appData.accounts}
+          categories={appData.categories}
+          onSubmit={handleBulkEdit}
+          onCancel={() => setIsBulkEditModalOpen(false)}
+        />
       </Modal>
 
       {/* Import CSV Modal */}
@@ -1301,6 +1462,147 @@ function TransactionForm({
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           {transaction ? 'Update Transaction' : 'Add Transaction'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// Bulk Edit Form Component
+interface BulkEditFormProps {
+  transactionCount: number
+  accounts: Account[]
+  categories: any[]
+  onSubmit: (updates: Partial<Transaction>) => void
+  onCancel: () => void
+}
+
+function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCancel }: BulkEditFormProps) {
+  const [formData, setFormData] = useState<{
+    categoryId?: string
+    accountId?: string
+    budgetType?: BudgetType
+    taxDeductible?: boolean
+  }>({})
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Only include fields that have been set
+    const updates: Partial<Transaction> = {}
+    if (formData.categoryId) updates.categoryId = formData.categoryId
+    if (formData.accountId) updates.accountId = formData.accountId
+    if (formData.budgetType) updates.budgetType = formData.budgetType
+    if (formData.taxDeductible !== undefined) updates.taxDeductible = formData.taxDeductible
+
+    if (Object.keys(updates).length === 0) {
+      alert('Please select at least one field to update')
+      return
+    }
+
+    onSubmit(updates)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Info message */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          Select the fields you want to update for {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}.
+          Only selected fields will be updated - leave others blank to keep existing values.
+        </p>
+      </div>
+
+      {/* Account */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Account (optional)
+        </label>
+        <select
+          value={formData.accountId || ''}
+          onChange={(e) => setFormData({ ...formData, accountId: e.target.value || undefined })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Keep Current --</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Category */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Category (optional)
+        </label>
+        <select
+          value={formData.categoryId || ''}
+          onChange={(e) => setFormData({ ...formData, categoryId: e.target.value || undefined })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Keep Current --</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Budget Type */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Budget Type (optional)
+        </label>
+        <select
+          value={formData.budgetType || ''}
+          onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as BudgetType || undefined })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Keep Current --</option>
+          <option value="household">Household</option>
+          <option value="business">Business</option>
+        </select>
+      </div>
+
+      {/* Tax Deductible */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Tax Deductible (optional)
+        </label>
+        <select
+          value={formData.taxDeductible === undefined ? '' : formData.taxDeductible.toString()}
+          onChange={(e) => {
+            const value = e.target.value
+            setFormData({
+              ...formData,
+              taxDeductible: value === '' ? undefined : value === 'true'
+            })
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Keep Current --</option>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+
+      {/* Form Actions */}
+      <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Update {transactionCount} Transaction{transactionCount !== 1 ? 's' : ''}
         </button>
       </div>
     </form>

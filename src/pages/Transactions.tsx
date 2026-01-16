@@ -989,6 +989,11 @@ export default function Transactions() {
                             onBlur={() => saveInlineEdit(transaction.id, 'description')}
                             onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'description')}
                             autoFocus
+                            ref={(input) => {
+                              if (input) {
+                                input.setSelectionRange(0, 0)
+                              }
+                            }}
                             className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
                           />
                         ) : (

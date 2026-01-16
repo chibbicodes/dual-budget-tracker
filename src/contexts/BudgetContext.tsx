@@ -143,20 +143,54 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
-      setAppDataState((prev) => ({
-        ...prev,
-        transactions: [...prev.transactions, newTransaction],
-      }))
+      setAppDataState((prev) => {
+        const transactions = [...prev.transactions, newTransaction]
+        let accounts = prev.accounts
 
-      // Update account balance
-      const account = appData.accounts.find((a) => a.id === transaction.accountId)
-      if (account) {
-        updateAccount(account.id, {
-          balance: account.balance + transaction.amount,
-        })
-      }
+        // Update source account balance
+        const sourceAccount = accounts.find((a) => a.id === transaction.accountId)
+        if (sourceAccount) {
+          accounts = accounts.map((a) =>
+            a.id === sourceAccount.id
+              ? { ...a, balance: a.balance + transaction.amount, updatedAt: now }
+              : a
+          )
+        }
+
+        // If this is a transfer, create corresponding deposit transaction and update destination account
+        if (transaction.toAccountId) {
+          const destAccount = accounts.find((a) => a.id === transaction.toAccountId)
+          if (destAccount) {
+            // Create deposit transaction for destination account
+            const depositTransaction: Transaction = {
+              ...transaction,
+              id: generateId(),
+              accountId: transaction.toAccountId,
+              amount: Math.abs(transaction.amount), // Positive amount for deposit
+              toAccountId: undefined, // Don't create circular reference
+              description: transaction.description || 'Transfer from ' + sourceAccount?.name,
+              createdAt: now,
+              updatedAt: now,
+            }
+            transactions.push(depositTransaction)
+
+            // Update destination account balance
+            accounts = accounts.map((a) =>
+              a.id === destAccount.id
+                ? { ...a, balance: a.balance + Math.abs(transaction.amount), updatedAt: now }
+                : a
+            )
+          }
+        }
+
+        return {
+          ...prev,
+          transactions,
+          accounts,
+        }
+      })
     },
-    [appData.categories, appData.accounts, updateAccount]
+    [appData.categories, appData.accounts]
   )
 
   const autoCategorizeTransaction = (description: string, budgetType: string): string => {

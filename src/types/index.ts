@@ -49,6 +49,7 @@ export interface Transaction {
   bucketId?: string // Auto-assigned based on category
   budgetType: BudgetType // Auto-assigned from account, but can be overridden
   accountId: string
+  toAccountId?: string // For transfers: destination account
   taxDeductible: boolean // Primarily for business, available for household
   notes?: string
   createdAt: string
@@ -103,6 +104,8 @@ export interface Category {
   isFixedExpense: boolean // Amount doesn't vary month to month
   isActive: boolean
   taxDeductibleByDefault: boolean // For business categories
+  isIncomeCategory?: boolean // Category is only for income transactions
+  excludeFromBudget?: boolean // Don't count toward budget (e.g., transfers)
   icon?: string
   autoCategorization: AutoCategorizationPattern[]
   createdAt: string
@@ -143,6 +146,7 @@ export interface IncomeSource {
   name: string
   budgetType: BudgetType
   incomeType: HouseholdIncomeType | BusinessIncomeType
+  categoryId?: string // Link to income category
   expectedAmount: number
   frequency: IncomeFrequency
   nextExpectedDate?: string // ISO date string

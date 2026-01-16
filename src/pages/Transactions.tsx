@@ -510,8 +510,9 @@ function TransactionForm({
     date: transaction?.date || new Date().toISOString().split('T')[0],
     description: transaction?.description || '',
     amount: transaction?.amount ? Math.abs(transaction.amount).toString() : '',
-    transactionType: transaction?.amount ? (transaction.amount >= 0 ? 'income' : 'expense') : 'expense',
+    transactionType: transaction?.toAccountId ? 'transfer' : transaction?.amount ? (transaction.amount >= 0 ? 'income' : 'expense') : 'expense',
     accountId: transaction?.accountId || '',
+    toAccountId: transaction?.toAccountId || '',
     categoryId: transaction?.categoryId || '',
     budgetType: transaction?.budgetType || defaultBudgetType,
     taxDeductible: transaction?.taxDeductible || false,
@@ -523,9 +524,22 @@ function TransactionForm({
     (a) => a.budgetType === formData.budgetType
   )
 
-  const filteredCategories = categories.filter(
-    (c) => c.budgetType === formData.budgetType && c.isActive
-  )
+  const filteredCategories = categories.filter((c) => {
+    if (c.budgetType !== formData.budgetType || !c.isActive) return false
+
+    // Show only income categories for income transactions
+    if (formData.transactionType === 'income') {
+      return c.isIncomeCategory === true
+    }
+
+    // Show only Transfer/Payment category for transfers
+    if (formData.transactionType === 'transfer') {
+      return c.name === 'Transfer/Payment' && c.excludeFromBudget === true
+    }
+
+    // For expenses, show non-income categories
+    return !c.isIncomeCategory
+  })
 
   // When budget type changes, reset account and category if they don't match
   const handleBudgetTypeChange = (newBudgetType: BudgetType) => {
@@ -548,9 +562,17 @@ function TransactionForm({
     e.preventDefault()
 
     const amount = parseFloat(formData.amount) || 0
-    const signedAmount = formData.transactionType === 'income' ? Math.abs(amount) : -Math.abs(amount)
+    let signedAmount = amount
 
-    const transactionData = {
+    if (formData.transactionType === 'income') {
+      signedAmount = Math.abs(amount)
+    } else if (formData.transactionType === 'expense') {
+      signedAmount = -Math.abs(amount)
+    } else if (formData.transactionType === 'transfer') {
+      signedAmount = -Math.abs(amount) // Deduct from source account
+    }
+
+    const transactionData: any = {
       date: formData.date,
       description: formData.description,
       amount: signedAmount,
@@ -559,6 +581,11 @@ function TransactionForm({
       budgetType: formData.budgetType,
       taxDeductible: formData.taxDeductible,
       notes: formData.notes || undefined,
+    }
+
+    // Add toAccountId for transfers
+    if (formData.transactionType === 'transfer' && formData.toAccountId) {
+      transactionData.toAccountId = formData.toAccountId
     }
 
     onSubmit(transactionData)
@@ -586,18 +613,18 @@ function TransactionForm({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Transaction Type *
           </label>
-          <div className="flex items-center gap-6 mb-3">
+          <div className="flex items-center gap-4 mb-3 flex-wrap">
             <label className="flex items-center cursor-pointer">
               <input
                 type="radio"
                 name="transactionType"
                 value="expense"
                 checked={formData.transactionType === 'expense'}
-                onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' })}
+                onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' | 'transfer', toAccountId: '' })}
                 className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
               />
               <span className="ml-2 text-sm font-medium text-gray-700">
-                Expense (money going out)
+                Expense
               </span>
             </label>
             <label className="flex items-center cursor-pointer">
@@ -606,11 +633,27 @@ function TransactionForm({
                 name="transactionType"
                 value="income"
                 checked={formData.transactionType === 'income'}
-                onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' })}
+                onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' | 'transfer', toAccountId: '' })}
                 className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
               />
               <span className="ml-2 text-sm font-medium text-gray-700">
-                Income (money coming in)
+                Income
+              </span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="transactionType"
+                value="transfer"
+                checked={formData.transactionType === 'transfer'}
+                onChange={(e) => {
+                  const transferCategory = filteredCategories.find(c => c.name === 'Transfer/Payment')
+                  setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' | 'transfer', categoryId: transferCategory?.id || '' })
+                }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">
+                Transfer/Payment
               </span>
             </label>
           </div>
@@ -653,7 +696,7 @@ function TransactionForm({
         {/* Account */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Account *
+            {formData.transactionType === 'transfer' ? 'From Account *' : 'Account *'}
           </label>
           <select
             required
@@ -669,6 +712,30 @@ function TransactionForm({
             ))}
           </select>
         </div>
+
+        {/* To Account (for transfers only) */}
+        {formData.transactionType === 'transfer' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              To Account *
+            </label>
+            <select
+              required
+              value={formData.toAccountId}
+              onChange={(e) => setFormData({ ...formData, toAccountId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select destination account...</option>
+              {filteredAccounts
+                .filter((account) => account.id !== formData.accountId)
+                .map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         {/* Category */}
         <div>

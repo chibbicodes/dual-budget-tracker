@@ -579,6 +579,224 @@ export const HOUSEHOLD_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedA
 ]
 
 // ============================================================================
+// INCOME CATEGORIES (Household & Business)
+// ============================================================================
+
+export const INCOME_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  // Household Income
+  {
+    name: 'Paycheck/Salary',
+    budgetType: 'household',
+    bucketId: 'needs',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Bonus',
+    budgetType: 'household',
+    bucketId: 'wants',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Freelance/Side Hustle',
+    budgetType: 'household',
+    bucketId: 'needs',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Investment Income/Dividends',
+    budgetType: 'household',
+    bucketId: 'savings',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Interest Income',
+    budgetType: 'household',
+    bucketId: 'savings',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Rental Income',
+    budgetType: 'household',
+    bucketId: 'needs',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Tax Refund',
+    budgetType: 'household',
+    bucketId: 'savings',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Gift/Cash Received',
+    budgetType: 'household',
+    bucketId: 'wants',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Other Income',
+    budgetType: 'household',
+    bucketId: 'needs',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  // Business Income
+  {
+    name: 'Client Payments',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Product Sales',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Service Revenue',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Consulting Fees',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Commission Income',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Business Investment Income',
+    budgetType: 'business',
+    bucketId: 'business_savings',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    isIncomeCategory: true,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+]
+
+// ============================================================================
+// TRANSFER/PAYMENT CATEGORY
+// ============================================================================
+
+export const TRANSFER_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    name: 'Transfer/Payment',
+    budgetType: 'household',
+    bucketId: 'needs',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Transfer/Payment',
+    budgetType: 'business',
+    bucketId: 'operating',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    excludeFromBudget: true,
+    autoCategorization: [],
+  },
+]
+
+// ============================================================================
 // BUSINESS CATEGORIES
 // ============================================================================
 
@@ -970,7 +1188,7 @@ export const BUSINESS_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt
  */
 export function generateDefaultCategories(): Category[] {
   const now = new Date().toISOString()
-  const allCategories = [...HOUSEHOLD_CATEGORIES, ...BUSINESS_CATEGORIES]
+  const allCategories = [...HOUSEHOLD_CATEGORIES, ...BUSINESS_CATEGORIES, ...INCOME_CATEGORIES, ...TRANSFER_CATEGORIES]
 
   return allCategories.map((cat) => ({
     ...cat,

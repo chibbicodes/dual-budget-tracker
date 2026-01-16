@@ -57,6 +57,7 @@ export default function Transactions() {
     similarVendors: string[]
     rowData: any
   } | null>(null)
+  const [editableStandardizedName, setEditableStandardizedName] = useState<string>('')
   const [pendingImports, setPendingImports] = useState<any[]>([])
   const [currentImportIndex, setCurrentImportIndex] = useState(0)
   const [editingCell, setEditingCell] = useState<{transactionId: string, field: string} | null>(null)
@@ -609,6 +610,7 @@ export default function Transactions() {
         similarVendors,
         rowData: importData,
       })
+      setEditableStandardizedName(importData.cleanedDescription)
       setVendorMatchModalOpen(true)
     } else {
       // No similar vendors, just import with cleaned description
@@ -1473,13 +1475,20 @@ export default function Transactions() {
               </p>
             </div>
 
-            {/* Cleaned Description */}
+            {/* Cleaned Description - Editable */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Standardized Name:
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Standardized Name (editable):
               </label>
-              <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-300 font-medium">
-                {pendingImport.cleanedDescription}
+              <input
+                type="text"
+                value={editableStandardizedName}
+                onChange={(e) => setEditableStandardizedName(e.target.value)}
+                className="w-full px-3 py-2 text-sm text-gray-900 bg-white border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                placeholder="Edit vendor name..."
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                You can edit this name before creating it as a new vendor
               </p>
             </div>
 
@@ -1491,13 +1500,14 @@ export default function Transactions() {
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {/* Option: Use new standardized name */}
                 <button
-                  onClick={() => handleVendorMatch(pendingImport.cleanedDescription)}
-                  className="w-full text-left px-4 py-3 bg-blue-50 border-2 border-blue-300 rounded-lg hover:bg-blue-100 transition-colors"
+                  onClick={() => handleVendorMatch(editableStandardizedName)}
+                  disabled={!editableStandardizedName.trim()}
+                  className="w-full text-left px-4 py-3 bg-blue-50 border-2 border-blue-300 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center">
                     <div className="flex-1">
                       <p className="font-medium text-blue-900">
-                        {pendingImport.cleanedDescription}
+                        {editableStandardizedName || '(empty)'}
                       </p>
                       <p className="text-xs text-blue-700 mt-1">Create as new vendor</p>
                     </div>

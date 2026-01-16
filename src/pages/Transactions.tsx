@@ -9,9 +9,10 @@ import {
   Search,
   Filter,
   CheckCircle,
+  Upload,
 } from 'lucide-react'
 import { formatCurrency } from '../utils/calculations'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import type { Transaction, BudgetType, Account } from '../types'
 
 type BudgetFilter = 'household' | 'business' | 'all'
@@ -34,6 +35,17 @@ export default function Transactions() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [csvData, setCsvData] = useState<string[][]>([])
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [columnMapping, setColumnMapping] = useState<{[key: string]: number | null}>({
+    date: null,
+    description: null,
+    amount: null,
+    category: null,
+    account: null,
+    notes: null,
+  })
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -147,6 +159,185 @@ export default function Transactions() {
     setEndDate('')
   }
 
+  // CSV Import handlers
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      parseCSV(text)
+    }
+    reader.readAsText(file)
+  }
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter((line) => line.trim())
+    if (lines.length === 0) return
+
+    // Parse CSV (simple parser - handles quotes)
+    const parseLine = (line: string): string[] => {
+      const result: string[] = []
+      let current = ''
+      let inQuotes = false
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      result.push(current.trim())
+      return result
+    }
+
+    const headers = parseLine(lines[0])
+    const data = lines.slice(1).map(parseLine)
+
+    setCsvHeaders(headers)
+    setCsvData(data)
+    setIsImportModalOpen(true)
+
+    // Auto-detect common column names
+    const mapping: {[key: string]: number | null} = {
+      date: null,
+      description: null,
+      amount: null,
+      category: null,
+      account: null,
+      notes: null,
+    }
+
+    headers.forEach((header, index) => {
+      const lower = header.toLowerCase()
+      if (lower.includes('date')) mapping.date = index
+      else if (lower.includes('description') || lower.includes('memo') || lower.includes('payee')) mapping.description = index
+      else if (lower.includes('amount') || lower.includes('debit') || lower.includes('credit')) mapping.amount = index
+      else if (lower.includes('category')) mapping.category = index
+      else if (lower.includes('account')) mapping.account = index
+      else if (lower.includes('note')) mapping.notes = index
+    })
+
+    setColumnMapping(mapping)
+  }
+
+  const handleImportTransactions = () => {
+    if (!columnMapping.date || columnMapping.description === null || columnMapping.amount === null) {
+      alert('Please map at least Date, Description, and Amount columns')
+      return
+    }
+
+    const importedCount = csvData.length
+    const errors: string[] = []
+
+    csvData.forEach((row, index) => {
+      try {
+        // Parse date
+        const dateStr = row[columnMapping.date!]
+        let transactionDate: string
+        try {
+          // Try parsing the date
+          const parsed = parseISO(dateStr)
+          if (isNaN(parsed.getTime())) {
+            // Try common formats
+            const parts = dateStr.split('/')
+            if (parts.length === 3) {
+              // Assume MM/DD/YYYY
+              const [month, day, year] = parts
+              transactionDate = `${year.padStart(4, '20')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+            } else {
+              throw new Error('Invalid date format')
+            }
+          } else {
+            transactionDate = format(parsed, 'yyyy-MM-dd')
+          }
+        } catch {
+          throw new Error(`Invalid date: ${dateStr}`)
+        }
+
+        // Parse amount
+        const amountStr = row[columnMapping.amount!].replace(/[$,]/g, '')
+        const amount = parseFloat(amountStr)
+        if (isNaN(amount)) {
+          throw new Error(`Invalid amount: ${row[columnMapping.amount!]}`)
+        }
+
+        // Get description
+        const description = row[columnMapping.description!] || 'Imported Transaction'
+
+        // Get optional fields
+        const notes = columnMapping.notes !== null ? row[columnMapping.notes] : undefined
+
+        // Find or use default account
+        let accountId = appData.accounts[0]?.id
+        if (columnMapping.account !== null && row[columnMapping.account]) {
+          const accountName = row[columnMapping.account]
+          const foundAccount = appData.accounts.find(
+            (a) => a.name.toLowerCase() === accountName.toLowerCase()
+          )
+          if (foundAccount) accountId = foundAccount.id
+        }
+
+        // Find or use default category
+        let categoryId = appData.categories[0]?.id
+        if (columnMapping.category !== null && row[columnMapping.category]) {
+          const categoryName = row[columnMapping.category]
+          const foundCategory = appData.categories.find(
+            (c) => c.name.toLowerCase() === categoryName.toLowerCase()
+          )
+          if (foundCategory) categoryId = foundCategory.id
+        }
+
+        if (!accountId || !categoryId) {
+          throw new Error('No accounts or categories available')
+        }
+
+        // Determine budget type from account
+        const account = appData.accounts.find((a) => a.id === accountId)
+        const budgetType = account?.budgetType || 'household'
+
+        // Create transaction
+        addTransaction({
+          date: transactionDate,
+          description,
+          amount,
+          categoryId,
+          accountId,
+          budgetType,
+          taxDeductible: false,
+          notes,
+        })
+      } catch (error) {
+        errors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
+    })
+
+    // Close modal and show results
+    setIsImportModalOpen(false)
+    setCsvData([])
+    setCsvHeaders([])
+    setColumnMapping({
+      date: null,
+      description: null,
+      amount: null,
+      category: null,
+      account: null,
+      notes: null,
+    })
+
+    if (errors.length > 0) {
+      alert(`Imported ${importedCount - errors.length} of ${importedCount} transactions.\n\nErrors:\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ''}`)
+    } else {
+      alert(`Successfully imported ${importedCount} transactions!`)
+    }
+  }
+
   // Calculate totals
   const totals = useMemo(() => {
     const income = filteredTransactions
@@ -170,13 +361,25 @@ export default function Transactions() {
             {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Transaction
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
+            <Upload className="w-5 h-5 mr-2" />
+            Import CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Transaction
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -483,6 +686,227 @@ export default function Transactions() {
             defaultBudgetType={selectedTransaction.budgetType}
           />
         )}
+      </Modal>
+
+      {/* Import CSV Modal */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          setIsImportModalOpen(false)
+          setCsvData([])
+          setCsvHeaders([])
+        }}
+        title="Import CSV Transactions"
+        size="xl"
+      >
+        <div className="space-y-6">
+          {/* Instructions */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">Import Instructions:</h3>
+            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <li>Map the CSV columns to transaction fields below</li>
+              <li>Date, Description, and Amount are required fields</li>
+              <li>Date format can be YYYY-MM-DD or MM/DD/YYYY</li>
+              <li>Negative amounts indicate expenses, positive for income</li>
+              <li>If Category or Account name matches existing, it will be linked automatically</li>
+            </ul>
+          </div>
+
+          {/* Column Mapping */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Map CSV Columns</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Date Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date * <span className="text-red-500">(Required)</span>
+                </label>
+                <select
+                  value={columnMapping.date ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    date: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Description Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description * <span className="text-red-500">(Required)</span>
+                </label>
+                <select
+                  value={columnMapping.description ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    description: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Amount * <span className="text-red-500">(Required)</span>
+                </label>
+                <select
+                  value={columnMapping.amount ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    amount: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Category Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category (Optional)
+                </label>
+                <select
+                  value={columnMapping.category ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    category: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Skip Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Account Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Account (Optional)
+                </label>
+                <select
+                  value={columnMapping.account ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    account: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Skip Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notes Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (Optional)
+                </label>
+                <select
+                  value={columnMapping.notes ?? ''}
+                  onChange={(e) => setColumnMapping({
+                    ...columnMapping,
+                    notes: e.target.value === '' ? null : parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Skip Column --</option>
+                  {csvHeaders.map((header, index) => (
+                    <option key={index} value={index}>
+                      {header} ({csvData[0]?.[index] || 'empty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Preview</h3>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-48 overflow-auto">
+              <p className="text-sm text-gray-600 mb-2">
+                {csvData.length} row{csvData.length !== 1 ? 's' : ''} will be imported
+              </p>
+              {csvData.length > 0 && (
+                <div className="text-xs text-gray-700">
+                  <strong>First row example:</strong>
+                  <ul className="mt-1 space-y-1">
+                    {columnMapping.date !== null && (
+                      <li><strong>Date:</strong> {csvData[0][columnMapping.date]}</li>
+                    )}
+                    {columnMapping.description !== null && (
+                      <li><strong>Description:</strong> {csvData[0][columnMapping.description]}</li>
+                    )}
+                    {columnMapping.amount !== null && (
+                      <li><strong>Amount:</strong> {csvData[0][columnMapping.amount]}</li>
+                    )}
+                    {columnMapping.category !== null && (
+                      <li><strong>Category:</strong> {csvData[0][columnMapping.category]}</li>
+                    )}
+                    {columnMapping.account !== null && (
+                      <li><strong>Account:</strong> {csvData[0][columnMapping.account]}</li>
+                    )}
+                    {columnMapping.notes !== null && (
+                      <li><strong>Notes:</strong> {csvData[0][columnMapping.notes]}</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setIsImportModalOpen(false)
+                setCsvData([])
+                setCsvHeaders([])
+              }}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleImportTransactions}
+              disabled={!columnMapping.date || columnMapping.description === null || columnMapping.amount === null}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Import {csvData.length} Transaction{csvData.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

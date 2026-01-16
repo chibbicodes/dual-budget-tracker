@@ -114,19 +114,12 @@ export default function Transactions() {
     searchText,
   ])
 
-  // Get filtered accounts for dropdown
+  // Get all accounts for dropdown (available across all views)
   const availableAccounts = useMemo(() => {
-    let accounts = appData.accounts
-    if (currentView !== 'combined') {
-      accounts = accounts.filter((a) => a.budgetType === currentView)
-    }
-    if (budgetFilter !== 'all') {
-      accounts = accounts.filter((a) => a.budgetType === budgetFilter)
-    }
-    return accounts
-  }, [appData.accounts, currentView, budgetFilter])
+    return appData.accounts
+  }, [appData.accounts])
 
-  // Get filtered categories for dropdown organized by bucket
+  // Get filtered categories for dropdown organized by bucket and income
   const availableCategories = useMemo(() => {
     let categories = appData.categories
     if (currentView !== 'combined') {
@@ -137,9 +130,19 @@ export default function Transactions() {
     }
     const activeCategories = categories.filter((c) => c.isActive)
 
-    // Group by bucket and sort alphabetically within each bucket
+    // Separate income categories from regular categories
+    const incomeCategories = activeCategories.filter((c) => c.isIncomeCategory)
+    const regularCategories = activeCategories.filter((c) => !c.isIncomeCategory)
+
+    // Group regular categories by bucket and sort alphabetically within each bucket
     const grouped: { [bucketId: string]: typeof activeCategories } = {}
-    activeCategories.forEach((cat) => {
+
+    // Add income categories as a special group
+    if (incomeCategories.length > 0) {
+      grouped['income'] = incomeCategories.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    regularCategories.forEach((cat) => {
       if (!grouped[cat.bucketId]) {
         grouped[cat.bucketId] = []
       }
@@ -148,7 +151,9 @@ export default function Transactions() {
 
     // Sort categories within each bucket alphabetically
     Object.keys(grouped).forEach((bucketId) => {
-      grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+      if (bucketId !== 'income') {
+        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+      }
     })
 
     return grouped
@@ -545,7 +550,8 @@ export default function Transactions() {
             >
               <option value="all">All Categories</option>
               {Object.entries(availableCategories).map(([bucketId, categories]) => {
-                const bucketName = bucketId === 'needs' ? 'Needs' :
+                const bucketName = bucketId === 'income' ? 'Income' :
+                                   bucketId === 'needs' ? 'Needs' :
                                    bucketId === 'wants' ? 'Wants' :
                                    bucketId === 'savings' ? 'Savings' :
                                    bucketId === 'operating' ? 'Operating' :
@@ -1147,11 +1153,10 @@ function TransactionForm({
     })
   }
 
-  // Filter accounts and categories based on selected budget type
-  const filteredAccounts = accounts.filter(
-    (a) => a.budgetType === formData.budgetType
-  )
+  // Show all accounts (cross-view access)
+  const filteredAccounts = accounts
 
+  // Filter categories based on selected budget type
   const filteredCategories = categories.filter((c) => {
     if (c.budgetType !== formData.budgetType || !c.isActive) return false
 
@@ -1164,11 +1169,57 @@ function TransactionForm({
     return !c.isIncomeCategory
   })
 
-  // When budget type changes, reset account and category if they don't match
+  // Group categories by bucket and income for organized display
+  const groupedCategories = useMemo(() => {
+    const incomeCategories = filteredCategories.filter((c) => c.isIncomeCategory)
+    const regularCategories = filteredCategories.filter((c) => !c.isIncomeCategory)
+
+    const grouped: { [bucketId: string]: typeof filteredCategories } = {}
+
+    // Add income categories as a special group
+    if (incomeCategories.length > 0) {
+      grouped['income'] = incomeCategories.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    regularCategories.forEach((cat) => {
+      if (!grouped[cat.bucketId]) {
+        grouped[cat.bucketId] = []
+      }
+      grouped[cat.bucketId].push(cat)
+    })
+
+    // Sort categories within each bucket alphabetically
+    Object.keys(grouped).forEach((bucketId) => {
+      if (bucketId !== 'income') {
+        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+      }
+    })
+
+    return grouped
+  }, [filteredCategories])
+
+  // When account changes, auto-update budget type to match account
+  const handleAccountChange = (accountId: string) => {
+    const selectedAccount = accounts.find((a) => a.id === accountId)
+    if (selectedAccount && selectedAccount.budgetType !== formData.budgetType) {
+      // Auto-move transaction to match account's budget type
+      const categoryMatches = categories.find(
+        (c) => c.id === formData.categoryId && c.budgetType === selectedAccount.budgetType
+      )
+
+      setFormData({
+        ...formData,
+        accountId,
+        budgetType: selectedAccount.budgetType,
+        categoryId: categoryMatches ? formData.categoryId : '',
+      })
+    } else {
+      setFormData({ ...formData, accountId })
+    }
+  }
+
+  // When budget type changes, reset category if it doesn't match
   const handleBudgetTypeChange = (newBudgetType: BudgetType) => {
-    const accountMatches = accounts.find(
-      (a) => a.id === formData.accountId && a.budgetType === newBudgetType
-    )
     const categoryMatches = categories.find(
       (c) => c.id === formData.categoryId && c.budgetType === newBudgetType
     )
@@ -1176,7 +1227,6 @@ function TransactionForm({
     setFormData({
       ...formData,
       budgetType: newBudgetType,
-      accountId: accountMatches ? formData.accountId : '',
       categoryId: categoryMatches ? formData.categoryId : '',
     })
   }
@@ -1352,13 +1402,13 @@ function TransactionForm({
           <select
             required
             value={formData.accountId}
-            onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
+            onChange={(e) => handleAccountChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Select account...</option>
             {filteredAccounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.name}
+                {account.name} ({account.budgetType === 'household' ? 'H' : 'B'})
               </option>
             ))}
           </select>
@@ -1381,7 +1431,7 @@ function TransactionForm({
                 .filter((account) => account.id !== formData.accountId)
                 .map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.name}
+                    {account.name} ({account.budgetType === 'household' ? 'H' : 'B'})
                   </option>
                 ))}
             </select>
@@ -1399,11 +1449,26 @@ function TransactionForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Auto-categorize</option>
-            {filteredCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
+            {Object.entries(groupedCategories).map(([bucketId, cats]) => {
+              const bucketName = bucketId === 'income' ? 'Income' :
+                                 bucketId === 'needs' ? 'Needs' :
+                                 bucketId === 'wants' ? 'Wants' :
+                                 bucketId === 'savings' ? 'Savings' :
+                                 bucketId === 'operating' ? 'Operating' :
+                                 bucketId === 'growth' ? 'Growth' :
+                                 bucketId === 'compensation' ? 'Compensation' :
+                                 bucketId === 'tax_reserve' ? 'Tax Reserve' :
+                                 bucketId === 'business_savings' ? 'Business Savings' : bucketId
+              return (
+                <optgroup key={bucketId} label={bucketName}>
+                  {cats.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            })}
           </select>
           {formData.transactionType === 'transfer' && (
             <p className="text-xs text-gray-500 mt-1">
@@ -1485,6 +1550,36 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     taxDeductible?: boolean
   }>({})
 
+  // Group categories by bucket and income for organized display
+  const groupedCategories = useMemo(() => {
+    const activeCategories = categories.filter((c) => c.isActive)
+    const incomeCategories = activeCategories.filter((c) => c.isIncomeCategory)
+    const regularCategories = activeCategories.filter((c) => !c.isIncomeCategory)
+
+    const grouped: { [bucketId: string]: typeof activeCategories } = {}
+
+    // Add income categories as a special group
+    if (incomeCategories.length > 0) {
+      grouped['income'] = incomeCategories.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    regularCategories.forEach((cat) => {
+      if (!grouped[cat.bucketId]) {
+        grouped[cat.bucketId] = []
+      }
+      grouped[cat.bucketId].push(cat)
+    })
+
+    // Sort categories within each bucket alphabetically
+    Object.keys(grouped).forEach((bucketId) => {
+      if (bucketId !== 'income') {
+        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+      }
+    })
+
+    return grouped
+  }, [categories])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -1543,11 +1638,26 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">-- Keep Current --</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
+          {Object.entries(groupedCategories).map(([bucketId, cats]) => {
+            const bucketName = bucketId === 'income' ? 'Income' :
+                               bucketId === 'needs' ? 'Needs' :
+                               bucketId === 'wants' ? 'Wants' :
+                               bucketId === 'savings' ? 'Savings' :
+                               bucketId === 'operating' ? 'Operating' :
+                               bucketId === 'growth' ? 'Growth' :
+                               bucketId === 'compensation' ? 'Compensation' :
+                               bucketId === 'tax_reserve' ? 'Tax Reserve' :
+                               bucketId === 'business_savings' ? 'Business Savings' : bucketId
+            return (
+              <optgroup key={bucketId} label={bucketName}>
+                {cats.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          })}
         </select>
       </div>
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
 import { getUpcomingDueDates, formatCurrency, getBudgetTypeColors } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
-import { Calendar, List, AlertTriangle, ExternalLink, Eye } from 'lucide-react'
+import { Calendar, List, AlertTriangle, ExternalLink, Eye, CreditCard } from 'lucide-react'
 import { format, setDate, startOfMonth } from 'date-fns'
 import type { BudgetType, Account } from '../types'
 import Modal from '../components/Modal'
@@ -252,23 +252,23 @@ export default function DueDates() {
                       {formatCurrency(minimumPayment)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-4">
                         <button
                           onClick={() => setViewingAccount(item.account)}
                           className="text-blue-600 hover:text-blue-800"
                           title="View details"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-5 w-5" />
                         </button>
                         {item.account.websiteUrl && (
                           <a
                             href={item.account.websiteUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-green-600 hover:text-green-800"
+                            className="text-green-600 hover:text-green-800 inline-flex items-center gap-1"
                             title="Pay bill"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            <CreditCard className="h-5 w-5" />
                           </a>
                         )}
                       </div>
@@ -354,15 +354,15 @@ export default function DueDates() {
                               </div>
                             </div>
                           </div>
-                          {item.account.billPayWebsite && (
+                          {item.account.websiteUrl && (
                             <a
-                              href={item.account.billPayWebsite}
+                              href={item.account.websiteUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`inline-flex items-center gap-2 px-4 py-2 rounded-md ${colors.bg} text-white hover:opacity-90 transition-opacity`}
                             >
                               Pay Bill
-                              <ExternalLink className="h-4 w-4" />
+                              <CreditCard className="h-4 w-4" />
                             </a>
                           )}
                         </div>

@@ -26,7 +26,10 @@ export function calculateAccountSummary(
   let totalLiabilities = 0
 
   filteredAccounts.forEach((account) => {
-    if (account.balance >= 0) {
+    // Credit cards and loans are always liabilities, regardless of sign
+    if (account.accountType === 'credit_card' || account.accountType === 'loan') {
+      totalLiabilities += Math.abs(account.balance)
+    } else if (account.balance >= 0) {
       totalAssets += account.balance
     } else {
       totalLiabilities += Math.abs(account.balance)

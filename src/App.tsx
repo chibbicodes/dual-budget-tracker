@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
 import DueDates from './pages/DueDates'
 import Budget from './pages/Budget'
+import BudgetArchive from './pages/BudgetArchive'
 import BudgetAnalysis from './pages/BudgetAnalysis'
 import Transactions from './pages/Transactions'
 import Income from './pages/Income'
@@ -21,6 +22,7 @@ function App() {
           <Route path="accounts" element={<Accounts />} />
           <Route path="due-dates" element={<DueDates />} />
           <Route path="budget" element={<Budget />} />
+          <Route path="budget-archive" element={<BudgetArchive />} />
           <Route path="budget-analysis" element={<BudgetAnalysis />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="income" element={<Income />} />

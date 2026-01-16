@@ -100,7 +100,7 @@ export interface Category {
   name: string
   budgetType: BudgetType
   bucketId: BucketId
-  monthlyBudget: number
+  monthlyBudget: number // Default budget amount (used if no monthly budget set)
   isFixedExpense: boolean // Amount doesn't vary month to month
   isActive: boolean
   taxDeductibleByDefault: boolean // For business categories
@@ -108,6 +108,20 @@ export interface Category {
   excludeFromBudget?: boolean // Don't count toward budget (e.g., transfers)
   icon?: string
   autoCategorization: AutoCategorizationPattern[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ============================================================================
+// Monthly Budget Types
+// ============================================================================
+
+export interface MonthlyBudget {
+  id: string
+  month: string // YYYY-MM format
+  budgetType: BudgetType
+  categoryId: string
+  amount: number // Budgeted amount for this category in this month
   createdAt: string
   updatedAt: string
 }
@@ -233,6 +247,7 @@ export interface AppData {
   incomeSources: IncomeSource[]
   income: Income[] // Legacy income tracking
   autoCategorization: AutoCategorizationRule[]
+  monthlyBudgets: MonthlyBudget[] // Monthly budget overrides
   settings: AppSettings
   version: string // For data migration
 }
@@ -383,6 +398,12 @@ export interface BudgetContextState {
   addRule: (rule: Omit<AutoCategorizationRule, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateRule: (id: string, updates: Partial<AutoCategorizationRule>) => void
   deleteRule: (id: string) => void
+
+  // Monthly Budget operations
+  addMonthlyBudget: (budget: Omit<MonthlyBudget, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateMonthlyBudget: (id: string, updates: Partial<MonthlyBudget>) => void
+  deleteMonthlyBudget: (id: string) => void
+  getMonthlyBudget: (month: string, categoryId: string) => MonthlyBudget | undefined
 
   // Settings operations
   updateSettings: (updates: Partial<AppSettings>) => void

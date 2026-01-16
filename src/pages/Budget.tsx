@@ -2,17 +2,21 @@ import { useBudget } from '../contexts/BudgetContext'
 import { useMemo, useState } from 'react'
 import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
 import { getAllBuckets } from '../data/defaultCategories'
-import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2 } from 'lucide-react'
+import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2, Archive, ChevronLeft, ChevronRight } from 'lucide-react'
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import type { BudgetType, Category, BucketId } from '../types'
 import Modal from '../components/Modal'
+import { useNavigate } from 'react-router-dom'
 
 export default function Budget() {
-  const { currentView, appData, updateCategory, addCategory, deleteCategory } = useBudget()
+  const { currentView, appData, updateCategory, addCategory, deleteCategory, addMonthlyBudget, updateMonthlyBudget, getMonthlyBudget } = useBudget()
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
+  const navigate = useNavigate()
 
   // Budget page doesn't support combined view
   if (currentView === 'combined') {
@@ -44,11 +48,126 @@ export default function Budget() {
 
   const budgetType = currentView as BudgetType
 
-  // Calculate budget summary
-  const budgetSummary = useMemo(
-    () => calculateBudgetSummary(appData.transactions, appData.categories, budgetType),
-    [appData.transactions, appData.categories, budgetType]
+  // Generate month options (3 months prior to 3 months future)
+  const monthOptions = useMemo(() => {
+    const options = []
+    const currentDate = new Date()
+    for (let i = -3; i <= 3; i++) {
+      const monthDate = addMonths(currentDate, i)
+      options.push({
+        date: monthDate,
+        label: format(monthDate, 'MMMM yyyy'),
+        value: format(monthDate, 'yyyy-MM'),
+      })
+    }
+    return options
+  }, [])
+
+  // Get month string for selected month (YYYY-MM format)
+  const selectedMonthString = useMemo(
+    () => format(selectedMonth, 'yyyy-MM'),
+    [selectedMonth]
   )
+
+  // Calculate budget summary for selected month
+  const budgetSummary = useMemo(
+    () => calculateBudgetSummary(appData.transactions, appData.categories, budgetType, selectedMonth),
+    [appData.transactions, appData.categories, budgetType, selectedMonth]
+  )
+
+  // Calculate suggested budgets based on last 6 months of spending
+  const suggestedBudgets = useMemo(() => {
+    const suggestions = new Map<string, number>()
+    const categories = appData.categories.filter((c) => c.budgetType === budgetType && c.isActive)
+
+    // Get last 6 months of historical data
+    const last6Months: { [month: string]: { total: number; byCategory: Map<string, number> } } = {}
+
+    for (let i = 1; i <= 6; i++) {
+      const monthDate = subMonths(startOfMonth(selectedMonth), i)
+      const monthStr = format(monthDate, 'yyyy-MM')
+      const monthStart = startOfMonth(monthDate)
+      const monthEnd = endOfMonth(monthDate)
+
+      // Get transactions for this month
+      const monthTransactions = appData.transactions.filter((t) => {
+        const tDate = parseISO(t.date)
+        const category = appData.categories.find((c) => c.id === t.categoryId)
+        return (
+          t.budgetType === budgetType &&
+          tDate >= monthStart &&
+          tDate <= monthEnd &&
+          t.amount < 0 && // Only expenses
+          !category?.excludeFromBudget
+        )
+      })
+
+      // Calculate total spent and by category
+      const totalSpent = Math.abs(
+        monthTransactions.reduce((sum, t) => sum + t.amount, 0)
+      )
+
+      const byCategory = new Map<string, number>()
+      monthTransactions.forEach((t) => {
+        const existing = byCategory.get(t.categoryId) || 0
+        byCategory.set(t.categoryId, existing + Math.abs(t.amount))
+      })
+
+      // Only include months with data
+      if (totalSpent > 0) {
+        last6Months[monthStr] = { total: totalSpent, byCategory }
+      }
+    }
+
+    const monthsWithData = Object.keys(last6Months)
+    const numMonths = monthsWithData.length
+
+    if (numMonths === 0) {
+      // No historical data, return empty suggestions
+      return suggestions
+    }
+
+    // Calculate average total spending and average per category
+    const avgTotalSpending = monthsWithData.reduce((sum, month) => sum + last6Months[month].total, 0) / numMonths
+
+    // Get expected income for the selected month
+    const expectedIncome = budgetSummary.totalIncome || 0
+
+    // Calculate fixed expenses total for the selected month
+    const fixedCategories = categories.filter((c) => c.isFixedExpense)
+    const fixedTotal = fixedCategories.reduce((sum, cat) => {
+      const monthlyBudget = getMonthlyBudget(selectedMonthString, cat.id)
+      return sum + (monthlyBudget?.amount ?? cat.monthlyBudget)
+    }, 0)
+
+    // Remaining income after fixed expenses
+    const remainingIncome = Math.max(expectedIncome - fixedTotal, 0)
+
+    // Calculate suggested budget for each category
+    categories.forEach((category) => {
+      if (category.isFixedExpense) {
+        // Fixed expenses use their set budget amount
+        const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
+        suggestions.set(category.id, monthlyBudget?.amount ?? category.monthlyBudget)
+      } else {
+        // Variable expenses: calculate average spent
+        let totalSpentOnCategory = 0
+        monthsWithData.forEach((month) => {
+          totalSpentOnCategory += last6Months[month].byCategory.get(category.id) || 0
+        })
+        const avgSpent = totalSpentOnCategory / numMonths
+
+        // Calculate what percentage this category was of total spending
+        const percentOfSpending = avgTotalSpending > 0 ? avgSpent / avgTotalSpending : 0
+
+        // Apply that percentage to remaining income
+        const suggested = percentOfSpending * remainingIncome
+        suggestions.set(category.id, Math.round(suggested * 100) / 100)
+      }
+    })
+
+    return suggestions
+  }, [appData.transactions, appData.categories, budgetType, selectedMonth, selectedMonthString, budgetSummary.totalIncome, getMonthlyBudget])
 
   // Get buckets for this budget type
   const buckets = useMemo(() => {
@@ -56,12 +175,15 @@ export default function Budget() {
     return budgetType === 'household' ? allBuckets.household : allBuckets.business
   }, [budgetType])
 
-  // Calculate total budgeted amount
+  // Calculate total budgeted amount for selected month
   const totalBudgeted = useMemo(() => {
     return appData.categories
-      .filter((c) => c.budgetType === budgetType)
-      .reduce((sum, c) => sum + c.monthlyBudget, 0)
-  }, [appData.categories, budgetType])
+      .filter((c) => c.budgetType === budgetType && c.isActive)
+      .reduce((sum, c) => {
+        const monthlyBudget = getMonthlyBudget(selectedMonthString, c.id)
+        return sum + (monthlyBudget?.amount ?? c.monthlyBudget)
+      }, 0)
+  }, [appData.categories, budgetType, selectedMonthString, getMonthlyBudget])
 
   const handleStartEdit = (categoryId: string, currentBudget: number) => {
     setEditingCategory(categoryId)
@@ -71,7 +193,21 @@ export default function Budget() {
   const handleSaveEdit = (categoryId: string) => {
     const newBudget = parseFloat(editValue)
     if (!isNaN(newBudget) && newBudget >= 0) {
-      updateCategory(categoryId, { monthlyBudget: newBudget })
+      // Check if a monthly budget already exists
+      const existingMonthlyBudget = getMonthlyBudget(selectedMonthString, categoryId)
+
+      if (existingMonthlyBudget) {
+        // Update existing monthly budget
+        updateMonthlyBudget(existingMonthlyBudget.id, { amount: newBudget })
+      } else {
+        // Create new monthly budget
+        addMonthlyBudget({
+          month: selectedMonthString,
+          budgetType,
+          categoryId,
+          amount: newBudget,
+        })
+      }
     }
     setEditingCategory(null)
     setEditValue('')
@@ -105,13 +241,58 @@ export default function Budget() {
             Manage your monthly budget by category
           </p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          Add Category
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/budget-archive')}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <Archive className="h-5 w-5" />
+            View Archive
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Add Category
+          </button>
+        </div>
+      </div>
+
+      {/* Month Selector */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Previous month"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Budget Month:</label>
+            <select
+              value={selectedMonthString}
+              onChange={(e) => setSelectedMonth(parseISO(e.target.value + '-01'))}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Next month"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -218,6 +399,9 @@ export default function Budget() {
                       Category
                     </th>
                     <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">
+                      Suggested
+                    </th>
+                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">
                       Budgeted
                     </th>
                     <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider pb-3">
@@ -237,7 +421,7 @@ export default function Budget() {
                 <tbody className="divide-y divide-gray-100">
                   {categoriesInBucket.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-500">
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
                         No active categories in this bucket
                       </td>
                     </tr>
@@ -247,7 +431,10 @@ export default function Budget() {
                         (c) => c.categoryId === category.id
                       )
 
-                      const budgeted = category.monthlyBudget
+                      // Get budget amount for this month (use monthly budget if exists, otherwise default)
+                      const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
+                      const budgeted = monthlyBudget?.amount ?? category.monthlyBudget
+                      const suggested = suggestedBudgets.get(category.id) || 0
                       const actual = categoryBreakdown?.actual || 0
                       const remaining = budgeted - actual
                       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0
@@ -266,6 +453,11 @@ export default function Budget() {
                                 )}
                               </div>
                             </div>
+                          </td>
+                          <td className="py-4 text-right">
+                            <p className="text-sm text-purple-600 font-medium">
+                              {formatCurrency(suggested)}
+                            </p>
                           </td>
                           <td className="py-4 text-right">
                             {editingCategory === category.id ? (

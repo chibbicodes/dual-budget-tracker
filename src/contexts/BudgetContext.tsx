@@ -10,6 +10,7 @@ import type {
   AppSettings,
   BudgetViewType,
   BudgetContextState,
+  MonthlyBudget,
 } from '../types'
 import StorageService from '../services/storage'
 import { generateDefaultCategories } from '../data/defaultCategories'
@@ -481,6 +482,56 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ============================================================================
+  // Monthly Budget Operations
+  // ============================================================================
+
+  const addMonthlyBudget = useCallback(
+    (budget: Omit<MonthlyBudget, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const now = new Date().toISOString()
+      const newBudget: MonthlyBudget = {
+        ...budget,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      setAppDataState((prev) => ({
+        ...prev,
+        monthlyBudgets: [...prev.monthlyBudgets, newBudget],
+      }))
+    },
+    []
+  )
+
+  const updateMonthlyBudget = useCallback((id: string, updates: Partial<MonthlyBudget>) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      monthlyBudgets: prev.monthlyBudgets.map((budget) =>
+        budget.id === id
+          ? {
+              ...budget,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            }
+          : budget
+      ),
+    }))
+  }, [])
+
+  const deleteMonthlyBudget = useCallback((id: string) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      monthlyBudgets: prev.monthlyBudgets.filter((b) => b.id !== id),
+    }))
+  }, [])
+
+  const getMonthlyBudget = useCallback((month: string, categoryId: string) => {
+    return appData.monthlyBudgets.find(
+      (b) => b.month === month && b.categoryId === categoryId
+    )
+  }, [appData.monthlyBudgets])
+
+  // ============================================================================
   // Settings Operations
   // ============================================================================
 
@@ -547,6 +598,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     addRule,
     updateRule,
     deleteRule,
+    addMonthlyBudget,
+    updateMonthlyBudget,
+    deleteMonthlyBudget,
+    getMonthlyBudget,
     updateSettings,
     importData,
     exportData,

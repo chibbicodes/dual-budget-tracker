@@ -50,6 +50,17 @@ export default function Transactions() {
     account: null,
     notes: null,
   })
+  const [vendorMatchModalOpen, setVendorMatchModalOpen] = useState(false)
+  const [pendingImport, setPendingImport] = useState<{
+    cleanedDescription: string
+    originalDescription: string
+    similarVendors: string[]
+    rowData: any
+  } | null>(null)
+  const [pendingImports, setPendingImports] = useState<any[]>([])
+  const [currentImportIndex, setCurrentImportIndex] = useState(0)
+  const [editingCell, setEditingCell] = useState<{transactionId: string, field: string} | null>(null)
+  const [editingValue, setEditingValue] = useState<string>('')
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -236,6 +247,145 @@ export default function Transactions() {
     setIsBulkEditModalOpen(false)
   }
 
+  // Inline editing handlers
+  const startInlineEdit = (transactionId: string, field: string, currentValue: any) => {
+    setEditingCell({ transactionId, field })
+    setEditingValue(String(currentValue || ''))
+  }
+
+  const saveInlineEdit = (transactionId: string, field: string) => {
+    if (!editingValue.trim() && field !== 'amount') {
+      // Don't allow empty values except for amount which can be 0
+      cancelInlineEdit()
+      return
+    }
+
+    const updates: Partial<Transaction> = {}
+
+    switch (field) {
+      case 'date':
+        updates.date = editingValue
+        break
+      case 'description':
+        updates.description = editingValue
+        break
+      case 'amount':
+        const amount = parseFloat(editingValue)
+        if (!isNaN(amount)) {
+          updates.amount = amount
+        }
+        break
+      case 'accountId':
+        updates.accountId = editingValue
+        break
+      case 'categoryId':
+        updates.categoryId = editingValue
+        break
+      case 'budgetType':
+        updates.budgetType = editingValue as BudgetType
+        break
+    }
+
+    if (Object.keys(updates).length > 0) {
+      updateTransaction(transactionId, updates)
+    }
+
+    cancelInlineEdit()
+  }
+
+  const cancelInlineEdit = () => {
+    setEditingCell(null)
+    setEditingValue('')
+  }
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent, transactionId: string, field: string) => {
+    if (e.key === 'Enter') {
+      saveInlineEdit(transactionId, field)
+    } else if (e.key === 'Escape') {
+      cancelInlineEdit()
+    }
+  }
+
+  // Standardize vendor/payee names
+  const standardizeVendorName = (name: string): string => {
+    let cleaned = name.trim()
+
+    // Remove common patterns
+    // Remove dates like 12/30, 12/22, etc.
+    cleaned = cleaned.replace(/\s+\d{1,2}\/\d{1,2}(\s|$)/g, ' ')
+
+    // Remove state abbreviations at end (e.g., "TX", "NY", "CA")
+    cleaned = cleaned.replace(/\s+[A-Z]{2}(\s|$)/g, ' ')
+
+    // Remove "PPD ID:" and similar transaction IDs
+    cleaned = cleaned.replace(/\s*PPD ID:\s*\d+/gi, '')
+    cleaned = cleaned.replace(/\s*WEB ID:\s*\d+/gi, '')
+    cleaned = cleaned.replace(/\s*ID:\s*\w+/gi, '')
+
+    // Remove alphanumeric codes at end (e.g., "JPM99c0awwic", "4V86YV1")
+    cleaned = cleaned.replace(/\s+[A-Z0-9]{6,}\s*$/gi, '')
+
+    // Remove website domains
+    cleaned = cleaned.replace(/\s+\S+\.co(m)?\s*/gi, ' ')
+
+    // Remove prefixes like "TST*", "SQ *", etc.
+    cleaned = cleaned.replace(/^[A-Z]+\*\s*/g, '')
+
+    // Remove "ending in XXXX" patterns
+    cleaned = cleaned.replace(/\s*ending in \d+/gi, '')
+
+    // Remove repeating words (e.g., "HEADWAY HEADWAY.CO" -> "HEADWAY")
+    const words = cleaned.split(/\s+/)
+    const seenWords = new Set<string>()
+    const uniqueWords: string[] = []
+    words.forEach((word) => {
+      const lower = word.toLowerCase().replace(/[^\w]/g, '')
+      if (lower && !seenWords.has(lower)) {
+        seenWords.add(lower)
+        uniqueWords.push(word)
+      }
+    })
+    cleaned = uniqueWords.join(' ')
+
+    // Convert to title case (first letter of each word capitalized)
+    cleaned = cleaned.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())
+
+    // Final cleanup
+    cleaned = cleaned.trim().replace(/\s+/g, ' ')
+
+    return cleaned
+  }
+
+  // Find similar vendors using fuzzy matching
+  const findSimilarVendors = (cleanedName: string): string[] => {
+    const existing = appData.transactions.map((t) => t.description.trim())
+    const unique = Array.from(new Set(existing))
+
+    const cleanedLower = cleanedName.toLowerCase()
+    const similar: string[] = []
+
+    unique.forEach((vendor) => {
+      const vendorLower = vendor.toLowerCase()
+
+      // Check if one contains the other or they're very similar
+      if (vendorLower.includes(cleanedLower) || cleanedLower.includes(vendorLower)) {
+        similar.push(vendor)
+      } else {
+        // Check for similar words
+        const cleanedWords = cleanedLower.split(/\s+/)
+        const vendorWords = vendorLower.split(/\s+/)
+        const matchingWords = cleanedWords.filter((w) => vendorWords.includes(w))
+
+        // If more than half the words match, consider it similar
+        if (matchingWords.length > 0 && matchingWords.length >= Math.min(cleanedWords.length, vendorWords.length) * 0.6) {
+          similar.push(vendor)
+        }
+      }
+    })
+
+    return similar
+  }
+
   // CSV Import handlers
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -310,7 +460,8 @@ export default function Transactions() {
       return
     }
 
-    const importedCount = csvData.length
+    // Prepare all imports for processing
+    const importsToProcess: any[] = []
     const errors: string[] = []
 
     csvData.forEach((row, index) => {
@@ -345,8 +496,9 @@ export default function Transactions() {
           throw new Error(`Invalid amount: ${row[columnMapping.amount!]}`)
         }
 
-        // Get description
-        const description = row[columnMapping.description!] || 'Imported Transaction'
+        // Get and standardize description
+        const originalDescription = row[columnMapping.description!] || 'Imported Transaction'
+        const cleanedDescription = standardizeVendorName(originalDescription)
 
         // Get optional fields
         const notes = columnMapping.notes !== null ? row[columnMapping.notes] : undefined
@@ -379,15 +531,16 @@ export default function Transactions() {
         const account = appData.accounts.find((a) => a.id === accountId)
         const budgetType = account?.budgetType || 'household'
 
-        // Create transaction
-        addTransaction({
+        // Store import data for processing
+        importsToProcess.push({
+          rowIndex: index,
           date: transactionDate,
-          description,
+          originalDescription,
+          cleanedDescription,
           amount,
           categoryId,
           accountId,
           budgetType,
-          taxDeductible: false,
           notes,
         })
       } catch (error) {
@@ -395,24 +548,105 @@ export default function Transactions() {
       }
     })
 
-    // Close modal and show results
+    // Close CSV modal
     setIsImportModalOpen(false)
-    setCsvData([])
-    setCsvHeaders([])
-    setColumnMapping({
-      date: null,
-      description: null,
-      amount: null,
-      category: null,
-      account: null,
-      notes: null,
+
+    // If there are errors, show them
+    if (errors.length > 0 && importsToProcess.length === 0) {
+      alert(`Failed to import transactions.\n\nErrors:\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ''}`)
+      setCsvData([])
+      setCsvHeaders([])
+      setColumnMapping({
+        date: null,
+        description: null,
+        amount: null,
+        category: null,
+        account: null,
+        notes: null,
+      })
+      return
+    }
+
+    // Start processing imports with vendor matching
+    setPendingImports(importsToProcess)
+    setCurrentImportIndex(0)
+    processNextImport(importsToProcess, 0, errors)
+  }
+
+  const processNextImport = (imports: any[], index: number, errors: string[]) => {
+    if (index >= imports.length) {
+      // All done
+      const importedCount = imports.length
+      setCsvData([])
+      setCsvHeaders([])
+      setColumnMapping({
+        date: null,
+        description: null,
+        amount: null,
+        category: null,
+        account: null,
+        notes: null,
+      })
+      setPendingImports([])
+      setCurrentImportIndex(0)
+
+      if (errors.length > 0) {
+        alert(`Imported ${importedCount - errors.length} of ${importedCount} transactions.\n\nErrors:\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ''}`)
+      } else {
+        alert(`Successfully imported ${importedCount} transactions!`)
+      }
+      return
+    }
+
+    const importData = imports[index]
+    const similarVendors = findSimilarVendors(importData.cleanedDescription)
+
+    if (similarVendors.length > 0 && !similarVendors.includes(importData.cleanedDescription)) {
+      // Show vendor matching modal
+      setPendingImport({
+        cleanedDescription: importData.cleanedDescription,
+        originalDescription: importData.originalDescription,
+        similarVendors,
+        rowData: importData,
+      })
+      setVendorMatchModalOpen(true)
+    } else {
+      // No similar vendors, just import with cleaned description
+      addTransaction({
+        date: importData.date,
+        description: importData.cleanedDescription,
+        amount: importData.amount,
+        categoryId: importData.categoryId,
+        accountId: importData.accountId,
+        budgetType: importData.budgetType,
+        taxDeductible: false,
+        notes: importData.notes,
+      })
+      processNextImport(imports, index + 1, errors)
+    }
+  }
+
+  const handleVendorMatch = (selectedVendor: string) => {
+    if (!pendingImport) return
+
+    // Import with selected vendor name
+    addTransaction({
+      date: pendingImport.rowData.date,
+      description: selectedVendor,
+      amount: pendingImport.rowData.amount,
+      categoryId: pendingImport.rowData.categoryId,
+      accountId: pendingImport.rowData.accountId,
+      budgetType: pendingImport.rowData.budgetType,
+      taxDeductible: false,
+      notes: pendingImport.rowData.notes,
     })
 
-    if (errors.length > 0) {
-      alert(`Imported ${importedCount - errors.length} of ${importedCount} transactions.\n\nErrors:\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ''}`)
-    } else {
-      alert(`Successfully imported ${importedCount} transactions!`)
-    }
+    setVendorMatchModalOpen(false)
+    setPendingImport(null)
+
+    // Process next import
+    processNextImport(pendingImports, currentImportIndex + 1, [])
+    setCurrentImportIndex(currentImportIndex + 1)
   }
 
   // Calculate totals
@@ -723,51 +957,182 @@ export default function Transactions() {
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                       </td>
+                      {/* Date - Editable */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-900">
-                          {format(new Date(transaction.date), 'MMM d, yyyy')}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-gray-900">
-                          {transaction.description}
-                        </p>
-                        {transaction.notes && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {transaction.notes}
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'date' ? (
+                          <input
+                            type="date"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'date')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'date')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        ) : (
+                          <p
+                            className="text-sm text-gray-900 cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                            onClick={() => startInlineEdit(transaction.id, 'date', transaction.date)}
+                          >
+                            {format(new Date(transaction.date), 'MMM d, yyyy')}
                           </p>
                         )}
-                        {transaction.taxDeductible && (
-                          <div className="flex items-center mt-1">
-                            <CheckCircle className="w-3 h-3 text-green-500 mr-1" />
-                            <span className="text-xs text-green-600">Tax Deductible</span>
+                      </td>
+
+                      {/* Description - Editable */}
+                      <td className="px-6 py-4">
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'description' ? (
+                          <input
+                            type="text"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'description')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'description')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        ) : (
+                          <div>
+                            <p
+                              className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                              onClick={() => startInlineEdit(transaction.id, 'description', transaction.description)}
+                            >
+                              {transaction.description}
+                            </p>
+                            {transaction.notes && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {transaction.notes}
+                              </p>
+                            )}
+                            {transaction.taxDeductible && (
+                              <div className="flex items-center mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500 mr-1" />
+                                <span className="text-xs text-green-600">Tax Deductible</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>
+
+                      {/* Account - Editable */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-900">
-                          {account?.name || 'Unknown'}
-                        </p>
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'accountId' ? (
+                          <select
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'accountId')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'accountId')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          >
+                            {availableAccounts.map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p
+                            className="text-sm text-gray-900 cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                            onClick={() => startInlineEdit(transaction.id, 'accountId', transaction.accountId)}
+                          >
+                            {account?.name || 'Unknown'}
+                          </p>
+                        )}
                       </td>
+
+                      {/* Category - Editable */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-900">
-                          {category?.name || 'Uncategorized'}
-                        </p>
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'categoryId' ? (
+                          <select
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'categoryId')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'categoryId')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          >
+                            {Object.entries(availableCategories).map(([bucketId, cats]) => {
+                              const bucketName = bucketId === 'income' ? 'Income' :
+                                                 bucketId === 'needs' ? 'Needs' :
+                                                 bucketId === 'wants' ? 'Wants' :
+                                                 bucketId === 'savings' ? 'Savings' :
+                                                 bucketId === 'operating' ? 'Operating' :
+                                                 bucketId === 'growth' ? 'Growth' :
+                                                 bucketId === 'compensation' ? 'Compensation' :
+                                                 bucketId === 'tax_reserve' ? 'Tax Reserve' :
+                                                 bucketId === 'business_savings' ? 'Business Savings' : bucketId
+                              return (
+                                <optgroup key={bucketId} label={bucketName}>
+                                  {cats.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )
+                            })}
+                          </select>
+                        ) : (
+                          <p
+                            className="text-sm text-gray-900 cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                            onClick={() => startInlineEdit(transaction.id, 'categoryId', transaction.categoryId)}
+                          >
+                            {category?.name || 'Uncategorized'}
+                          </p>
+                        )}
                       </td>
+
+                      {/* Budget Type - Editable */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <BudgetBadge budgetType={transaction.budgetType} />
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'budgetType' ? (
+                          <select
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'budgetType')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'budgetType')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="household">Household</option>
+                            <option value="business">Business</option>
+                          </select>
+                        ) : (
+                          <div
+                            className="cursor-pointer hover:opacity-80"
+                            onClick={() => startInlineEdit(transaction.id, 'budgetType', transaction.budgetType)}
+                          >
+                            <BudgetBadge budgetType={transaction.budgetType} />
+                          </div>
+                        )}
                       </td>
+
+                      {/* Amount - Editable */}
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <p
-                          className={`text-sm font-medium ${
-                            transaction.amount >= 0
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }`}
-                        >
-                          {transaction.amount >= 0 ? '+' : ''}
-                          {formatCurrency(transaction.amount)}
-                        </p>
+                        {editingCell?.transactionId === transaction.id && editingCell?.field === 'amount' ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => saveInlineEdit(transaction.id, 'amount')}
+                            onKeyDown={(e) => handleInlineKeyDown(e, transaction.id, 'amount')}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm text-right border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        ) : (
+                          <p
+                            className={`text-sm font-medium cursor-pointer hover:bg-blue-50 px-2 py-1 rounded ${
+                              transaction.amount >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                            }`}
+                            onClick={() => startInlineEdit(transaction.id, 'amount', transaction.amount)}
+                          >
+                            {transaction.amount >= 0 ? '+' : ''}
+                            {formatCurrency(transaction.amount)}
+                          </p>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end space-x-2">
@@ -1074,6 +1439,95 @@ export default function Transactions() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Vendor Match Modal */}
+      <Modal
+        isOpen={vendorMatchModalOpen}
+        onClose={() => setVendorMatchModalOpen(false)}
+        title="Match Vendor/Payee"
+        size="lg"
+      >
+        {pendingImport && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">Similar Vendor Found</h3>
+              <p className="text-sm text-blue-800">
+                The imported description has been standardized. We found similar existing vendors.
+                Please select if this is the same vendor or create a new one.
+              </p>
+            </div>
+
+            {/* Original Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Original Import:
+              </label>
+              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                {pendingImport.originalDescription}
+              </p>
+            </div>
+
+            {/* Cleaned Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Standardized Name:
+              </label>
+              <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-300 font-medium">
+                {pendingImport.cleanedDescription}
+              </p>
+            </div>
+
+            {/* Similar Vendors */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Select vendor/payee:
+              </label>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {/* Option: Use new standardized name */}
+                <button
+                  onClick={() => handleVendorMatch(pendingImport.cleanedDescription)}
+                  className="w-full text-left px-4 py-3 bg-blue-50 border-2 border-blue-300 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <p className="font-medium text-blue-900">
+                        {pendingImport.cleanedDescription}
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">Create as new vendor</p>
+                    </div>
+                    <div className="ml-4 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-full">
+                      NEW
+                    </div>
+                  </div>
+                </button>
+
+                {/* Existing similar vendors */}
+                {pendingImport.similarVendors.map((vendor, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleVendorMatch(vendor)}
+                    className="w-full text-left px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{vendor}</p>
+                        <p className="text-xs text-gray-500 mt-1">Use existing vendor</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600 text-center">
+                Processing transaction {currentImportIndex + 1} of {pendingImports.length}
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

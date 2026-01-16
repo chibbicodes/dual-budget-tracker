@@ -78,7 +78,7 @@ export default function Budget() {
   // Calculate suggested budgets based on last 6 months of spending
   const suggestedBudgets = useMemo(() => {
     const suggestions = new Map<string, number>()
-    const categories = appData.categories.filter((c) => c.budgetType === budgetType && c.isActive)
+    const categories = appData.categories.filter((c) => c.budgetType === budgetType && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget)
 
     // Get last 6 months of historical data
     const last6Months: { [month: string]: { total: number; byCategory: Map<string, number> } } = {}
@@ -178,7 +178,7 @@ export default function Budget() {
   // Calculate total budgeted amount for selected month
   const totalBudgeted = useMemo(() => {
     return appData.categories
-      .filter((c) => c.budgetType === budgetType && c.isActive)
+      .filter((c) => c.budgetType === budgetType && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget)
       .reduce((sum, c) => {
         const monthlyBudget = getMonthlyBudget(selectedMonthString, c.id)
         return sum + (monthlyBudget?.amount ?? c.monthlyBudget)
@@ -331,7 +331,7 @@ export default function Budget() {
       {budgetSummary.bucketBreakdown.map((bucket) => {
         const bucketInfo = buckets.find((b) => b.id === bucket.bucketId)
         const categoriesInBucket = appData.categories.filter(
-          (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && c.isActive
+          (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget
         )
 
         return (

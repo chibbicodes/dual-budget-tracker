@@ -343,7 +343,7 @@ export default function Transactions() {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Description
+                    To/From
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Account
@@ -506,6 +506,8 @@ function TransactionForm({
   onCancel,
   defaultBudgetType,
 }: TransactionFormProps) {
+  const { appData } = useBudget()
+
   const [formData, setFormData] = useState({
     date: transaction?.date || new Date().toISOString().split('T')[0],
     description: transaction?.description || '',
@@ -518,6 +520,47 @@ function TransactionForm({
     taxDeductible: transaction?.taxDeductible || false,
     notes: transaction?.notes || '',
   })
+
+  // Get unique vendors from past transactions
+  const uniqueVendors = useMemo(() => {
+    const vendors = new Set<string>()
+    appData.transactions.forEach(t => {
+      if (t.description && t.description.trim()) {
+        vendors.add(t.description.trim())
+      }
+    })
+    return Array.from(vendors).sort()
+  }, [appData.transactions])
+
+  // Get last category used for each vendor
+  const vendorCategoryMap = useMemo(() => {
+    const map = new Map<string, string>()
+    // Sort transactions by date (newest first)
+    const sortedTransactions = [...appData.transactions].sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    // For each vendor, store the most recent category used
+    sortedTransactions.forEach(t => {
+      const vendor = t.description?.trim()
+      if (vendor && t.categoryId && !map.has(vendor)) {
+        map.set(vendor, t.categoryId)
+      }
+    })
+    return map
+  }, [appData.transactions])
+
+  // Handle vendor selection/change
+  const handleVendorChange = (newVendor: string) => {
+    setFormData(prev => {
+      const updates: any = { ...prev, description: newVendor }
+      // Auto-populate category if this vendor was used before
+      const lastCategory = vendorCategoryMap.get(newVendor.trim())
+      if (lastCategory && !prev.categoryId) {
+        updates.categoryId = lastCategory
+      }
+      return updates
+    })
+  }
 
   // Filter accounts and categories based on selected budget type
   const filteredAccounts = accounts.filter(
@@ -603,7 +646,7 @@ function TransactionForm({
           />
         </div>
 
-        {/* Transaction Type & Amount */}
+        {/* Transaction Type */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Transaction Type *
@@ -652,6 +695,34 @@ function TransactionForm({
               </span>
             </label>
           </div>
+        </div>
+
+        {/* To/From (Vendor/Payee) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            To/From *
+          </label>
+          <input
+            type="text"
+            required
+            list="vendor-list"
+            value={formData.description}
+            onChange={(e) => handleVendorChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Vendor or payee name"
+          />
+          <datalist id="vendor-list">
+            {uniqueVendors.map((vendor) => (
+              <option key={vendor} value={vendor} />
+            ))}
+          </datalist>
+          <p className="text-xs text-gray-500 mt-1">
+            Start typing to see previous vendors/payees
+          </p>
+        </div>
+
+        {/* Amount */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Amount *
           </label>
@@ -776,21 +847,6 @@ function TransactionForm({
             </label>
           </div>
         )}
-      </div>
-
-      {/* Description */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Description *
-        </label>
-        <input
-          type="text"
-          required
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="e.g., Grocery shopping at Walmart"
-        />
       </div>
 
       {/* Notes */}

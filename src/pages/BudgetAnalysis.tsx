@@ -115,6 +115,46 @@ export default function BudgetAnalysis() {
     }
   }, [historicalData, appData.categories, budgetType])
 
+  // Calculate vendor/payee analysis
+  const vendorAnalysis = useMemo(() => {
+    const vendorMap = new Map<string, { totalExpenses: number; totalIncome: number; count: number; net: number }>()
+
+    // Filter transactions for the selected budget type and time range
+    const cutoffDate = subMonths(new Date(), monthsToAnalyze)
+    const relevantTransactions = appData.transactions.filter(
+      (t) =>
+        t.budgetType === budgetType &&
+        new Date(t.date) >= cutoffDate &&
+        t.description &&
+        t.description.trim()
+    )
+
+    relevantTransactions.forEach((t) => {
+      const vendor = t.description.trim()
+      const existing = vendorMap.get(vendor) || { totalExpenses: 0, totalIncome: 0, count: 0, net: 0 }
+
+      if (t.amount >= 0) {
+        existing.totalIncome += t.amount
+      } else {
+        existing.totalExpenses += Math.abs(t.amount)
+      }
+      existing.count += 1
+      existing.net = existing.totalIncome - existing.totalExpenses
+
+      vendorMap.set(vendor, existing)
+    })
+
+    // Convert to array and sort by total transaction value (income + expenses)
+    return Array.from(vendorMap.entries())
+      .map(([vendor, data]) => ({
+        vendor,
+        ...data,
+        totalValue: data.totalIncome + data.totalExpenses,
+      }))
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .slice(0, 20) // Top 20 vendors
+  }, [appData.transactions, budgetType, monthsToAnalyze])
+
   // Generate budget suggestions
   const suggestions = useMemo(() => {
     const suggestions: Array<{ category: Category; type: 'increase' | 'decrease' | 'create'; reason: string }> = []
@@ -402,6 +442,68 @@ export default function BudgetAnalysis() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vendor/Payee Analysis */}
+      {vendorAnalysis.length > 0 && (
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Vendor/Payee Analysis</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Top {vendorAnalysis.length} vendors/payees by transaction volume
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vendor/Payee
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transactions
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Paid
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Received
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Net
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {vendorAnalysis.map((vendor, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {vendor.vendor}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                      {vendor.count}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600">
+                      {vendor.totalExpenses > 0 ? formatCurrency(vendor.totalExpenses) : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
+                      {vendor.totalIncome > 0 ? formatCurrency(vendor.totalIncome) : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span
+                        className={`text-sm font-medium ${
+                          vendor.net >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {formatCurrency(vendor.net)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

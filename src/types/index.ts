@@ -165,6 +165,8 @@ export interface Income {
   client?: string // For business income - client/customer name
   expectedAmount?: number
   isRecurring: boolean // Monthly recurring or one-time
+  recurringFrequency?: 'weekly' | 'bi-weekly' | 'every-15-days' | 'monthly' | 'same-day-each-month' // How often it recurs
+  recurringDayOfMonth?: number // 1-31, for same-day-each-month frequency
   expectedDate?: string // ISO date string
   createdAt?: string
   updatedAt?: string

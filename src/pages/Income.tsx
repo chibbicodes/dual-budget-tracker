@@ -418,6 +418,8 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
     client: income?.client || '',
     expectedAmount: income?.expectedAmount?.toString() || '',
     isRecurring: income?.isRecurring ?? true,
+    recurringFrequency: income?.recurringFrequency || 'monthly',
+    recurringDayOfMonth: income?.recurringDayOfMonth?.toString() || '1',
     expectedDate: income?.expectedDate || '',
   })
 
@@ -428,7 +430,7 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
+    const submissionData: any = {
       source: formData.source,
       budgetType: formData.budgetType,
       categoryId: formData.categoryId || undefined,
@@ -436,7 +438,17 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
       expectedAmount: parseFloat(formData.expectedAmount) || 0,
       isRecurring: formData.isRecurring,
       expectedDate: formData.expectedDate || undefined,
-    } as any)
+    }
+
+    // Add recurring frequency options if recurring
+    if (formData.isRecurring) {
+      submissionData.recurringFrequency = formData.recurringFrequency
+      if (formData.recurringFrequency === 'same-day-each-month') {
+        submissionData.recurringDayOfMonth = parseInt(formData.recurringDayOfMonth) || 1
+      }
+    }
+
+    onSubmit(submissionData)
   }
 
   return (
@@ -521,8 +533,47 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
           />
           <span className="text-sm font-medium text-gray-700">Recurring Income</span>
         </label>
-        <p className="text-sm text-gray-500 ml-6">Check if this income repeats monthly</p>
+        <p className="text-sm text-gray-500 ml-6">Check if this income repeats regularly</p>
       </div>
+
+      {/* Recurring Frequency Options */}
+      {formData.isRecurring && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Frequency *</label>
+          <select
+            value={formData.recurringFrequency}
+            onChange={(e) => setFormData({ ...formData, recurringFrequency: e.target.value as any })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="weekly">Weekly</option>
+            <option value="bi-weekly">Bi-weekly (Every 2 weeks)</option>
+            <option value="every-15-days">Every 15 Days</option>
+            <option value="monthly">Monthly</option>
+            <option value="same-day-each-month">Same Day Each Month</option>
+          </select>
+        </div>
+      )}
+
+      {/* Day of Month (only for same-day-each-month) */}
+      {formData.isRecurring && formData.recurringFrequency === 'same-day-each-month' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Day of Month *</label>
+          <input
+            type="number"
+            min="1"
+            max="31"
+            value={formData.recurringDayOfMonth}
+            onChange={(e) => setFormData({ ...formData, recurringDayOfMonth: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="1-31"
+            required
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Enter the day of the month (1-31) when this income is expected
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Expected Date</label>
@@ -532,6 +583,9 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
           onChange={(e) => setFormData({ ...formData, expectedDate: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <p className="text-sm text-gray-500 mt-1">
+          {formData.isRecurring ? 'Next expected date for this recurring income' : 'Expected date for this one-time income'}
+        </p>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">

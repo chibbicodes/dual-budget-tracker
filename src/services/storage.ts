@@ -68,6 +68,7 @@ export class StorageService {
       transactions: data.transactions.filter((t) => t.budgetType === 'household'),
       categories: data.categories.filter((c) => c.budgetType === 'household'),
       incomeSources: data.incomeSources.filter((i) => i.budgetType === 'household'),
+      income: data.income.filter((i) => i.budgetType === 'household'),
       autoCategorization: data.autoCategorization.filter(
         (r) => r.budgetType === 'household' || r.budgetType === 'both'
       ),
@@ -97,6 +98,7 @@ export class StorageService {
       transactions: data.transactions.filter((t) => t.budgetType === 'business'),
       categories: data.categories.filter((c) => c.budgetType === 'business'),
       incomeSources: data.incomeSources.filter((i) => i.budgetType === 'business'),
+      income: data.income.filter((i) => i.budgetType === 'business'),
       autoCategorization: data.autoCategorization.filter(
         (r) => r.budgetType === 'business' || r.budgetType === 'both'
       ),
@@ -144,10 +146,11 @@ export class StorageService {
           accounts: [...existing.accounts, ...importedData.accounts],
           transactions: [...existing.transactions, ...importedData.transactions],
           categories: [...existing.categories, ...importedData.categories],
-          incomeSources: [...existing.incomeSources, ...importedData.incomeSources],
+          incomeSources: [...existing.incomeSources, ...(importedData.incomeSources || [])],
+          income: [...existing.income, ...(importedData.income || [])],
           autoCategorization: [
             ...existing.autoCategorization,
-            ...importedData.autoCategorization,
+            ...(importedData.autoCategorization || []),
           ],
           settings: importedData.settings || existing.settings,
           version: CURRENT_VERSION,
@@ -183,6 +186,7 @@ export class StorageService {
       transactions: [],
       categories: [],
       incomeSources: [],
+      income: [],
       autoCategorization: [],
       settings: {
         defaultBudgetView: 'household',
@@ -270,6 +274,7 @@ export class StorageService {
       transactions: data.transactions.filter((t) => t.budgetType !== budgetType),
       categories: data.categories.filter((c) => c.budgetType !== budgetType),
       incomeSources: data.incomeSources.filter((i) => i.budgetType !== budgetType),
+      income: data.income.filter((i) => i.budgetType !== budgetType),
       autoCategorization: data.autoCategorization.filter(
         (r) => r.budgetType !== budgetType && r.budgetType !== 'both'
       ),

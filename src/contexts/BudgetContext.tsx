@@ -5,6 +5,7 @@ import type {
   Transaction,
   Category,
   IncomeSource,
+  Income,
   AutoCategorizationRule,
   AppSettings,
   BudgetViewType,
@@ -358,6 +359,50 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ============================================================================
+  // Legacy Income Operations
+  // ============================================================================
+
+  const addIncome = useCallback(
+    (income: Omit<Income, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const now = new Date().toISOString()
+      const newIncome: Income = {
+        ...income,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      setAppDataState((prev) => ({
+        ...prev,
+        income: [...prev.income, newIncome],
+      }))
+    },
+    []
+  )
+
+  const updateIncome = useCallback((id: string, updates: Partial<Income>) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      income: prev.income.map((income) =>
+        income.id === id
+          ? {
+              ...income,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            }
+          : income
+      ),
+    }))
+  }, [])
+
+  const deleteIncome = useCallback((id: string) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      income: prev.income.filter((i) => i.id !== id),
+    }))
+  }, [])
+
+  // ============================================================================
   // Rule Operations
   // ============================================================================
 
@@ -462,6 +507,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     addIncomeSource,
     updateIncomeSource,
     deleteIncomeSource,
+    addIncome,
+    updateIncome,
+    deleteIncome,
     addRule,
     updateRule,
     deleteRule,

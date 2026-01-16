@@ -9,6 +9,7 @@ interface SummaryCardProps {
     isPositive: boolean
   }
   colorClass?: string
+  valueColorClass?: string
 }
 
 export default function SummaryCard({
@@ -17,13 +18,14 @@ export default function SummaryCard({
   icon: Icon,
   trend,
   colorClass = 'bg-blue-500',
+  valueColorClass = 'text-gray-900',
 }: SummaryCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          <p className={`text-3xl font-bold mt-2 ${valueColorClass}`}>{value}</p>
           {trend && (
             <p
               className={`text-sm mt-2 ${

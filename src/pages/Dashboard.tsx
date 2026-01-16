@@ -103,6 +103,7 @@ export default function Dashboard() {
             value={formatCurrency(combinedSummary.netWorth)}
             icon={TrendingUp}
             colorClass="bg-purple-500"
+            valueColorClass={combinedSummary.netWorth >= 0 ? 'text-green-600' : 'text-red-600'}
           />
         </div>
 
@@ -118,7 +119,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-blue-50 rounded-lg p-4">
                 <p className="text-sm text-blue-600 font-medium">Net Worth</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">
+                <p className={`text-2xl font-bold mt-1 ${householdSummary.netWorth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(householdSummary.netWorth)}
                 </p>
               </div>
@@ -201,7 +202,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-green-50 rounded-lg p-4">
                 <p className="text-sm text-green-600 font-medium">Net Worth</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">
+                <p className={`text-2xl font-bold mt-1 ${businessSummary.netWorth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(businessSummary.netWorth)}
                 </p>
               </div>
@@ -322,6 +323,7 @@ export default function Dashboard() {
           value={formatCurrency(summary.netWorth)}
           icon={TrendingUp}
           colorClass={budgetType === 'household' ? 'bg-blue-700' : 'bg-green-700'}
+          valueColorClass={summary.netWorth >= 0 ? 'text-green-600' : 'text-red-600'}
         />
       </div>
 

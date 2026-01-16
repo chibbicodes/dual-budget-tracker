@@ -1,17 +1,526 @@
+import { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
+import { formatCurrency } from '../utils/calculations'
+import BudgetBadge from '../components/BudgetBadge'
+import Modal from '../components/Modal'
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar } from 'lucide-react'
+import type { BudgetType, Income as IncomeType } from '../types'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
+
+type BudgetFilter = 'all' | BudgetType
 
 export default function Income() {
-  const { currentView } = useBudget()
+  const { currentView, appData, addIncome, updateIncome, deleteIncome } = useBudget()
+  const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingIncome, setEditingIncome] = useState<IncomeType | null>(null)
+
+  // Filter income sources
+  const filteredIncome = useMemo(() => {
+    let income = appData.income
+
+    if (currentView !== 'combined') {
+      income = income.filter((i) => i.budgetType === currentView)
+    } else if (budgetFilter !== 'all') {
+      income = income.filter((i) => i.budgetType === budgetFilter)
+    }
+
+    return income.sort((a, b) => a.source.localeCompare(b.source))
+  }, [appData.income, currentView, budgetFilter])
+
+  // Calculate actual income for current month from transactions
+  const actualIncomeThisMonth = useMemo(() => {
+    const monthStart = startOfMonth(new Date())
+    const monthEnd = endOfMonth(new Date())
+
+    return appData.transactions
+      .filter((t) => {
+        const transDate = new Date(t.date)
+        const matchesBudget =
+          currentView === 'combined'
+            ? budgetFilter === 'all' || t.budgetType === budgetFilter
+            : t.budgetType === currentView
+        return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
+      })
+      .reduce((sum, t) => sum + t.amount, 0)
+  }, [appData.transactions, currentView, budgetFilter])
+
+  // Calculate expected income for current month
+  const expectedIncomeThisMonth = useMemo(() => {
+    return filteredIncome
+      .filter((i) => i.isRecurring || i.expectedDate)
+      .reduce((sum, i) => sum + (i.expectedAmount || 0), 0)
+  }, [filteredIncome])
+
+  // Income by source breakdown
+  const incomeBySource = useMemo(() => {
+    const monthStart = startOfMonth(new Date())
+    const monthEnd = endOfMonth(new Date())
+
+    const sourceMap = new Map<string, { expected: number; actual: number; source: IncomeType }>()
+
+    // Initialize with expected amounts
+    filteredIncome.forEach((income) => {
+      sourceMap.set(income.id, {
+        expected: income.expectedAmount || 0,
+        actual: 0,
+        source: income,
+      })
+    })
+
+    // Add actual income from transactions
+    appData.transactions
+      .filter((t) => {
+        const transDate = new Date(t.date)
+        const matchesBudget =
+          currentView === 'combined'
+            ? budgetFilter === 'all' || t.budgetType === budgetFilter
+            : t.budgetType === currentView
+        return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
+      })
+      .forEach((transaction) => {
+        // Try to match transaction to income source by description
+        const matchingIncome = filteredIncome.find(
+          (income) =>
+            income.budgetType === transaction.budgetType &&
+            (transaction.description.toLowerCase().includes(income.source.toLowerCase()) ||
+              (income.client && transaction.description.toLowerCase().includes(income.client.toLowerCase())))
+        )
+
+        if (matchingIncome) {
+          const existing = sourceMap.get(matchingIncome.id)
+          if (existing) {
+            existing.actual += transaction.amount
+          }
+        }
+      })
+
+    return Array.from(sourceMap.values()).sort((a, b) => b.expected - a.expected)
+  }, [filteredIncome, appData.transactions, currentView, budgetFilter])
+
+  const handleAdd = (income: Omit<IncomeType, 'id'>) => {
+    addIncome(income)
+    setIsAddModalOpen(false)
+  }
+
+  const handleUpdate = (income: Omit<IncomeType, 'id'>) => {
+    if (editingIncome) {
+      updateIncome(editingIncome.id, income)
+      setEditingIncome(null)
+    }
+  }
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this income source?')) {
+      deleteIncome(id)
+    }
+  }
+
+  const variance = actualIncomeThisMonth - expectedIncomeThisMonth
+  const variancePercent = expectedIncomeThisMonth > 0 ? (variance / expectedIncomeThisMonth) * 100 : 0
 
   return (
     <div>
-      <h2 className="text-3xl font-bold text-gray-900 mb-6">Income Tracking</h2>
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600">
-          Income sources for <span className="font-semibold">{currentView}</span> budget
-        </p>
-        <p className="text-sm text-gray-500 mt-2">Content coming soon...</p>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-3xl font-bold text-gray-900">Income Tracking</h2>
+
+        <div className="flex items-center gap-4">
+          {/* Budget filter (only show in combined view) */}
+          {currentView === 'combined' && (
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setBudgetFilter('all')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  budgetFilter === 'all'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setBudgetFilter('household')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  budgetFilter === 'household'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Household
+              </button>
+              <button
+                onClick={() => setBudgetFilter('business')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  budgetFilter === 'business'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Business
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Income Source
+          </button>
+        </div>
       </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-600">Expected This Month</h3>
+            <Calendar className="h-5 w-5 text-gray-400" />
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(expectedIncomeThisMonth)}</p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-600">Actual This Month</h3>
+            <TrendingUp className="h-5 w-5 text-gray-400" />
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(actualIncomeThisMonth)}</p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-600">Variance</h3>
+            {variance >= 0 ? (
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            ) : (
+              <TrendingDown className="h-5 w-5 text-red-600" />
+            )}
+          </div>
+          <p className={`text-2xl font-bold ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {variance >= 0 ? '+' : ''}
+            {formatCurrency(variance)}
+          </p>
+          <p className={`text-sm ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {variancePercent >= 0 ? '+' : ''}
+            {variancePercent.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Income by source breakdown */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Income by Source (This Month)</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Source
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Budget
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Expected
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actual
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Variance
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Progress
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {incomeBySource.map((item) => {
+                const variance = item.actual - item.expected
+                const percentAchieved = item.expected > 0 ? (item.actual / item.expected) * 100 : 0
+
+                return (
+                  <tr key={item.source.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{item.source.source}</div>
+                        {item.source.client && (
+                          <div className="text-sm text-gray-500">{item.source.client}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <BudgetBadge budgetType={item.source.budgetType} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(item.expected)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(item.actual)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {variance >= 0 ? '+' : ''}
+                        {formatCurrency(variance)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${
+                              percentAchieved >= 100
+                                ? 'bg-green-600'
+                                : percentAchieved >= 75
+                                ? 'bg-yellow-500'
+                                : 'bg-red-600'
+                            }`}
+                            style={{ width: `${Math.min(percentAchieved, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 w-12 text-right">{percentAchieved.toFixed(0)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Income sources list */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Income Sources</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Source
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Budget
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Expected Amount
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Expected Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredIncome.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No income sources found. Click "Add Income Source" to get started.
+                  </td>
+                </tr>
+              ) : (
+                filteredIncome.map((income) => (
+                  <tr key={income.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{income.source}</div>
+                        {income.client && <div className="text-sm text-gray-500">{income.client}</div>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <BudgetBadge budgetType={income.budgetType} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          income.isRecurring ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {income.isRecurring ? 'Recurring' : 'One-time'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(income.expectedAmount || 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {income.expectedDate ? format(new Date(income.expectedDate), 'MMM d, yyyy') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
+                      <button
+                        onClick={() => setEditingIncome(income)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleDelete(income.id)} className="text-red-600 hover:text-red-800">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add modal */}
+      {isAddModalOpen && (
+        <Modal isOpen={true} onClose={() => setIsAddModalOpen(false)} title="Add Income Source">
+          <IncomeForm
+            onSubmit={handleAdd}
+            onCancel={() => setIsAddModalOpen(false)}
+            defaultBudgetType={currentView === 'combined' ? 'household' : (currentView as BudgetType)}
+          />
+        </Modal>
+      )}
+
+      {/* Edit modal */}
+      {editingIncome && (
+        <Modal isOpen={true} onClose={() => setEditingIncome(null)} title="Edit Income Source">
+          <IncomeForm
+            income={editingIncome}
+            onSubmit={handleUpdate}
+            onCancel={() => setEditingIncome(null)}
+            defaultBudgetType={editingIncome.budgetType}
+          />
+        </Modal>
+      )}
     </div>
+  )
+}
+
+interface IncomeFormProps {
+  income?: IncomeType
+  onSubmit: (income: Omit<IncomeType, 'id'>) => void
+  onCancel: () => void
+  defaultBudgetType: BudgetType
+}
+
+function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFormProps) {
+  const [formData, setFormData] = useState({
+    source: income?.source || '',
+    budgetType: income?.budgetType || defaultBudgetType,
+    client: income?.client || '',
+    expectedAmount: income?.expectedAmount?.toString() || '',
+    isRecurring: income?.isRecurring ?? true,
+    expectedDate: income?.expectedDate || '',
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit({
+      source: formData.source,
+      budgetType: formData.budgetType,
+      client: formData.client || undefined,
+      expectedAmount: parseFloat(formData.expectedAmount) || 0,
+      isRecurring: formData.isRecurring,
+      expectedDate: formData.expectedDate || undefined,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Source Name *</label>
+        <input
+          type="text"
+          value={formData.source}
+          onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="e.g., Salary, Freelance, Dividends"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Budget Type *</label>
+        <select
+          value={formData.budgetType}
+          onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as BudgetType })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        >
+          <option value="household">Household</option>
+          <option value="business">Business</option>
+        </select>
+      </div>
+
+      {formData.budgetType === 'business' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Client/Customer</label>
+          <input
+            type="text"
+            value={formData.client}
+            onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Optional client name"
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Amount *</label>
+        <input
+          type="number"
+          step="0.01"
+          value={formData.expectedAmount}
+          onChange={(e) => setFormData({ ...formData, expectedAmount: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="0.00"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={formData.isRecurring}
+            onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm font-medium text-gray-700">Recurring Income</span>
+        </label>
+        <p className="text-sm text-gray-500 ml-6">Check if this income repeats monthly</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Date</label>
+        <input
+          type="date"
+          value={formData.expectedDate}
+          onChange={(e) => setFormData({ ...formData, expectedDate: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          {income ? 'Update' : 'Add'} Income Source
+        </button>
+      </div>
+    </form>
   )
 }

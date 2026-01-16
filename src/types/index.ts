@@ -30,6 +30,7 @@ export interface Account {
   paymentDueDate?: string // Day of month (1-31) or ISO date
   minimumPayment?: number
   websiteUrl?: string // Bill pay URL
+  billPayWebsite?: string // Legacy alias for websiteUrl
   notes?: string
   createdAt: string
   updatedAt: string
@@ -151,6 +152,19 @@ export interface IncomeSource {
   updatedAt: string
 }
 
+// Legacy Income type for backward compatibility
+export interface Income {
+  id: string
+  source: string // Income source name
+  budgetType: BudgetType
+  client?: string // For business income - client/customer name
+  expectedAmount?: number
+  isRecurring: boolean // Monthly recurring or one-time
+  expectedDate?: string // ISO date string
+  createdAt?: string
+  updatedAt?: string
+}
+
 // ============================================================================
 // Auto-Categorization Rule Types
 // ============================================================================
@@ -210,6 +224,7 @@ export interface AppData {
   transactions: Transaction[]
   categories: Category[]
   incomeSources: IncomeSource[]
+  income: Income[] // Legacy income tracking
   autoCategorization: AutoCategorizationRule[]
   settings: AppSettings
   version: string // For data migration
@@ -351,6 +366,11 @@ export interface BudgetContextState {
   addIncomeSource: (income: Omit<IncomeSource, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateIncomeSource: (id: string, updates: Partial<IncomeSource>) => void
   deleteIncomeSource: (id: string) => void
+
+  // Legacy income operations
+  addIncome: (income: Omit<Income, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateIncome: (id: string, updates: Partial<Income>) => void
+  deleteIncome: (id: string) => void
 
   // Rule operations
   addRule: (rule: Omit<AutoCategorizationRule, 'id' | 'createdAt' | 'updatedAt'>) => void

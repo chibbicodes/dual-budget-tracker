@@ -161,6 +161,7 @@ export interface Income {
   id: string
   source: string // Income source name
   budgetType: BudgetType
+  categoryId?: string // Link to income category
   client?: string // For business income - client/customer name
   expectedAmount?: number
   isRecurring: boolean // Monthly recurring or one-time

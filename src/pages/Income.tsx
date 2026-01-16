@@ -409,25 +409,34 @@ interface IncomeFormProps {
 }
 
 function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFormProps) {
+  const { appData } = useBudget()
+
   const [formData, setFormData] = useState({
     source: income?.source || '',
     budgetType: income?.budgetType || defaultBudgetType,
+    categoryId: (income as any)?.categoryId || '',
     client: income?.client || '',
     expectedAmount: income?.expectedAmount?.toString() || '',
     isRecurring: income?.isRecurring ?? true,
     expectedDate: income?.expectedDate || '',
   })
 
+  // Get income categories for the selected budget type
+  const incomeCategories = appData.categories.filter(
+    (c) => c.budgetType === formData.budgetType && c.isIncomeCategory === true && c.isActive
+  )
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit({
       source: formData.source,
       budgetType: formData.budgetType,
+      categoryId: formData.categoryId || undefined,
       client: formData.client || undefined,
       expectedAmount: parseFloat(formData.expectedAmount) || 0,
       isRecurring: formData.isRecurring,
       expectedDate: formData.expectedDate || undefined,
-    })
+    } as any)
   }
 
   return (
@@ -448,13 +457,32 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
         <label className="block text-sm font-medium text-gray-700 mb-1">Budget Type *</label>
         <select
           value={formData.budgetType}
-          onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as BudgetType })}
+          onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as BudgetType, categoryId: '' })}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           required
         >
           <option value="household">Household</option>
           <option value="business">Business</option>
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Income Category</label>
+        <select
+          value={formData.categoryId}
+          onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select category (optional)</option>
+          {incomeCategories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Links this income source to a category for better tracking in transactions
+        </p>
       </div>
 
       {formData.budgetType === 'business' && (

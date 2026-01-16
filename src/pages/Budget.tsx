@@ -2,13 +2,17 @@ import { useBudget } from '../contexts/BudgetContext'
 import { useMemo, useState } from 'react'
 import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
 import { getAllBuckets } from '../data/defaultCategories'
-import { Edit, Check, X, AlertCircle } from 'lucide-react'
-import type { BudgetType } from '../types'
+import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2 } from 'lucide-react'
+import type { BudgetType, Category, BucketId } from '../types'
+import Modal from '../components/Modal'
 
 export default function Budget() {
-  const { currentView, appData, updateCategory } = useBudget()
+  const { currentView, appData, updateCategory, addCategory, deleteCategory } = useBudget()
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
 
   // Budget page doesn't support combined view
   if (currentView === 'combined') {
@@ -78,16 +82,36 @@ export default function Budget() {
     setEditValue('')
   }
 
+  const handleOpenEditModal = (category: Category) => {
+    setSelectedCategory(category)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteCategory = (categoryId: string) => {
+    if (confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
+      deleteCategory(categoryId)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          {budgetType === 'household' ? 'Household' : 'Business'} Budget
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Manage your monthly budget by category
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {budgetType === 'household' ? 'Household' : 'Business'} Budget
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Manage your monthly budget by category
+          </p>
+        </div>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          Add Category
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -330,15 +354,31 @@ export default function Budget() {
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() =>
-                                  handleStartEdit(category.id, category.monthlyBudget)
-                                }
-                                className="text-blue-600 hover:text-blue-800"
-                                title="Edit budget"
-                              >
-                                <Edit className="w-5 h-5" />
-                              </button>
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() =>
+                                    handleStartEdit(category.id, category.monthlyBudget)
+                                  }
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="Quick edit budget amount"
+                                >
+                                  <Edit className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenEditModal(category)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                  title="Edit category details"
+                                >
+                                  <Settings2 className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete category"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -355,10 +395,205 @@ export default function Budget() {
       {/* Help Text */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
-          <strong>Tip:</strong> Click the edit icon next to any budget amount to adjust it.
-          Your changes are saved automatically. Hover over any amount to see the exact value.
+          <strong>Tip:</strong> Click the <Edit className="inline h-4 w-4" /> icon for quick budget edits,
+          <Settings2 className="inline h-4 w-4 mx-1" /> icon to edit full category details, or the
+          <Trash2 className="inline h-4 w-4 mx-1" /> icon to delete categories.
         </p>
       </div>
+
+      {/* Add Category Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Add New Category"
+      >
+        <CategoryForm
+          budgetType={budgetType}
+          buckets={buckets}
+          onSubmit={(data) => {
+            addCategory(data)
+            setIsAddModalOpen(false)
+          }}
+          onCancel={() => setIsAddModalOpen(false)}
+        />
+      </Modal>
+
+      {/* Edit Category Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedCategory(null)
+        }}
+        title="Edit Category"
+      >
+        {selectedCategory && (
+          <CategoryForm
+            budgetType={budgetType}
+            buckets={buckets}
+            category={selectedCategory}
+            onSubmit={(data) => {
+              updateCategory(selectedCategory.id, data)
+              setIsEditModalOpen(false)
+              setSelectedCategory(null)
+            }}
+            onCancel={() => {
+              setIsEditModalOpen(false)
+              setSelectedCategory(null)
+            }}
+          />
+        )}
+      </Modal>
     </div>
+  )
+}
+
+// Category Form Component
+interface CategoryFormProps {
+  budgetType: BudgetType
+  buckets: Array<{ id: BucketId; name: string }>
+  category?: Category
+  onSubmit: (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => void
+  onCancel: () => void
+}
+
+function CategoryForm({ budgetType, buckets, category, onSubmit, onCancel }: CategoryFormProps) {
+  const [formData, setFormData] = useState({
+    name: category?.name || '',
+    bucketId: category?.bucketId || buckets[0]?.id || '',
+    monthlyBudget: category?.monthlyBudget?.toString() || '0',
+    isFixedExpense: category?.isFixedExpense || false,
+    taxDeductibleByDefault: category?.taxDeductibleByDefault || false,
+    isActive: category?.isActive ?? true,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit({
+      name: formData.name,
+      budgetType,
+      bucketId: formData.bucketId as BucketId,
+      monthlyBudget: parseFloat(formData.monthlyBudget) || 0,
+      isFixedExpense: formData.isFixedExpense,
+      isActive: formData.isActive,
+      taxDeductibleByDefault: formData.taxDeductibleByDefault,
+      icon: '',
+      autoCategorization: category?.autoCategorization || [],
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Category Name */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Category Name *
+        </label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="e.g., Groceries, Office Supplies"
+          required
+        />
+      </div>
+
+      {/* Bucket Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Bucket *
+        </label>
+        <select
+          value={formData.bucketId}
+          onChange={(e) => setFormData({ ...formData, bucketId: e.target.value as BucketId })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        >
+          {buckets.map((bucket) => (
+            <option key={bucket.id} value={bucket.id}>
+              {bucket.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Monthly Budget */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Monthly Budget *
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={formData.monthlyBudget}
+          onChange={(e) => setFormData({ ...formData, monthlyBudget: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="0.00"
+          required
+        />
+      </div>
+
+      {/* Checkboxes */}
+      <div className="space-y-2">
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={formData.isFixedExpense}
+            onChange={(e) => setFormData({ ...formData, isFixedExpense: e.target.checked })}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <span className="ml-2 text-sm text-gray-700">
+            Fixed Expense (amount doesn't vary month to month)
+          </span>
+        </label>
+
+        {budgetType === 'business' && (
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={formData.taxDeductibleByDefault}
+              onChange={(e) =>
+                setFormData({ ...formData, taxDeductibleByDefault: e.target.checked })
+              }
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <span className="ml-2 text-sm text-gray-700">
+              Tax Deductible by Default
+            </span>
+          </label>
+        )}
+
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={formData.isActive}
+            onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <span className="ml-2 text-sm text-gray-700">
+            Active (show in budget and transaction forms)
+          </span>
+        </label>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          {category ? 'Save Changes' : 'Add Category'}
+        </button>
+      </div>
+    </form>
   )
 }

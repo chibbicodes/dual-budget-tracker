@@ -1198,11 +1198,13 @@ function TransactionForm({
     return grouped
   }, [filteredCategories])
 
-  // When account changes, auto-update budget type to match account
+  // When account changes in a NEW transaction, default budget type to match account
+  // For existing transactions, keep the budget type as-is (allow independent editing)
   const handleAccountChange = (accountId: string) => {
     const selectedAccount = accounts.find((a) => a.id === accountId)
-    if (selectedAccount && selectedAccount.budgetType !== formData.budgetType) {
-      // Auto-move transaction to match account's budget type
+
+    // Only auto-set budget type for NEW transactions (no existing transaction prop)
+    if (!transaction && selectedAccount && selectedAccount.budgetType !== formData.budgetType) {
       const categoryMatches = categories.find(
         (c) => c.id === formData.categoryId && c.budgetType === selectedAccount.budgetType
       )
@@ -1214,6 +1216,7 @@ function TransactionForm({
         categoryId: categoryMatches ? formData.categoryId : '',
       })
     } else {
+      // For existing transactions, just update the account without changing budget type
       setFormData({ ...formData, accountId })
     }
   }

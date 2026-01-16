@@ -75,13 +75,18 @@ export function calculateBudgetSummary(
     )
   })
 
-  // Calculate totals
-  const totalIncome = monthTransactions
+  // Calculate totals (exclude transactions with excludeFromBudget categories)
+  const includedTransactions = monthTransactions.filter((t) => {
+    const category = categories.find((c) => c.id === t.categoryId)
+    return !category?.excludeFromBudget
+  })
+
+  const totalIncome = includedTransactions
     .filter((t) => t.amount > 0)
     .reduce((sum, t) => sum + t.amount, 0)
 
   const totalExpenses = Math.abs(
-    monthTransactions
+    includedTransactions
       .filter((t) => t.amount < 0)
       .reduce((sum, t) => sum + t.amount, 0)
   )
@@ -95,16 +100,16 @@ export function calculateBudgetSummary(
 
   // Calculate bucket breakdown
   const bucketBreakdown: BucketBreakdown[] = relevantBuckets.map((bucket) => {
-    // Get categories for this bucket
+    // Get categories for this bucket (exclude categories marked as excludeFromBudget)
     const bucketCategories = categories.filter(
-      (c) => c.budgetType === budgetType && c.bucketId === bucket.id
+      (c) => c.budgetType === budgetType && c.bucketId === bucket.id && !c.excludeFromBudget
     )
 
     // Calculate target amount based on income
     const targetAmount = ((bucket.targetPercentage || 0) / 100) * totalIncome
 
-    // Calculate actual amount spent in this bucket
-    const bucketTransactions = monthTransactions.filter((t) =>
+    // Calculate actual amount spent in this bucket (only included transactions)
+    const bucketTransactions = includedTransactions.filter((t) =>
       bucketCategories.some((c) => c.id === t.categoryId)
     )
     const actualAmount = Math.abs(

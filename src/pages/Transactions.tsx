@@ -532,12 +532,7 @@ function TransactionForm({
       return c.isIncomeCategory === true
     }
 
-    // Show only Transfer/Payment category for transfers
-    if (formData.transactionType === 'transfer') {
-      return c.name === 'Transfer/Payment' && c.excludeFromBudget === true
-    }
-
-    // For expenses, show non-income categories
+    // For transfers and expenses, show all non-income categories (including Transfer/Payment)
     return !c.isIncomeCategory
   })
 
@@ -754,6 +749,11 @@ function TransactionForm({
               </option>
             ))}
           </select>
+          {formData.transactionType === 'transfer' && (
+            <p className="text-xs text-gray-500 mt-1">
+              Select "Transfer/Payment" to exclude from budget, or choose a regular category to include in budget
+            </p>
+          )}
         </div>
 
         {/* Tax Deductible */}

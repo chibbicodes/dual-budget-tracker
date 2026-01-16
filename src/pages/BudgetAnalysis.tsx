@@ -3,20 +3,74 @@ import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency, calculateBudgetSummary } from '../utils/calculations'
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lightbulb } from 'lucide-react'
 import type { BudgetType, Category } from '../types'
-import { subMonths, format } from 'date-fns'
+import { subMonths, format, startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns'
 
 type BudgetFilter = 'all' | BudgetType
+type TimeRange = 'this_month' | 'last_month' | '1_month' | '3_months' | '6_months' | '1_year' | 'ytd' | 'last_year'
 
 export default function BudgetAnalysis() {
   const { currentView, appData } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
-  const [monthsToAnalyze, setMonthsToAnalyze] = useState(6)
+  const [timeRange, setTimeRange] = useState<TimeRange>('6_months')
 
   // Determine which budget we're analyzing
   const budgetType =
     currentView === 'combined' ? (budgetFilter === 'all' ? 'household' : budgetFilter) : (currentView as BudgetType)
 
-  // Calculate historical data for past N months
+  // Calculate date range based on selected timeRange
+  const dateRange = useMemo(() => {
+    const now = new Date()
+    let startDate: Date
+    let endDate: Date = now
+    let monthsCount: number
+
+    switch (timeRange) {
+      case 'this_month':
+        startDate = startOfMonth(now)
+        endDate = endOfMonth(now)
+        monthsCount = 1
+        break
+      case 'last_month':
+        const lastMonth = subMonths(now, 1)
+        startDate = startOfMonth(lastMonth)
+        endDate = endOfMonth(lastMonth)
+        monthsCount = 1
+        break
+      case '1_month':
+        startDate = subMonths(now, 1)
+        monthsCount = 1
+        break
+      case '3_months':
+        startDate = subMonths(now, 3)
+        monthsCount = 3
+        break
+      case '6_months':
+        startDate = subMonths(now, 6)
+        monthsCount = 6
+        break
+      case '1_year':
+        startDate = subMonths(now, 12)
+        monthsCount = 12
+        break
+      case 'ytd':
+        startDate = startOfYear(now)
+        monthsCount = now.getMonth() + 1
+        break
+      case 'last_year':
+        const lastYear = subYears(now, 1)
+        startDate = startOfYear(lastYear)
+        endDate = endOfYear(lastYear)
+        monthsCount = 12
+        break
+      default:
+        startDate = subMonths(now, 6)
+        monthsCount = 6
+    }
+
+    return { startDate, endDate, monthsCount }
+  }, [timeRange])
+
+  // Calculate historical data for the selected time range
   const historicalData = useMemo(() => {
     const months: Array<{
       month: Date
@@ -26,8 +80,8 @@ export default function BudgetAnalysis() {
       categorySpending: Record<string, number>
     }> = []
 
-    for (let i = 0; i < monthsToAnalyze; i++) {
-      const monthDate = subMonths(new Date(), i)
+    for (let i = 0; i < dateRange.monthsCount; i++) {
+      const monthDate = subMonths(dateRange.endDate, i)
       const summary = calculateBudgetSummary(appData.transactions, appData.categories, budgetType, monthDate)
 
       // Calculate category spending
@@ -48,7 +102,7 @@ export default function BudgetAnalysis() {
     }
 
     return months.reverse() // Oldest to newest
-  }, [appData.transactions, appData.categories, budgetType, monthsToAnalyze])
+  }, [appData.transactions, appData.categories, budgetType, dateRange])
 
   // Calculate averages and trends
   const analysis = useMemo(() => {
@@ -115,45 +169,75 @@ export default function BudgetAnalysis() {
     }
   }, [historicalData, appData.categories, budgetType])
 
-  // Calculate vendor/payee analysis
+  // Calculate vendor analysis (expenses only)
   const vendorAnalysis = useMemo(() => {
-    const vendorMap = new Map<string, { totalExpenses: number; totalIncome: number; count: number; net: number }>()
+    const vendorMap = new Map<string, { totalPaid: number; count: number }>()
 
-    // Filter transactions for the selected budget type and time range
-    const cutoffDate = subMonths(new Date(), monthsToAnalyze)
+    // Filter expense transactions for the selected budget type and time range
     const relevantTransactions = appData.transactions.filter(
       (t) =>
         t.budgetType === budgetType &&
-        new Date(t.date) >= cutoffDate &&
+        new Date(t.date) >= dateRange.startDate &&
+        new Date(t.date) <= dateRange.endDate &&
+        t.amount < 0 && // Only expenses
         t.description &&
         t.description.trim()
     )
 
     relevantTransactions.forEach((t) => {
       const vendor = t.description.trim()
-      const existing = vendorMap.get(vendor) || { totalExpenses: 0, totalIncome: 0, count: 0, net: 0 }
+      const existing = vendorMap.get(vendor) || { totalPaid: 0, count: 0 }
 
-      if (t.amount >= 0) {
-        existing.totalIncome += t.amount
-      } else {
-        existing.totalExpenses += Math.abs(t.amount)
-      }
+      existing.totalPaid += Math.abs(t.amount)
       existing.count += 1
-      existing.net = existing.totalIncome - existing.totalExpenses
 
       vendorMap.set(vendor, existing)
     })
 
-    // Convert to array and sort by total transaction value (income + expenses)
+    // Convert to array and sort by total paid
     return Array.from(vendorMap.entries())
       .map(([vendor, data]) => ({
         vendor,
         ...data,
-        totalValue: data.totalIncome + data.totalExpenses,
       }))
-      .sort((a, b) => b.totalValue - a.totalValue)
+      .sort((a, b) => b.totalPaid - a.totalPaid)
       .slice(0, 20) // Top 20 vendors
-  }, [appData.transactions, budgetType, monthsToAnalyze])
+  }, [appData.transactions, budgetType, dateRange])
+
+  // Calculate payee analysis (income only)
+  const payeeAnalysis = useMemo(() => {
+    const payeeMap = new Map<string, { totalReceived: number; count: number }>()
+
+    // Filter income transactions for the selected budget type and time range
+    const relevantTransactions = appData.transactions.filter(
+      (t) =>
+        t.budgetType === budgetType &&
+        new Date(t.date) >= dateRange.startDate &&
+        new Date(t.date) <= dateRange.endDate &&
+        t.amount >= 0 && // Only income
+        t.description &&
+        t.description.trim()
+    )
+
+    relevantTransactions.forEach((t) => {
+      const payee = t.description.trim()
+      const existing = payeeMap.get(payee) || { totalReceived: 0, count: 0 }
+
+      existing.totalReceived += t.amount
+      existing.count += 1
+
+      payeeMap.set(payee, existing)
+    })
+
+    // Convert to array and sort by total received
+    return Array.from(payeeMap.entries())
+      .map(([payee, data]) => ({
+        payee,
+        ...data,
+      }))
+      .sort((a, b) => b.totalReceived - a.totalReceived)
+      .slice(0, 20) // Top 20 payees
+  }, [appData.transactions, budgetType, dateRange])
 
   // Generate budget suggestions
   const suggestions = useMemo(() => {
@@ -280,13 +364,18 @@ export default function BudgetAnalysis() {
 
           {/* Time range selector */}
           <select
-            value={monthsToAnalyze}
-            onChange={(e) => setMonthsToAnalyze(parseInt(e.target.value))}
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
             className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value={3}>Last 3 months</option>
-            <option value={6}>Last 6 months</option>
-            <option value={12}>Last 12 months</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="1_month">1 Month</option>
+            <option value="3_months">3 Months</option>
+            <option value="6_months">6 Months</option>
+            <option value="1_year">1 Year</option>
+            <option value="ytd">Year to Date</option>
+            <option value="last_year">Last Year</option>
           </select>
         </div>
       </div>
@@ -446,13 +535,13 @@ export default function BudgetAnalysis() {
         </div>
       )}
 
-      {/* Vendor/Payee Analysis */}
+      {/* Vendor Analysis (Expenses) */}
       {vendorAnalysis.length > 0 && (
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Vendor/Payee Analysis</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Vendor Analysis</h3>
             <p className="text-sm text-gray-500 mt-1">
-              Top {vendorAnalysis.length} vendors/payees by transaction volume
+              Top {vendorAnalysis.length} vendors by total expenses
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -460,19 +549,13 @@ export default function BudgetAnalysis() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendor/Payee
+                    Vendor
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Transactions
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Paid
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Received
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Net
                   </th>
                 </tr>
               </thead>
@@ -485,20 +568,52 @@ export default function BudgetAnalysis() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
                       {vendor.count}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600">
-                      {vendor.totalExpenses > 0 ? formatCurrency(vendor.totalExpenses) : '-'}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
+                      {formatCurrency(vendor.totalPaid)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
-                      {vendor.totalIncome > 0 ? formatCurrency(vendor.totalIncome) : '-'}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payee Analysis (Income) */}
+      {payeeAnalysis.length > 0 && (
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Payee Analysis</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Top {payeeAnalysis.length} payees by total income
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payee
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transactions
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Received
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {payeeAnalysis.map((payee, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {payee.payee}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span
-                        className={`text-sm font-medium ${
-                          vendor.net >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        {formatCurrency(vendor.net)}
-                      </span>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                      {payee.count}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">
+                      {formatCurrency(payee.totalReceived)}
                     </td>
                   </tr>
                 ))}

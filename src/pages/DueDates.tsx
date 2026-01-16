@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
 import { getUpcomingDueDates, formatCurrency, getBudgetTypeColors } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
-import { Calendar, List, AlertTriangle, ExternalLink } from 'lucide-react'
-import type { BudgetType } from '../types'
+import { Calendar, List, AlertTriangle, ExternalLink, Eye } from 'lucide-react'
+import { format, setDate, startOfMonth } from 'date-fns'
+import type { BudgetType, Account } from '../types'
+import Modal from '../components/Modal'
 
 type BudgetFilter = 'all' | BudgetType
 type ViewMode = 'calendar' | 'list'
@@ -12,6 +14,24 @@ export default function DueDates() {
   const { currentView, appData } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewingAccount, setViewingAccount] = useState<Account | null>(null)
+
+  // Helper function to calculate next due date
+  const getNextDueDate = (paymentDueDate: string) => {
+    const today = new Date()
+    const dayOfMonth = parseInt(paymentDueDate)
+
+    // Get the date in the current month
+    let nextDue = setDate(startOfMonth(today), dayOfMonth)
+
+    // If that date has passed, move to next month
+    if (nextDue < today) {
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, dayOfMonth)
+      nextDue = nextMonth
+    }
+
+    return nextDue
+  }
 
   // Get upcoming due dates
   const upcomingDueDates = useMemo(() => {
@@ -173,7 +193,7 @@ export default function DueDates() {
                   Budget
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
+                  Next Due Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Days Until Due
@@ -188,7 +208,6 @@ export default function DueDates() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {upcomingDueDates.map((item) => {
-                const colors = getBudgetTypeColors(item.account.budgetType)
                 const minimumPayment =
                   item.account.minimumPayment ||
                   (item.account.creditLimit ? Math.abs(item.account.balance) * 0.02 : 0)
@@ -208,7 +227,7 @@ export default function DueDates() {
                       <BudgetBadge budgetType={item.account.budgetType} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      Day {item.account.paymentDueDate}
+                      {format(getNextDueDate(item.account.paymentDueDate!), 'MMM d')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -233,17 +252,26 @@ export default function DueDates() {
                       {formatCurrency(minimumPayment)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {item.account.billPayWebsite && (
-                        <a
-                          href={item.account.billPayWebsite}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 ${colors.text} hover:underline`}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setViewingAccount(item.account)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="View details"
                         >
-                          Pay Bill
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {item.account.websiteUrl && (
+                          <a
+                            href={item.account.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-600 hover:text-green-800"
+                            title="Pay bill"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -346,6 +374,121 @@ export default function DueDates() {
             )
           })}
         </div>
+      )}
+
+      {/* Account Details Modal */}
+      {viewingAccount && (
+        <Modal
+          isOpen={true}
+          onClose={() => setViewingAccount(null)}
+          title="Account Details"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-500">Account Name</label>
+              <p className="text-base font-semibold text-gray-900">{viewingAccount.name}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Account Type</label>
+                <p className="text-base text-gray-900 capitalize">
+                  {viewingAccount.accountType.replace('_', ' ')}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Budget Type</label>
+                <div className="mt-1">
+                  <BudgetBadge budgetType={viewingAccount.budgetType} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-500">Current Balance</label>
+              <p
+                className={`text-xl font-bold ${
+                  viewingAccount.balance >= 0 ? 'text-gray-900' : 'text-red-600'
+                }`}
+              >
+                {formatCurrency(viewingAccount.balance)}
+              </p>
+            </div>
+
+            {viewingAccount.creditLimit && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Credit Limit</label>
+                  <p className="text-base text-gray-900">{formatCurrency(viewingAccount.creditLimit)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Available Credit</label>
+                  <p className="text-base text-gray-900">
+                    {formatCurrency(viewingAccount.availableCredit || 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {viewingAccount.paymentDueDate && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Next Due Date</label>
+                  <p className="text-base text-gray-900">
+                    {format(getNextDueDate(viewingAccount.paymentDueDate), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                {viewingAccount.minimumPayment && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Minimum Payment</label>
+                    <p className="text-base text-gray-900">
+                      {formatCurrency(viewingAccount.minimumPayment)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {viewingAccount.interestRate && (
+              <div>
+                <label className="text-sm font-medium text-gray-500">Interest Rate (APR)</label>
+                <p className="text-base text-gray-900">{viewingAccount.interestRate.toFixed(2)}%</p>
+              </div>
+            )}
+
+            {viewingAccount.websiteUrl && (
+              <div>
+                <label className="text-sm font-medium text-gray-500">Bill Pay Website</label>
+                <a
+                  href={viewingAccount.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 mt-1"
+                >
+                  {viewingAccount.websiteUrl}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+
+            {viewingAccount.notes && (
+              <div>
+                <label className="text-sm font-medium text-gray-500">Notes</label>
+                <p className="text-sm text-gray-700 mt-1">{viewingAccount.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setViewingAccount(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

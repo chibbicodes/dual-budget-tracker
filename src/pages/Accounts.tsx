@@ -339,11 +339,18 @@ function AccountForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    let balance = parseFloat(formData.balance) || 0
+
+    // Automatically make balance negative for credit cards and loans
+    if ((formData.accountType === 'credit_card' || formData.accountType === 'loan') && balance > 0) {
+      balance = -balance
+    }
+
     const accountData = {
       name: formData.name,
       budgetType: formData.budgetType,
       accountType: formData.accountType,
-      balance: parseFloat(formData.balance) || 0,
+      balance: balance,
       interestRate: formData.interestRate ? parseFloat(formData.interestRate) : undefined,
       creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : undefined,
       paymentDueDate: formData.paymentDueDate || undefined,

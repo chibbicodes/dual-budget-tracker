@@ -641,14 +641,18 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setAppDataState((prev) => ({
       ...prev,
       categories: prev.categories.map((category) => {
-        // Only process active business expense categories
-        if (
-          category.budgetType === 'business' &&
-          category.bucketId === 'business_expenses' &&
-          category.isActive
-        ) {
-          // If it's NOT in the tailored list, deactivate it
-          if (!tailoredCategoryNames.includes(category.name)) {
+        // Process ALL active business categories
+        if (category.budgetType === 'business' && category.isActive) {
+          // Deactivate if it's in a non-business_expenses bucket (Operating, Growth, Compensation, etc.)
+          if (category.bucketId !== 'business_expenses') {
+            deactivatedCount++
+            return {
+              ...category,
+              isActive: false,
+            }
+          }
+          // Or if it's in business_expenses but not in the tailored list
+          if (category.bucketId === 'business_expenses' && !tailoredCategoryNames.includes(category.name)) {
             deactivatedCount++
             return {
               ...category,

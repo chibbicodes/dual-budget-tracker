@@ -244,9 +244,9 @@ export default function Settings() {
           {/* Cleanup Business Expenses */}
           <div className="bg-white rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Cleanup Business Expense Categories</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Cleanup Business Categories</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Remove old generic business expense categories and keep only the tailored artist categories
+                Hide all business categories except the 27 tailored artist categories
               </p>
             </div>
             <div className="p-6">
@@ -255,11 +255,12 @@ export default function Settings() {
                 className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
               >
                 <SettingsIcon className="h-4 w-4" />
-                Cleanup Old Categories
+                Cleanup Business Categories
               </button>
               <p className="text-sm text-gray-500 mt-4">
-                This will deactivate old generic business expense categories (like "Professional Services", "Equipment & Tools", etc.)
-                while keeping the 27 tailored categories for artists (Travel, Craft Business, etc.). Historical data will be preserved.
+                This will deactivate ALL categories from Operating, Growth, Compensation, Tax Reserve, and Business Savings buckets.
+                It will also clean up any old categories in Business Expenses that aren't part of the 27 tailored artist categories.
+                Only the organized artist categories will remain visible in dropdowns. Historical data will be preserved.
               </p>
             </div>
           </div>

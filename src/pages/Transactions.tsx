@@ -798,6 +798,7 @@ export default function Transactions() {
                                    bucketId === 'needs' ? 'Needs' :
                                    bucketId === 'wants' ? 'Wants' :
                                    bucketId === 'savings' ? 'Savings' :
+                                   bucketId === 'business_expenses' ? 'Business Expenses' :
                                    bucketId === 'operating' ? 'Operating' :
                                    bucketId === 'growth' ? 'Growth' :
                                    bucketId === 'compensation' ? 'Compensation' :
@@ -1081,6 +1082,7 @@ export default function Transactions() {
                                                  bucketId === 'needs' ? 'Needs' :
                                                  bucketId === 'wants' ? 'Wants' :
                                                  bucketId === 'savings' ? 'Savings' :
+                                                 bucketId === 'business_expenses' ? 'Business Expenses' :
                                                  bucketId === 'operating' ? 'Operating' :
                                                  bucketId === 'growth' ? 'Growth' :
                                                  bucketId === 'compensation' ? 'Compensation' :
@@ -1985,6 +1987,7 @@ function TransactionForm({
                                  bucketId === 'needs' ? 'Needs' :
                                  bucketId === 'wants' ? 'Wants' :
                                  bucketId === 'savings' ? 'Savings' :
+                                 bucketId === 'business_expenses' ? 'Business Expenses' :
                                  bucketId === 'operating' ? 'Operating' :
                                  bucketId === 'growth' ? 'Growth' :
                                  bucketId === 'compensation' ? 'Compensation' :
@@ -2231,6 +2234,7 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
                                bucketId === 'needs' ? 'Needs' :
                                bucketId === 'wants' ? 'Wants' :
                                bucketId === 'savings' ? 'Savings' :
+                               bucketId === 'business_expenses' ? 'Business Expenses' :
                                bucketId === 'operating' ? 'Operating' :
                                bucketId === 'growth' ? 'Growth' :
                                bucketId === 'compensation' ? 'Compensation' :

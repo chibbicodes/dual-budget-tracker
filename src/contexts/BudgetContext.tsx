@@ -577,6 +577,27 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     console.log('Load sample data - to be implemented')
   }, [])
 
+  const addMissingDefaultCategories = useCallback(() => {
+    const defaultCategories = generateDefaultCategories()
+    const existingCategoryKeys = new Set(
+      appData.categories.map((c) => `${c.name}|${c.budgetType}`)
+    )
+
+    const missingCategories = defaultCategories.filter((defaultCat) => {
+      const key = `${defaultCat.name}|${defaultCat.budgetType}`
+      return !existingCategoryKeys.has(key)
+    })
+
+    if (missingCategories.length > 0) {
+      setAppDataState((prev) => ({
+        ...prev,
+        categories: [...prev.categories, ...missingCategories],
+      }))
+      return missingCategories.length
+    }
+    return 0
+  }, [appData.categories])
+
   const value: BudgetContextState = {
     currentView,
     setCurrentView,
@@ -609,6 +630,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     exportData,
     clearAllData,
     loadSampleData,
+    addMissingDefaultCategories,
   }
 
   return <BudgetContext.Provider value={value}>{children}</BudgetContext.Provider>

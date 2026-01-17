@@ -7,7 +7,7 @@ import type { BudgetType } from '../types'
 type Tab = 'data' | 'preferences' | 'categories'
 
 export default function Settings() {
-  const { appData, updateSettings, clearAllData, importData } = useBudget()
+  const { appData, updateSettings, clearAllData, importData, addMissingDefaultCategories } = useBudget()
   const [activeTab, setActiveTab] = useState<Tab>('data')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -77,6 +77,15 @@ export default function Settings() {
 
   const handleCurrencyChange = (symbol: string) => {
     updateSettings({ currencySymbol: symbol })
+  }
+
+  const handleSyncCategories = () => {
+    const addedCount = addMissingDefaultCategories()
+    if (addedCount > 0) {
+      alert(`Successfully added ${addedCount} new categories to your budget!`)
+    } else {
+      alert('No new categories to add. You already have all default categories.')
+    }
   }
 
   return (
@@ -188,6 +197,29 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Sync Categories */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Sync Default Categories</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Add new default categories that were added in app updates
+              </p>
+            </div>
+            <div className="p-6">
+              <button
+                onClick={handleSyncCategories}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <SettingsIcon className="h-4 w-4" />
+                Sync Missing Categories
+              </button>
+              <p className="text-sm text-gray-500 mt-4">
+                This will add any new default categories (like business expense categories) that were added to the app
+                but aren't in your existing data. Your existing categories won't be affected.
+              </p>
             </div>
           </div>
 

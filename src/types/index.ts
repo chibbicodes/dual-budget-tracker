@@ -416,4 +416,5 @@ export interface BudgetContextState {
   exportData: () => AppData
   clearAllData: () => void
   loadSampleData: () => void
+  addMissingDefaultCategories: () => number
 }

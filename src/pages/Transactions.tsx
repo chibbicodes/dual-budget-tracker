@@ -1595,6 +1595,7 @@ function TransactionForm({
     categoryId: transaction?.categoryId || '',
     budgetType: transaction?.budgetType || defaultBudgetType,
     taxDeductible: transaction?.taxDeductible || false,
+    incomeSourceId: transaction?.incomeSourceId || '',
     notes: transaction?.notes || '',
   })
 
@@ -1638,6 +1639,15 @@ function TransactionForm({
       return updates
     })
   }
+
+  // Check if destination account is a checking account (for income source field)
+  const isDestinationChecking = useMemo(() => {
+    if (formData.transactionType === 'transfer' && formData.toAccountId) {
+      const destAccount = accounts.find(a => a.id === formData.toAccountId)
+      return destAccount?.accountType === 'checking'
+    }
+    return false
+  }, [formData.transactionType, formData.toAccountId, accounts])
 
   // Show all accounts (cross-view access)
   const filteredAccounts = accounts
@@ -1748,6 +1758,11 @@ function TransactionForm({
     // Add toAccountId for transfers
     if (formData.transactionType === 'transfer' && formData.toAccountId) {
       transactionData.toAccountId = formData.toAccountId
+
+      // Add incomeSourceId if destination is checking and source is selected
+      if (formData.incomeSourceId) {
+        transactionData.incomeSourceId = formData.incomeSourceId
+      }
     }
 
     onSubmit(transactionData)
@@ -1924,6 +1939,33 @@ function TransactionForm({
                   </option>
                 ))}
             </select>
+          </div>
+        )}
+
+        {/* Income Source (for transfers to checking accounts) */}
+        {isDestinationChecking && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Income Source
+              <span className="text-xs text-gray-500 ml-2">(Optional - for income tracking)</span>
+            </label>
+            <select
+              value={formData.incomeSourceId}
+              onChange={(e) => setFormData({ ...formData, incomeSourceId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">None (not tracked as income)</option>
+              {appData.incomeSources
+                .filter((source) => source.isActive)
+                .map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.name} ({source.budgetType === 'household' ? 'H' : 'B'})
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Link this transfer to an income source to track it in Income Tracking
+            </p>
           </div>
         )}
 

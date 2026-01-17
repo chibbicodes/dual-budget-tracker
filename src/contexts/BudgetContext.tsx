@@ -667,6 +667,69 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return deactivatedCount
   }, [appData.categories])
 
+  const addCategoryGroupsToBusinessExpenses = useCallback(() => {
+    // Map of category names to their groups
+    const categoryGroupMap: { [name: string]: string } = {
+      // Travel & Performance
+      'Travel - Airfare': 'Travel & Performance',
+      'Travel - Lodging': 'Travel & Performance',
+      'Travel - Meals': 'Travel & Performance',
+      'Travel - Transportation (rental, taxi, etc)': 'Travel & Performance',
+      'Mileage & Vehicle Expenses': 'Travel & Performance',
+      'Speaking Engagement Fees': 'Travel & Performance',
+      'Performance Equipment & Gear': 'Travel & Performance',
+      // Craft Business
+      'Craft Supplies & Materials': 'Craft Business',
+      'Packaging & Labels': 'Craft Business',
+      'Shipping & Postage': 'Craft Business',
+      'Booth/Vendor Fees': 'Craft Business',
+      'Event Registration Fees': 'Craft Business',
+      // Online & Marketing
+      'Website & Online Store Fees': 'Online & Marketing',
+      'Marketing & Advertising': 'Online & Marketing',
+      'Business Cards & Promotional Materials': 'Online & Marketing',
+      'Photography & Media': 'Online & Marketing',
+      // Professional Services
+      'Software & Subscriptions': 'Professional Services',
+      'Professional Development': 'Professional Services',
+      'Workshops & Classes': 'Professional Services',
+      'Licenses & Permits': 'Professional Services',
+      'Insurance': 'Professional Services',
+      // Administrative
+      'Bank & Merchant Fees': 'Administrative',
+      'Office Supplies': 'Administrative',
+      'Internet & Phone': 'Administrative',
+      'Accounting & Bookkeeping': 'Administrative',
+      'Legal & Professional Services': 'Administrative',
+      'Taxes & Compliance': 'Administrative',
+      'Other Business Expenses': 'Administrative',
+    }
+
+    let updatedCount = 0
+
+    setAppDataState((prev) => ({
+      ...prev,
+      categories: prev.categories.map((category) => {
+        // Only process business_expenses categories without categoryGroup
+        if (
+          category.budgetType === 'business' &&
+          category.bucketId === 'business_expenses' &&
+          !category.categoryGroup &&
+          categoryGroupMap[category.name]
+        ) {
+          updatedCount++
+          return {
+            ...category,
+            categoryGroup: categoryGroupMap[category.name],
+          }
+        }
+        return category
+      }),
+    }))
+
+    return updatedCount
+  }, [appData.categories])
+
   const value: BudgetContextState = {
     currentView,
     setCurrentView,
@@ -701,6 +764,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     loadSampleData,
     addMissingDefaultCategories,
     cleanupOldBusinessExpenseCategories,
+    addCategoryGroupsToBusinessExpenses,
   }
 
   return <BudgetContext.Provider value={value}>{children}</BudgetContext.Provider>

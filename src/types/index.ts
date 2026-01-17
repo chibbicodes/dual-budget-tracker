@@ -103,6 +103,7 @@ export interface Category {
   name: string
   budgetType: BudgetType
   bucketId: BucketId
+  categoryGroup?: string // Optional grouping within a bucket (e.g., "Travel & Performance", "Craft Business")
   monthlyBudget: number // Default budget amount (used if no monthly budget set)
   isFixedExpense: boolean // Amount doesn't vary month to month
   isActive: boolean
@@ -418,4 +419,5 @@ export interface BudgetContextState {
   loadSampleData: () => void
   addMissingDefaultCategories: () => number
   cleanupOldBusinessExpenseCategories: () => number
+  addCategoryGroupsToBusinessExpenses: () => number
 }

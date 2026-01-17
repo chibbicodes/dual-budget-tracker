@@ -132,7 +132,7 @@ export default function Transactions() {
     return appData.accounts
   }, [appData.accounts])
 
-  // Get filtered categories for dropdown organized by bucket and income
+  // Get filtered categories for dropdown organized by bucket/group and income
   const availableCategories = useMemo(() => {
     let categories = appData.categories
     if (currentView !== 'combined') {
@@ -147,8 +147,8 @@ export default function Transactions() {
     const incomeCategories = activeCategories.filter((c) => c.isIncomeCategory)
     const regularCategories = activeCategories.filter((c) => !c.isIncomeCategory)
 
-    // Group regular categories by bucket and sort alphabetically within each bucket
-    const grouped: { [bucketId: string]: typeof activeCategories } = {}
+    // Group regular categories by bucket/group and sort alphabetically within each group
+    const grouped: { [key: string]: typeof activeCategories } = {}
 
     // Add income categories as a special group
     if (incomeCategories.length > 0) {
@@ -156,16 +156,21 @@ export default function Transactions() {
     }
 
     regularCategories.forEach((cat) => {
-      if (!grouped[cat.bucketId]) {
-        grouped[cat.bucketId] = []
+      // For business_expenses with categoryGroup, group by categoryGroup instead of bucket
+      const groupKey = cat.bucketId === 'business_expenses' && cat.categoryGroup
+        ? `business_expenses:${cat.categoryGroup}`
+        : cat.bucketId
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = []
       }
-      grouped[cat.bucketId].push(cat)
+      grouped[groupKey].push(cat)
     })
 
-    // Sort categories within each bucket alphabetically
-    Object.keys(grouped).forEach((bucketId) => {
-      if (bucketId !== 'income') {
-        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+    // Sort categories within each group alphabetically
+    Object.keys(grouped).forEach((groupKey) => {
+      if (groupKey !== 'income') {
+        grouped[groupKey].sort((a, b) => a.name.localeCompare(b.name))
       }
     })
 
@@ -793,19 +798,25 @@ export default function Transactions() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Categories</option>
-              {Object.entries(availableCategories).map(([bucketId, categories]) => {
-                const bucketName = bucketId === 'income' ? 'Income' :
-                                   bucketId === 'needs' ? 'Needs' :
-                                   bucketId === 'wants' ? 'Wants' :
-                                   bucketId === 'savings' ? 'Savings' :
-                                   bucketId === 'business_expenses' ? 'Business Expenses' :
-                                   bucketId === 'operating' ? 'Operating' :
-                                   bucketId === 'growth' ? 'Growth' :
-                                   bucketId === 'compensation' ? 'Compensation' :
-                                   bucketId === 'tax_reserve' ? 'Tax Reserve' :
-                                   bucketId === 'business_savings' ? 'Business Savings' : bucketId
+              {Object.entries(availableCategories).map(([groupKey, categories]) => {
+                // Handle business_expenses:GroupName format
+                let groupLabel: string
+                if (groupKey.startsWith('business_expenses:')) {
+                  groupLabel = groupKey.split(':')[1] // e.g., "Travel & Performance"
+                } else {
+                  groupLabel = groupKey === 'income' ? 'Income' :
+                               groupKey === 'needs' ? 'Needs' :
+                               groupKey === 'wants' ? 'Wants' :
+                               groupKey === 'savings' ? 'Savings' :
+                               groupKey === 'business_expenses' ? 'Business Expenses' :
+                               groupKey === 'operating' ? 'Operating' :
+                               groupKey === 'growth' ? 'Growth' :
+                               groupKey === 'compensation' ? 'Compensation' :
+                               groupKey === 'tax_reserve' ? 'Tax Reserve' :
+                               groupKey === 'business_savings' ? 'Business Savings' : groupKey
+                }
                 return (
-                  <optgroup key={bucketId} label={bucketName}>
+                  <optgroup key={groupKey} label={groupLabel}>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
@@ -1077,19 +1088,25 @@ export default function Transactions() {
                             autoFocus
                             className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:ring-2 focus:ring-blue-500"
                           >
-                            {Object.entries(availableCategories).map(([bucketId, cats]) => {
-                              const bucketName = bucketId === 'income' ? 'Income' :
-                                                 bucketId === 'needs' ? 'Needs' :
-                                                 bucketId === 'wants' ? 'Wants' :
-                                                 bucketId === 'savings' ? 'Savings' :
-                                                 bucketId === 'business_expenses' ? 'Business Expenses' :
-                                                 bucketId === 'operating' ? 'Operating' :
-                                                 bucketId === 'growth' ? 'Growth' :
-                                                 bucketId === 'compensation' ? 'Compensation' :
-                                                 bucketId === 'tax_reserve' ? 'Tax Reserve' :
-                                                 bucketId === 'business_savings' ? 'Business Savings' : bucketId
+                            {Object.entries(availableCategories).map(([groupKey, cats]) => {
+                              // Handle business_expenses:GroupName format
+                              let groupLabel: string
+                              if (groupKey.startsWith('business_expenses:')) {
+                                groupLabel = groupKey.split(':')[1] // e.g., "Travel & Performance"
+                              } else {
+                                groupLabel = groupKey === 'income' ? 'Income' :
+                                             groupKey === 'needs' ? 'Needs' :
+                                             groupKey === 'wants' ? 'Wants' :
+                                             groupKey === 'savings' ? 'Savings' :
+                                             groupKey === 'business_expenses' ? 'Business Expenses' :
+                                             groupKey === 'operating' ? 'Operating' :
+                                             groupKey === 'growth' ? 'Growth' :
+                                             groupKey === 'compensation' ? 'Compensation' :
+                                             groupKey === 'tax_reserve' ? 'Tax Reserve' :
+                                             groupKey === 'business_savings' ? 'Business Savings' : groupKey
+                              }
                               return (
-                                <optgroup key={bucketId} label={bucketName}>
+                                <optgroup key={groupKey} label={groupLabel}>
                                   {cats.map((cat) => (
                                     <option key={cat.id} value={cat.id}>
                                       {cat.name}
@@ -1667,12 +1684,12 @@ function TransactionForm({
     return !c.isIncomeCategory
   })
 
-  // Group categories by bucket and income for organized display
+  // Group categories by bucket/group for organized display
   const groupedCategories = useMemo(() => {
     const incomeCategories = filteredCategories.filter((c) => c.isIncomeCategory)
     const regularCategories = filteredCategories.filter((c) => !c.isIncomeCategory)
 
-    const grouped: { [bucketId: string]: typeof filteredCategories } = {}
+    const grouped: { [key: string]: typeof filteredCategories } = {}
 
     // Add income categories as a special group
     if (incomeCategories.length > 0) {
@@ -1680,16 +1697,21 @@ function TransactionForm({
     }
 
     regularCategories.forEach((cat) => {
-      if (!grouped[cat.bucketId]) {
-        grouped[cat.bucketId] = []
+      // For business_expenses with categoryGroup, group by categoryGroup instead of bucket
+      const groupKey = cat.bucketId === 'business_expenses' && cat.categoryGroup
+        ? `business_expenses:${cat.categoryGroup}`
+        : cat.bucketId
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = []
       }
-      grouped[cat.bucketId].push(cat)
+      grouped[groupKey].push(cat)
     })
 
-    // Sort categories within each bucket alphabetically
-    Object.keys(grouped).forEach((bucketId) => {
-      if (bucketId !== 'income') {
-        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+    // Sort categories within each group alphabetically
+    Object.keys(grouped).forEach((groupKey) => {
+      if (groupKey !== 'income') {
+        grouped[groupKey].sort((a, b) => a.name.localeCompare(b.name))
       }
     })
 
@@ -1982,19 +2004,25 @@ function TransactionForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Auto-categorize</option>
-            {Object.entries(groupedCategories).map(([bucketId, cats]) => {
-              const bucketName = bucketId === 'income' ? 'Income' :
-                                 bucketId === 'needs' ? 'Needs' :
-                                 bucketId === 'wants' ? 'Wants' :
-                                 bucketId === 'savings' ? 'Savings' :
-                                 bucketId === 'business_expenses' ? 'Business Expenses' :
-                                 bucketId === 'operating' ? 'Operating' :
-                                 bucketId === 'growth' ? 'Growth' :
-                                 bucketId === 'compensation' ? 'Compensation' :
-                                 bucketId === 'tax_reserve' ? 'Tax Reserve' :
-                                 bucketId === 'business_savings' ? 'Business Savings' : bucketId
+            {Object.entries(groupedCategories).map(([groupKey, cats]) => {
+              // Handle business_expenses:GroupName format
+              let groupLabel: string
+              if (groupKey.startsWith('business_expenses:')) {
+                groupLabel = groupKey.split(':')[1] // e.g., "Travel & Performance"
+              } else {
+                groupLabel = groupKey === 'income' ? 'Income' :
+                             groupKey === 'needs' ? 'Needs' :
+                             groupKey === 'wants' ? 'Wants' :
+                             groupKey === 'savings' ? 'Savings' :
+                             groupKey === 'business_expenses' ? 'Business Expenses' :
+                             groupKey === 'operating' ? 'Operating' :
+                             groupKey === 'growth' ? 'Growth' :
+                             groupKey === 'compensation' ? 'Compensation' :
+                             groupKey === 'tax_reserve' ? 'Tax Reserve' :
+                             groupKey === 'business_savings' ? 'Business Savings' : groupKey
+              }
               return (
-                <optgroup key={bucketId} label={bucketName}>
+                <optgroup key={groupKey} label={groupLabel}>
                   {cats.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
@@ -2088,13 +2116,13 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     notes?: string
   }>({})
 
-  // Group categories by bucket and income for organized display
+  // Group categories by bucket/group for organized display
   const groupedCategories = useMemo(() => {
     const activeCategories = categories.filter((c) => c.isActive)
     const incomeCategories = activeCategories.filter((c) => c.isIncomeCategory)
     const regularCategories = activeCategories.filter((c) => !c.isIncomeCategory)
 
-    const grouped: { [bucketId: string]: typeof activeCategories } = {}
+    const grouped: { [key: string]: typeof activeCategories } = {}
 
     // Add income categories as a special group
     if (incomeCategories.length > 0) {
@@ -2102,16 +2130,21 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     }
 
     regularCategories.forEach((cat) => {
-      if (!grouped[cat.bucketId]) {
-        grouped[cat.bucketId] = []
+      // For business_expenses with categoryGroup, group by categoryGroup instead of bucket
+      const groupKey = cat.bucketId === 'business_expenses' && cat.categoryGroup
+        ? `business_expenses:${cat.categoryGroup}`
+        : cat.bucketId
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = []
       }
-      grouped[cat.bucketId].push(cat)
+      grouped[groupKey].push(cat)
     })
 
-    // Sort categories within each bucket alphabetically
-    Object.keys(grouped).forEach((bucketId) => {
-      if (bucketId !== 'income') {
-        grouped[bucketId].sort((a, b) => a.name.localeCompare(b.name))
+    // Sort categories within each group alphabetically
+    Object.keys(grouped).forEach((groupKey) => {
+      if (groupKey !== 'income') {
+        grouped[groupKey].sort((a, b) => a.name.localeCompare(b.name))
       }
     })
 
@@ -2229,19 +2262,25 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">-- Keep Current --</option>
-          {Object.entries(groupedCategories).map(([bucketId, cats]) => {
-            const bucketName = bucketId === 'income' ? 'Income' :
-                               bucketId === 'needs' ? 'Needs' :
-                               bucketId === 'wants' ? 'Wants' :
-                               bucketId === 'savings' ? 'Savings' :
-                               bucketId === 'business_expenses' ? 'Business Expenses' :
-                               bucketId === 'operating' ? 'Operating' :
-                               bucketId === 'growth' ? 'Growth' :
-                               bucketId === 'compensation' ? 'Compensation' :
-                               bucketId === 'tax_reserve' ? 'Tax Reserve' :
-                               bucketId === 'business_savings' ? 'Business Savings' : bucketId
+          {Object.entries(groupedCategories).map(([groupKey, cats]) => {
+            // Handle business_expenses:GroupName format
+            let groupLabel: string
+            if (groupKey.startsWith('business_expenses:')) {
+              groupLabel = groupKey.split(':')[1] // e.g., "Travel & Performance"
+            } else {
+              groupLabel = groupKey === 'income' ? 'Income' :
+                           groupKey === 'needs' ? 'Needs' :
+                           groupKey === 'wants' ? 'Wants' :
+                           groupKey === 'savings' ? 'Savings' :
+                           groupKey === 'business_expenses' ? 'Business Expenses' :
+                           groupKey === 'operating' ? 'Operating' :
+                           groupKey === 'growth' ? 'Growth' :
+                           groupKey === 'compensation' ? 'Compensation' :
+                           groupKey === 'tax_reserve' ? 'Tax Reserve' :
+                           groupKey === 'business_savings' ? 'Business Savings' : groupKey
+            }
             return (
-              <optgroup key={bucketId} label={bucketName}>
+              <optgroup key={groupKey} label={groupLabel}>
                 {cats.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}

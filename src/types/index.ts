@@ -417,4 +417,5 @@ export interface BudgetContextState {
   clearAllData: () => void
   loadSampleData: () => void
   addMissingDefaultCategories: () => number
+  cleanupOldBusinessExpenseCategories: () => number
 }

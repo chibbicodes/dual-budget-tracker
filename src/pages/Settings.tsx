@@ -7,7 +7,7 @@ import type { BudgetType } from '../types'
 type Tab = 'data' | 'preferences' | 'categories'
 
 export default function Settings() {
-  const { appData, updateSettings, clearAllData, importData, addMissingDefaultCategories } = useBudget()
+  const { appData, updateSettings, clearAllData, importData, addMissingDefaultCategories, cleanupOldBusinessExpenseCategories } = useBudget()
   const [activeTab, setActiveTab] = useState<Tab>('data')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -85,6 +85,17 @@ export default function Settings() {
       alert(`Successfully added ${addedCount} new categories to your budget!`)
     } else {
       alert('No new categories to add. You already have all default categories.')
+    }
+  }
+
+  const handleCleanupBusinessExpenses = () => {
+    if (confirm('This will deactivate old generic business expense categories and keep only the tailored artist categories. Historical transactions will be preserved. Continue?')) {
+      const deactivatedCount = cleanupOldBusinessExpenseCategories()
+      if (deactivatedCount > 0) {
+        alert(`Successfully cleaned up ${deactivatedCount} old business expense categories. They are now hidden from dropdowns but historical data is preserved.`)
+      } else {
+        alert('No old categories found to clean up. Your business expense categories are already up to date!')
+      }
     }
   }
 
@@ -219,6 +230,29 @@ export default function Settings() {
               <p className="text-sm text-gray-500 mt-4">
                 This will add any new default categories (like business expense categories) that were added to the app
                 but aren't in your existing data. Your existing categories won't be affected.
+              </p>
+            </div>
+          </div>
+
+          {/* Cleanup Business Expenses */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Cleanup Business Expense Categories</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Remove old generic business expense categories and keep only the tailored artist categories
+              </p>
+            </div>
+            <div className="p-6">
+              <button
+                onClick={handleCleanupBusinessExpenses}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+              >
+                <SettingsIcon className="h-4 w-4" />
+                Cleanup Old Categories
+              </button>
+              <p className="text-sm text-gray-500 mt-4">
+                This will deactivate old generic business expense categories (like "Professional Services", "Equipment & Tools", etc.)
+                while keeping the 27 tailored categories for artists (Travel, Craft Business, etc.). Historical data will be preserved.
               </p>
             </div>
           </div>

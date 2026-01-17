@@ -598,6 +598,86 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return 0
   }, [appData.categories])
 
+  const cleanupOldBusinessExpenseCategories = useCallback(() => {
+    // List of old generic business expense category names to deactivate
+    const oldGenericNames = [
+      'Office Supplies',
+      'Software & Subscriptions',
+      'Internet & Phone',
+      'Professional Services',
+      'Marketing & Advertising',
+      'Travel & Meals',
+      'Equipment & Tools',
+      'Rent & Facilities',
+      'Insurance',
+      'Licenses & Fees',
+      'Contractor Payments',
+      'Bank & Merchant Fees',
+      'Shipping & Postage',
+      'Education & Training',
+      'Taxes & Compliance',
+      'Other Business Expenses',
+    ]
+
+    // List of new tailored category names (should remain active)
+    const newTailoredNames = [
+      'Travel - Airfare',
+      'Travel - Lodging',
+      'Travel - Meals',
+      'Travel - Transportation (rental, taxi, etc)',
+      'Mileage & Vehicle Expenses',
+      'Speaking Engagement Fees',
+      'Performance Equipment & Gear',
+      'Craft Supplies & Materials',
+      'Packaging & Labels',
+      'Shipping & Postage',
+      'Booth/Vendor Fees',
+      'Event Registration Fees',
+      'Website & Online Store Fees',
+      'Marketing & Advertising',
+      'Business Cards & Promotional Materials',
+      'Photography & Media',
+      'Software & Subscriptions',
+      'Professional Development',
+      'Workshops & Classes',
+      'Licenses & Permits',
+      'Insurance',
+      'Bank & Merchant Fees',
+      'Office Supplies',
+      'Internet & Phone',
+      'Accounting & Bookkeeping',
+      'Legal & Professional Services',
+      'Taxes & Compliance',
+      'Other Business Expenses',
+    ]
+
+    let deactivatedCount = 0
+
+    setAppDataState((prev) => ({
+      ...prev,
+      categories: prev.categories.map((category) => {
+        // Only process business expense categories
+        if (
+          category.budgetType === 'business' &&
+          category.bucketId === 'business_expenses' &&
+          category.isActive
+        ) {
+          // If it's an old generic name AND not in the new tailored list, deactivate it
+          if (oldGenericNames.includes(category.name) && !newTailoredNames.includes(category.name)) {
+            deactivatedCount++
+            return {
+              ...category,
+              isActive: false,
+            }
+          }
+        }
+        return category
+      }),
+    }))
+
+    return deactivatedCount
+  }, [appData.categories])
+
   const value: BudgetContextState = {
     currentView,
     setCurrentView,
@@ -631,6 +711,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     clearAllData,
     loadSampleData,
     addMissingDefaultCategories,
+    cleanupOldBusinessExpenseCategories,
   }
 
   return <BudgetContext.Provider value={value}>{children}</BudgetContext.Provider>

@@ -175,6 +175,17 @@ export default function Budget() {
     return budgetType === 'household' ? allBuckets.household : allBuckets.business
   }, [budgetType])
 
+  // Filter buckets to show based on view
+  // Household: only needs, wants, savings
+  // Business: only business_expenses
+  const visibleBucketIds = useMemo<BucketId[]>(() => {
+    if (budgetType === 'household') {
+      return ['needs', 'wants', 'savings']
+    } else {
+      return ['business_expenses']
+    }
+  }, [budgetType])
+
   // Calculate total budgeted amount for selected month
   const totalBudgeted = useMemo(() => {
     return appData.categories
@@ -328,7 +339,9 @@ export default function Budget() {
       </div>
 
       {/* Bucket Breakdown */}
-      {budgetSummary.bucketBreakdown.map((bucket) => {
+      {budgetSummary.bucketBreakdown
+        .filter((bucket) => visibleBucketIds.includes(bucket.bucketId))
+        .map((bucket) => {
         const bucketInfo = buckets.find((b) => b.id === bucket.bucketId)
         const categoriesInBucket = appData.categories.filter(
           (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget

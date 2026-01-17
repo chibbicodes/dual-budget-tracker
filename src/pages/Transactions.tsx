@@ -56,6 +56,7 @@ export default function Transactions() {
     originalDescription: string
     similarVendors: string[]
     rowData: any
+    index: number
   } | null>(null)
   const [editableStandardizedName, setEditableStandardizedName] = useState<string>('')
   const [pendingImports, setPendingImports] = useState<any[]>([])
@@ -599,6 +600,9 @@ export default function Transactions() {
       return
     }
 
+    // Update progress indicator
+    setCurrentImportIndex(index)
+
     const importData = imports[index]
     const similarVendors = findSimilarVendors(importData.cleanedDescription)
 
@@ -609,6 +613,7 @@ export default function Transactions() {
         originalDescription: importData.originalDescription,
         similarVendors,
         rowData: importData,
+        index, // Store the index with the pending import
       })
       setEditableStandardizedName(importData.cleanedDescription)
       setVendorMatchModalOpen(true)
@@ -643,12 +648,13 @@ export default function Transactions() {
       notes: pendingImport.rowData.notes,
     })
 
+    const nextIndex = pendingImport.index + 1
+
     setVendorMatchModalOpen(false)
     setPendingImport(null)
 
-    // Process next import
-    processNextImport(pendingImports, currentImportIndex + 1, [])
-    setCurrentImportIndex(currentImportIndex + 1)
+    // Process next import using the stored index
+    processNextImport(pendingImports, nextIndex, [])
   }
 
   // Calculate totals

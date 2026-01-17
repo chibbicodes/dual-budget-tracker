@@ -89,7 +89,14 @@ export default function Settings() {
   }
 
   const handleCleanupBusinessExpenses = () => {
-    if (confirm('This will deactivate old generic business expense categories and keep only the tailored artist categories. Historical transactions will be preserved. Continue?')) {
+    // First, show diagnostic info
+    const activeBusinessExpenses = appData.categories.filter(
+      (c) => c.budgetType === 'business' && c.bucketId === 'business_expenses' && c.isActive
+    )
+
+    const diagnosticInfo = `You currently have ${activeBusinessExpenses.length} active business expense categories:\n\n${activeBusinessExpenses.map(c => `- ${c.name}`).join('\n')}\n\nClick OK to deactivate all except the 27 tailored artist categories.`
+
+    if (confirm(diagnosticInfo)) {
       const deactivatedCount = cleanupOldBusinessExpenseCategories()
       if (deactivatedCount > 0) {
         alert(`Successfully cleaned up ${deactivatedCount} old business expense categories. They are now hidden from dropdowns but historical data is preserved.`)

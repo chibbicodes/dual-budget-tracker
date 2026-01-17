@@ -599,28 +599,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [appData.categories])
 
   const cleanupOldBusinessExpenseCategories = useCallback(() => {
-    // List of old generic business expense category names to deactivate
-    const oldGenericNames = [
-      'Office Supplies',
-      'Software & Subscriptions',
-      'Internet & Phone',
-      'Professional Services',
-      'Marketing & Advertising',
-      'Travel & Meals',
-      'Equipment & Tools',
-      'Rent & Facilities',
-      'Insurance',
-      'Licenses & Fees',
-      'Contractor Payments',
-      'Bank & Merchant Fees',
-      'Shipping & Postage',
-      'Education & Training',
-      'Taxes & Compliance',
-      'Other Business Expenses',
-    ]
-
-    // List of new tailored category names (should remain active)
-    const newTailoredNames = [
+    // List of the ONLY 27 tailored category names that should remain active
+    const tailoredCategoryNames = [
+      // Travel & Performance (7)
       'Travel - Airfare',
       'Travel - Lodging',
       'Travel - Meals',
@@ -628,20 +609,24 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       'Mileage & Vehicle Expenses',
       'Speaking Engagement Fees',
       'Performance Equipment & Gear',
+      // Craft Business (5)
       'Craft Supplies & Materials',
       'Packaging & Labels',
       'Shipping & Postage',
       'Booth/Vendor Fees',
       'Event Registration Fees',
+      // Online & Marketing (4)
       'Website & Online Store Fees',
       'Marketing & Advertising',
       'Business Cards & Promotional Materials',
       'Photography & Media',
+      // Professional Services (5)
       'Software & Subscriptions',
       'Professional Development',
       'Workshops & Classes',
       'Licenses & Permits',
       'Insurance',
+      // Administrative (6)
       'Bank & Merchant Fees',
       'Office Supplies',
       'Internet & Phone',
@@ -656,14 +641,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setAppDataState((prev) => ({
       ...prev,
       categories: prev.categories.map((category) => {
-        // Only process business expense categories
+        // Only process active business expense categories
         if (
           category.budgetType === 'business' &&
           category.bucketId === 'business_expenses' &&
           category.isActive
         ) {
-          // If it's an old generic name AND not in the new tailored list, deactivate it
-          if (oldGenericNames.includes(category.name) && !newTailoredNames.includes(category.name)) {
+          // If it's NOT in the tailored list, deactivate it
+          if (!tailoredCategoryNames.includes(category.name)) {
             deactivatedCount++
             return {
               ...category,

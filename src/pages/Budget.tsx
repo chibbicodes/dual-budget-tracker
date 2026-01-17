@@ -1,5 +1,5 @@
 import { useBudget } from '../contexts/BudgetContext'
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
 import { getAllBuckets } from '../data/defaultCategories'
 import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2, Archive, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -438,7 +438,346 @@ export default function Budget() {
                         No active categories in this bucket
                       </td>
                     </tr>
+                  ) : bucket.bucketId === 'business_expenses' ? (
+                    // For business_expenses, group by categoryGroup
+                    (() => {
+                      // Group categories by their categoryGroup
+                      const grouped = new Map<string, Category[]>()
+                      const ungrouped: Category[] = []
+
+                      categoriesInBucket.forEach((cat) => {
+                        if (cat.categoryGroup) {
+                          if (!grouped.has(cat.categoryGroup)) {
+                            grouped.set(cat.categoryGroup, [])
+                          }
+                          grouped.get(cat.categoryGroup)!.push(cat)
+                        } else {
+                          ungrouped.push(cat)
+                        }
+                      })
+
+                      // Sort groups alphabetically
+                      const sortedGroups = Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+
+                      return (
+                        <>
+                          {sortedGroups.map(([groupName, groupCategories]) => (
+                            <React.Fragment key={groupName}>
+                              {/* Group Header Row */}
+                              <tr className="bg-indigo-50">
+                                <td colSpan={7} className="py-2 px-3">
+                                  <h4 className="text-sm font-semibold text-indigo-900">
+                                    {groupName}
+                                  </h4>
+                                </td>
+                              </tr>
+                              {/* Categories in this group */}
+                              {groupCategories.map((category) => {
+                                const categoryBreakdown = bucket.categories.find(
+                                  (c) => c.categoryId === category.id
+                                )
+
+                                const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
+                                const budgeted = monthlyBudget?.amount ?? category.monthlyBudget
+                                const suggested = suggestedBudgets.get(category.id) || 0
+                                const actual = categoryBreakdown?.actual || 0
+                                const remaining = budgeted - actual
+                                const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0
+
+                                return (
+                                  <tr key={category.id} className="hover:bg-gray-50">
+                                    <td className="py-4 pl-8">
+                                      <div className="flex items-center">
+                                        <div>
+                                          <p className="font-medium text-gray-900">{category.name}</p>
+                                          {category.isFixedExpense && (
+                                            <span className="text-xs text-blue-600">Fixed</span>
+                                          )}
+                                          {category.taxDeductibleByDefault && (
+                                            <span className="text-xs text-green-600 ml-2">Tax Deductible</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      <p className="text-sm text-purple-600 font-medium">
+                                        {formatCurrency(suggested)}
+                                      </p>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      {editingCategory === category.id ? (
+                                        <div className="flex items-center justify-end">
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            value={editValue}
+                                            onChange={(e) => setEditValue(e.target.value)}
+                                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                handleSaveEdit(category.id)
+                                              } else if (e.key === 'Escape') {
+                                                handleCancelEdit()
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                      ) : (
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {formatCurrency(budgeted)}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      <p className="text-sm text-red-600">
+                                        {formatCurrency(actual)}
+                                      </p>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      <p
+                                        className={`text-sm font-medium ${
+                                          remaining >= 0 ? 'text-green-600' : 'text-red-600'
+                                        }`}
+                                      >
+                                        {formatCurrency(remaining)}
+                                      </p>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      <div className="flex items-center justify-end space-x-2">
+                                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                                          <div
+                                            className={`h-2 rounded-full ${
+                                              percentUsed > 100
+                                                ? 'bg-red-500'
+                                                : percentUsed > 90
+                                                ? 'bg-yellow-500'
+                                                : 'bg-green-500'
+                                            }`}
+                                            style={{
+                                              width: `${Math.min(percentUsed, 100)}%`,
+                                            }}
+                                          />
+                                        </div>
+                                        <span
+                                          className={`text-xs font-medium ${
+                                            percentUsed > 100
+                                              ? 'text-red-600'
+                                              : percentUsed > 90
+                                              ? 'text-yellow-600'
+                                              : 'text-green-600'
+                                          }`}
+                                        >
+                                          {percentUsed.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                      {editingCategory === category.id ? (
+                                        <div className="flex items-center justify-end space-x-2">
+                                          <button
+                                            onClick={() => handleSaveEdit(category.id)}
+                                            className="text-green-600 hover:text-green-800"
+                                            title="Save"
+                                          >
+                                            <Check className="w-5 h-5" />
+                                          </button>
+                                          <button
+                                            onClick={handleCancelEdit}
+                                            className="text-red-600 hover:text-red-800"
+                                            title="Cancel"
+                                          >
+                                            <X className="w-5 h-5" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-end space-x-2">
+                                          <button
+                                            onClick={() =>
+                                              handleStartEdit(category.id, category.monthlyBudget)
+                                            }
+                                            className="text-blue-600 hover:text-blue-800"
+                                            title="Quick edit budget amount"
+                                          >
+                                            <Edit className="w-5 h-5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleOpenEditModal(category)}
+                                            className="text-gray-600 hover:text-gray-800"
+                                            title="Edit category details"
+                                          >
+                                            <Settings2 className="w-5 h-5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteCategory(category.id)}
+                                            className="text-red-600 hover:text-red-800"
+                                            title="Delete category"
+                                          >
+                                            <Trash2 className="w-5 h-5" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </React.Fragment>
+                          ))}
+                          {/* Ungrouped categories */}
+                          {ungrouped.map((category) => {
+                            const categoryBreakdown = bucket.categories.find(
+                              (c) => c.categoryId === category.id
+                            )
+
+                            const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
+                            const budgeted = monthlyBudget?.amount ?? category.monthlyBudget
+                            const suggested = suggestedBudgets.get(category.id) || 0
+                            const actual = categoryBreakdown?.actual || 0
+                            const remaining = budgeted - actual
+                            const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0
+
+                            return (
+                              <tr key={category.id} className="hover:bg-gray-50">
+                                <td className="py-4">
+                                  <div className="flex items-center">
+                                    <div>
+                                      <p className="font-medium text-gray-900">{category.name}</p>
+                                      {category.isFixedExpense && (
+                                        <span className="text-xs text-blue-600">Fixed</span>
+                                      )}
+                                      {category.taxDeductibleByDefault && (
+                                        <span className="text-xs text-green-600 ml-2">Tax Deductible</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <p className="text-sm text-purple-600 font-medium">
+                                    {formatCurrency(suggested)}
+                                  </p>
+                                </td>
+                                <td className="py-4 text-right">
+                                  {editingCategory === category.id ? (
+                                    <div className="flex items-center justify-end">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={editValue}
+                                        onChange={(e) => setEditValue(e.target.value)}
+                                        className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleSaveEdit(category.id)
+                                          } else if (e.key === 'Escape') {
+                                            handleCancelEdit()
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {formatCurrency(budgeted)}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="py-4 text-right">
+                                  <p className="text-sm text-red-600">
+                                    {formatCurrency(actual)}
+                                  </p>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <p
+                                    className={`text-sm font-medium ${
+                                      remaining >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}
+                                  >
+                                    {formatCurrency(remaining)}
+                                  </p>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <div className="flex items-center justify-end space-x-2">
+                                    <div className="w-24 bg-gray-200 rounded-full h-2">
+                                      <div
+                                        className={`h-2 rounded-full ${
+                                          percentUsed > 100
+                                            ? 'bg-red-500'
+                                            : percentUsed > 90
+                                            ? 'bg-yellow-500'
+                                            : 'bg-green-500'
+                                        }`}
+                                        style={{
+                                          width: `${Math.min(percentUsed, 100)}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <span
+                                      className={`text-xs font-medium ${
+                                        percentUsed > 100
+                                          ? 'text-red-600'
+                                          : percentUsed > 90
+                                          ? 'text-yellow-600'
+                                          : 'text-green-600'
+                                      }`}
+                                    >
+                                      {percentUsed.toFixed(0)}%
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-4 text-right">
+                                  {editingCategory === category.id ? (
+                                    <div className="flex items-center justify-end space-x-2">
+                                      <button
+                                        onClick={() => handleSaveEdit(category.id)}
+                                        className="text-green-600 hover:text-green-800"
+                                        title="Save"
+                                      >
+                                        <Check className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={handleCancelEdit}
+                                        className="text-red-600 hover:text-red-800"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-5 h-5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-end space-x-2">
+                                      <button
+                                        onClick={() =>
+                                          handleStartEdit(category.id, category.monthlyBudget)
+                                        }
+                                        className="text-blue-600 hover:text-blue-800"
+                                        title="Quick edit budget amount"
+                                      >
+                                        <Edit className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleOpenEditModal(category)}
+                                        className="text-gray-600 hover:text-gray-800"
+                                        title="Edit category details"
+                                      >
+                                        <Settings2 className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteCategory(category.id)}
+                                        className="text-red-600 hover:text-red-800"
+                                        title="Delete category"
+                                      >
+                                        <Trash2 className="w-5 h-5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </>
+                      )
+                    })()
                   ) : (
+                    // For other buckets, render categories flat
                     categoriesInBucket.map((category) => {
                       const categoryBreakdown = bucket.categories.find(
                         (c) => c.categoryId === category.id
@@ -666,15 +1005,25 @@ function CategoryForm({ budgetType, buckets, category, onSubmit, onCancel }: Cat
   const [formData, setFormData] = useState({
     name: category?.name || '',
     bucketId: category?.bucketId || buckets[0]?.id || '',
+    categoryGroup: category?.categoryGroup || '',
     monthlyBudget: category?.monthlyBudget?.toString() || '0',
     isFixedExpense: category?.isFixedExpense || false,
     taxDeductibleByDefault: category?.taxDeductibleByDefault || false,
     isActive: category?.isActive ?? true,
   })
 
+  // Available category groups for business_expenses
+  const categoryGroups = [
+    'Travel & Performance',
+    'Craft Business',
+    'Online & Marketing',
+    'Professional Services',
+    'Administrative',
+  ]
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
+    const submitData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'> = {
       name: formData.name,
       budgetType,
       bucketId: formData.bucketId as BucketId,
@@ -684,7 +1033,14 @@ function CategoryForm({ budgetType, buckets, category, onSubmit, onCancel }: Cat
       taxDeductibleByDefault: formData.taxDeductibleByDefault,
       icon: '',
       autoCategorization: category?.autoCategorization || [],
-    })
+    }
+
+    // Only include categoryGroup if bucketId is business_expenses and a group is selected
+    if (formData.bucketId === 'business_expenses' && formData.categoryGroup) {
+      submitData.categoryGroup = formData.categoryGroup
+    }
+
+    onSubmit(submitData)
   }
 
   return (
@@ -722,6 +1078,30 @@ function CategoryForm({ budgetType, buckets, category, onSubmit, onCancel }: Cat
           ))}
         </select>
       </div>
+
+      {/* Category Group (only for business_expenses) */}
+      {formData.bucketId === 'business_expenses' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Category Group
+          </label>
+          <select
+            value={formData.categoryGroup}
+            onChange={(e) => setFormData({ ...formData, categoryGroup: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">None (Ungrouped)</option>
+            {categoryGroups.map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Organize this category into a logical group for better organization
+          </p>
+        </div>
+      )}
 
       {/* Monthly Budget */}
       <div>

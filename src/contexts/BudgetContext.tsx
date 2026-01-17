@@ -140,6 +140,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         id: generateId(),
         categoryId,
         bucketId,
+        reconciled: transaction.reconciled ?? false,
         createdAt: now,
         updatedAt: now,
       }
@@ -169,6 +170,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
               accountId: transaction.toAccountId,
               amount: Math.abs(transaction.amount), // Positive amount for deposit
               toAccountId: undefined, // Don't create circular reference
+              reconciled: transaction.reconciled ?? false,
               description: transaction.description || 'Transfer from ' + sourceAccount?.name,
               createdAt: now,
               updatedAt: now,

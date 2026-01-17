@@ -626,6 +626,7 @@ export default function Transactions() {
         categoryId: importData.categoryId,
         accountId: importData.accountId,
         budgetType: importData.budgetType,
+        reconciled: false,
         taxDeductible: false,
         notes: importData.notes,
       })
@@ -644,6 +645,7 @@ export default function Transactions() {
       categoryId: pendingImport.rowData.categoryId,
       accountId: pendingImport.rowData.accountId,
       budgetType: pendingImport.rowData.budgetType,
+      reconciled: false,
       taxDeductible: false,
       notes: pendingImport.rowData.notes,
     })

@@ -39,6 +39,12 @@ export const HOUSEHOLD_BUCKETS: HouseholdBucket[] = [
 
 export const BUSINESS_BUCKETS: BusinessBucket[] = [
   {
+    id: 'business_expenses',
+    name: 'Business Expenses',
+    description: 'All business operating costs',
+    colorClass: 'bg-business-500',
+  },
+  {
     id: 'operating',
     name: 'Operating Expenses',
     description: 'Essential business costs',
@@ -797,6 +803,174 @@ export const TRANSFER_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt
 ]
 
 // ============================================================================
+// BUSINESS EXPENSE CATEGORIES (Separate bucket, not part of % split)
+// ============================================================================
+
+export const BUSINESS_EXPENSE_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  // Common business expenses
+  {
+    name: 'Office Supplies',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Software & Subscriptions',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: true,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Internet & Phone',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: true,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Professional Services',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Marketing & Advertising',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Travel & Meals',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Equipment & Tools',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Rent & Facilities',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: true,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Insurance',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: true,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Licenses & Fees',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Contractor Payments',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Bank & Merchant Fees',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Shipping & Postage',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Education & Training',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+  {
+    name: 'Taxes & Compliance',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: false,
+    autoCategorization: [],
+  },
+  {
+    name: 'Other Business Expenses',
+    budgetType: 'business',
+    bucketId: 'business_expenses',
+    monthlyBudget: 0,
+    isFixedExpense: false,
+    isActive: true,
+    taxDeductibleByDefault: true,
+    autoCategorization: [],
+  },
+]
+
+// ============================================================================
 // BUSINESS CATEGORIES
 // ============================================================================
 
@@ -1188,7 +1362,13 @@ export const BUSINESS_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt
  */
 export function generateDefaultCategories(): Category[] {
   const now = new Date().toISOString()
-  const allCategories = [...HOUSEHOLD_CATEGORIES, ...BUSINESS_CATEGORIES, ...INCOME_CATEGORIES, ...TRANSFER_CATEGORIES]
+  const allCategories = [
+    ...HOUSEHOLD_CATEGORIES,
+    ...BUSINESS_EXPENSE_CATEGORIES,
+    ...BUSINESS_CATEGORIES,
+    ...INCOME_CATEGORIES,
+    ...TRANSFER_CATEGORIES
+  ]
 
   return allCategories.map((cat) => ({
     ...cat,

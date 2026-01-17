@@ -50,7 +50,9 @@ export interface Transaction {
   budgetType: BudgetType // Auto-assigned from account, but can be overridden
   accountId: string
   toAccountId?: string // For transfers: destination account
+  incomeSourceId?: string // For transfers into checking: link to income source for tracking
   taxDeductible: boolean // Primarily for business, available for household
+  reconciled: boolean // Has transaction been reviewed/confirmed
   notes?: string
   createdAt: string
   updatedAt: string
@@ -78,6 +80,7 @@ export type BusinessBucketId =
   | 'compensation'
   | 'tax_reserve'
   | 'business_savings'
+  | 'business_expenses' // Separate from 50/30/20 split
 
 export interface BusinessBucket {
   id: BusinessBucketId

@@ -929,6 +929,9 @@ export default function Transactions() {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reconciled?
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
@@ -965,6 +968,16 @@ export default function Transactions() {
                           checked={selectedTransactionIds.has(transaction.id)}
                           onChange={() => handleSelectTransaction(transaction.id)}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </td>
+                      {/* Reconciled - Checkbox */}
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="checkbox"
+                          checked={transaction.reconciled}
+                          onChange={() => updateTransaction(transaction.id, { reconciled: !transaction.reconciled })}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
+                          title={transaction.reconciled ? "Mark as unreconciled" : "Mark as reconciled"}
                         />
                       </td>
                       {/* Date - Editable */}

@@ -2018,10 +2018,14 @@ interface BulkEditFormProps {
 
 function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCancel }: BulkEditFormProps) {
   const [formData, setFormData] = useState<{
+    date?: string
+    description?: string
+    amount?: string
     categoryId?: string
     accountId?: string
     budgetType?: BudgetType
     taxDeductible?: boolean
+    notes?: string
   }>({})
 
   // Group categories by bucket and income for organized display
@@ -2059,10 +2063,19 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
 
     // Only include fields that have been set
     const updates: Partial<Transaction> = {}
+    if (formData.date) updates.date = formData.date
+    if (formData.description) updates.description = formData.description
+    if (formData.amount) {
+      const amount = parseFloat(formData.amount)
+      if (!isNaN(amount)) {
+        updates.amount = amount
+      }
+    }
     if (formData.categoryId) updates.categoryId = formData.categoryId
     if (formData.accountId) updates.accountId = formData.accountId
     if (formData.budgetType) updates.budgetType = formData.budgetType
     if (formData.taxDeductible !== undefined) updates.taxDeductible = formData.taxDeductible
+    if (formData.notes) updates.notes = formData.notes
 
     if (Object.keys(updates).length === 0) {
       alert('Please select at least one field to update')
@@ -2082,23 +2095,67 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
         </p>
       </div>
 
-      {/* Account */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Account (optional)
-        </label>
-        <select
-          value={formData.accountId || ''}
-          onChange={(e) => setFormData({ ...formData, accountId: e.target.value || undefined })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">-- Keep Current --</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date (optional)
+          </label>
+          <input
+            type="date"
+            value={formData.date || ''}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value || undefined })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description (optional)
+          </label>
+          <input
+            type="text"
+            value={formData.description || ''}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value || undefined })}
+            placeholder="-- Keep Current --"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Amount */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Amount (optional)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.amount || ''}
+            onChange={(e) => setFormData({ ...formData, amount: e.target.value || undefined })}
+            placeholder="-- Keep Current --"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Account */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Account (optional)
+          </label>
+          <select
+            value={formData.accountId || ''}
+            onChange={(e) => setFormData({ ...formData, accountId: e.target.value || undefined })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Keep Current --</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Category */}
@@ -2171,6 +2228,20 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
           <option value="true">Yes</option>
           <option value="false">No</option>
         </select>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Notes (optional)
+        </label>
+        <textarea
+          value={formData.notes || ''}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value || undefined })}
+          rows={3}
+          placeholder="-- Keep Current --"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
       </div>
 
       {/* Form Actions */}

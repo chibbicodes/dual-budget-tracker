@@ -3,9 +3,9 @@ import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
 import Modal from '../components/Modal'
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar } from 'lucide-react'
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { BudgetType, Income as IncomeType } from '../types'
-import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
+import { startOfMonth, endOfMonth, format, parseISO, addMonths, subMonths, differenceInDays } from 'date-fns'
 
 type BudgetFilter = 'all' | BudgetType
 
@@ -14,6 +14,28 @@ export default function Income() {
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState<IncomeType | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
+
+  // Generate month options (3 months prior to 3 months future)
+  const monthOptions = useMemo(() => {
+    const options = []
+    const currentDate = new Date()
+    for (let i = -3; i <= 3; i++) {
+      const monthDate = addMonths(currentDate, i)
+      options.push({
+        date: monthDate,
+        label: format(monthDate, 'MMMM yyyy'),
+        value: format(monthDate, 'yyyy-MM'),
+      })
+    }
+    return options
+  }, [])
+
+  // Get month string for selected month (YYYY-MM format)
+  const selectedMonthString = useMemo(
+    () => format(selectedMonth, 'yyyy-MM'),
+    [selectedMonth]
+  )
 
   // Filter income sources
   const filteredIncome = useMemo(() => {
@@ -28,10 +50,47 @@ export default function Income() {
     return income.sort((a, b) => a.source.localeCompare(b.source))
   }, [appData.income, currentView, budgetFilter])
 
-  // Calculate actual income for current month from transactions
+  // Helper function to calculate recurring income occurrences in a month
+  const calculateRecurringOccurrences = (income: IncomeType, monthDate: Date): number => {
+    if (!income.isRecurring) {
+      // One-time income: check if expected date falls in this month
+      if (income.expectedDate) {
+        const expectedDate = parseISO(income.expectedDate)
+        const monthStart = startOfMonth(monthDate)
+        const monthEnd = endOfMonth(monthDate)
+        return expectedDate >= monthStart && expectedDate <= monthEnd ? 1 : 0
+      }
+      return 0
+    }
+
+    const monthStart = startOfMonth(monthDate)
+    const monthEnd = endOfMonth(monthDate)
+    const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
+
+    switch (income.recurringFrequency) {
+      case 'weekly':
+        // Approximately 4-5 times per month
+        return Math.floor(daysInMonth / 7)
+      case 'bi-weekly':
+        // Every 2 weeks = approximately 2 times per month
+        return Math.floor(daysInMonth / 14)
+      case 'every-15-days':
+        // Every 15 days = approximately 2 times per month
+        return Math.floor(daysInMonth / 15)
+      case 'monthly':
+      case 'same-day-each-month':
+        // Once per month
+        return 1
+      default:
+        // Default to once per month if frequency is unknown
+        return 1
+    }
+  }
+
+  // Calculate actual income for selected month from transactions
   const actualIncomeThisMonth = useMemo(() => {
-    const monthStart = startOfMonth(new Date())
-    const monthEnd = endOfMonth(new Date())
+    const monthStart = startOfMonth(selectedMonth)
+    const monthEnd = endOfMonth(selectedMonth)
 
     return appData.transactions
       .filter((t) => {
@@ -43,26 +102,30 @@ export default function Income() {
         return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
       })
       .reduce((sum, t) => sum + t.amount, 0)
-  }, [appData.transactions, currentView, budgetFilter])
+  }, [appData.transactions, currentView, budgetFilter, selectedMonth])
 
-  // Calculate expected income for current month
+  // Calculate expected income for selected month (with recurring occurrences)
   const expectedIncomeThisMonth = useMemo(() => {
     return filteredIncome
-      .filter((i) => i.isRecurring || i.expectedDate)
-      .reduce((sum, i) => sum + (i.expectedAmount || 0), 0)
-  }, [filteredIncome])
+      .map((i) => {
+        const occurrences = calculateRecurringOccurrences(i, selectedMonth)
+        return occurrences * (i.expectedAmount || 0)
+      })
+      .reduce((sum, amount) => sum + amount, 0)
+  }, [filteredIncome, selectedMonth])
 
   // Income by source breakdown
   const incomeBySource = useMemo(() => {
-    const monthStart = startOfMonth(new Date())
-    const monthEnd = endOfMonth(new Date())
+    const monthStart = startOfMonth(selectedMonth)
+    const monthEnd = endOfMonth(selectedMonth)
 
     const sourceMap = new Map<string, { expected: number; actual: number; source: IncomeType }>()
 
-    // Initialize with expected amounts
+    // Initialize with expected amounts (with recurring occurrences calculated)
     filteredIncome.forEach((income) => {
+      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
       sourceMap.set(income.id, {
-        expected: income.expectedAmount || 0,
+        expected: occurrences * (income.expectedAmount || 0),
         actual: 0,
         source: income,
       })
@@ -96,7 +159,7 @@ export default function Income() {
       })
 
     return Array.from(sourceMap.values()).sort((a, b) => b.expected - a.expected)
-  }, [filteredIncome, appData.transactions, currentView, budgetFilter])
+  }, [filteredIncome, appData.transactions, currentView, budgetFilter, selectedMonth])
 
   const handleAdd = (income: Omit<IncomeType, 'id'>) => {
     addIncome(income)
@@ -171,11 +234,47 @@ export default function Income() {
         </div>
       </div>
 
+      {/* Month Selector */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Previous month"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Viewing:</label>
+            <select
+              value={selectedMonthString}
+              onChange={(e) => setSelectedMonth(parseISO(e.target.value + '-01'))}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Next month"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Expected This Month</h3>
+            <h3 className="text-sm font-medium text-gray-600">Expected ({format(selectedMonth, 'MMM yyyy')})</h3>
             <Calendar className="h-5 w-5 text-gray-400" />
           </div>
           <p className="text-2xl font-bold text-gray-900">{formatCurrency(expectedIncomeThisMonth)}</p>
@@ -183,7 +282,7 @@ export default function Income() {
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Actual This Month</h3>
+            <h3 className="text-sm font-medium text-gray-600">Actual ({format(selectedMonth, 'MMM yyyy')})</h3>
             <TrendingUp className="h-5 w-5 text-gray-400" />
           </div>
           <p className="text-2xl font-bold text-gray-900">{formatCurrency(actualIncomeThisMonth)}</p>
@@ -212,7 +311,7 @@ export default function Income() {
       {/* Income by source breakdown */}
       <div className="bg-white rounded-lg shadow mb-6">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Income by Source (This Month)</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Income by Source ({format(selectedMonth, 'MMMM yyyy')})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">

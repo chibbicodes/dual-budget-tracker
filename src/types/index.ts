@@ -75,12 +75,13 @@ export interface HouseholdBucket {
 
 // Business Buckets
 export type BusinessBucketId =
-  | 'operating'
-  | 'growth'
-  | 'compensation'
-  | 'tax_reserve'
-  | 'business_savings'
-  | 'business_expenses' // Separate from 50/30/20 split
+  | 'travel_performance'
+  | 'craft_business'
+  | 'online_marketing'
+  | 'professional_services'
+  | 'administrative'
+  | 'personnel'
+  | 'business_expenses' // Legacy - used for filtering logic
 
 export interface BusinessBucket {
   id: BusinessBucketId

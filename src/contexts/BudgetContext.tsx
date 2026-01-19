@@ -174,12 +174,31 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           const destAccount = accounts.find((a) => a.id === transactionWithoutLinking.toAccountId)
           if (destAccount) {
             if (linkingOption === 'create_paired') {
+              // Find the category for the paired transaction (should match budget type)
+              let pairedCategoryId = categoryId
+              let pairedBucketId = bucketId
+
+              // If the category doesn't match the destination budget type, try to find a matching Transfer/Payment category
+              const pairedCategory = appData.categories.find(c => c.id === categoryId && c.budgetType === destAccount.budgetType)
+              if (!pairedCategory) {
+                // Look for Transfer/Payment category in destination budget
+                const transferCategory = appData.categories.find(
+                  c => c.name === 'Transfer/Payment' && c.budgetType === destAccount.budgetType
+                )
+                if (transferCategory) {
+                  pairedCategoryId = transferCategory.id
+                  pairedBucketId = transferCategory.bucketId
+                }
+              }
+
               // Create paired transaction and link both
               const depositTransaction: Transaction = {
                 ...transactionWithoutLinking,
                 id: pairedTransactionId,
                 accountId: transactionWithoutLinking.toAccountId,
                 amount: Math.abs(transactionWithoutLinking.amount), // Positive amount for deposit
+                categoryId: pairedCategoryId,
+                bucketId: pairedBucketId,
                 budgetType: destAccount.budgetType,
                 toAccountId: undefined, // Don't create circular reference
                 linkedTransactionId: mainTransactionId, // Link to source transaction

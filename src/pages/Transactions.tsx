@@ -1706,6 +1706,14 @@ function TransactionForm({
 }: TransactionFormProps) {
   const { appData } = useBudget()
 
+  // Helper to get local date string without timezone conversion
+  const getLocalDateString = (date: Date = new Date()) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Combine legacy income and new incomeSources for dropdown
   const allIncomeSources = useMemo(() => {
     const sources: Array<{ id: string; name: string; budgetType: BudgetType }> = []
@@ -1733,8 +1741,8 @@ function TransactionForm({
     return sources.sort((a, b) => a.name.localeCompare(b.name))
   }, [appData.incomeSources, appData.income])
 
-  const [formData, setFormData] = useState({
-    date: transaction?.date || new Date().toISOString().split('T')[0],
+  const [formData, setFormData] = useState(() => ({
+    date: transaction?.date || getLocalDateString(),
     description: transaction?.description || '',
     amount: transaction?.amount ? Math.abs(transaction.amount).toString() : '',
     transactionType: transaction?.toAccountId ? 'transfer' : transaction?.amount ? (transaction.amount >= 0 ? 'income' : 'expense') : 'expense',
@@ -1747,7 +1755,7 @@ function TransactionForm({
     notes: transaction?.notes || '',
     linkingOption: 'create_paired' as 'create_paired' | 'link_existing' | 'no_link',
     linkedTransactionId: transaction?.linkedTransactionId || '',
-  })
+  }))
 
   // Get unique vendors from past transactions
   const uniqueVendors = useMemo(() => {
@@ -1948,19 +1956,25 @@ function TransactionForm({
       notes: formData.notes || undefined,
     }
 
-    // Add toAccountId for transfers
+    // Add incomeSourceId for income transactions (not just transfers)
+    if (formData.incomeSourceId && (formData.transactionType === 'income' || formData.transactionType === 'transfer')) {
+      transactionData.incomeSourceId = formData.incomeSourceId
+    }
+
+    // Add toAccountId and linking info for transfers
     if (formData.transactionType === 'transfer' && formData.toAccountId) {
       transactionData.toAccountId = formData.toAccountId
-
-      // Add incomeSourceId if destination is checking and source is selected
-      if (formData.incomeSourceId) {
-        transactionData.incomeSourceId = formData.incomeSourceId
-      }
 
       // Add linking information
       transactionData.linkingOption = formData.linkingOption
       if (formData.linkingOption === 'link_existing' && formData.linkedTransactionId) {
         transactionData.linkedTransactionId = formData.linkedTransactionId
+      }
+    } else {
+      // If changing from transfer to something else, explicitly clear transfer fields
+      if (transaction?.toAccountId) {
+        transactionData.toAccountId = undefined
+        transactionData.linkedTransactionId = undefined
       }
     }
 

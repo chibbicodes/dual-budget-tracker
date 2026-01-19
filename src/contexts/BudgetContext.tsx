@@ -120,15 +120,20 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ============================================================================
 
   const addTransaction = useCallback(
-    (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+    (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> & { linkingOption?: string }) => {
       const now = new Date().toISOString()
 
+      // Extract linking option
+      const linkingOption = (transaction as any).linkingOption || 'create_paired'
+      const transactionWithoutLinking = { ...transaction }
+      delete (transactionWithoutLinking as any).linkingOption
+
       // Auto-categorize if category not provided or is "uncategorized"
-      let categoryId = transaction.categoryId
+      let categoryId = transactionWithoutLinking.categoryId
       if (!categoryId || categoryId === 'uncategorized') {
         categoryId = autoCategorizeTransaction(
-          transaction.description,
-          transaction.budgetType
+          transactionWithoutLinking.description,
+          transactionWithoutLinking.budgetType
         )
       }
 
@@ -136,12 +141,16 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       const category = appData.categories.find((c) => c.id === categoryId)
       const bucketId = category?.bucketId
 
+      // Generate IDs upfront for linking
+      const mainTransactionId = generateId()
+      const pairedTransactionId = generateId()
+
       const newTransaction: Transaction = {
-        ...transaction,
-        id: generateId(),
+        ...transactionWithoutLinking,
+        id: mainTransactionId,
         categoryId,
         bucketId,
-        reconciled: transaction.reconciled ?? false,
+        reconciled: transactionWithoutLinking.reconciled ?? false,
         createdAt: now,
         updatedAt: now,
       }
@@ -151,39 +160,67 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         let accounts = prev.accounts
 
         // Update source account balance
-        const sourceAccount = accounts.find((a) => a.id === transaction.accountId)
+        const sourceAccount = accounts.find((a) => a.id === transactionWithoutLinking.accountId)
         if (sourceAccount) {
           accounts = accounts.map((a) =>
             a.id === sourceAccount.id
-              ? { ...a, balance: a.balance + transaction.amount, updatedAt: now }
+              ? { ...a, balance: a.balance + transactionWithoutLinking.amount, updatedAt: now }
               : a
           )
         }
 
-        // If this is a transfer, create corresponding deposit transaction and update destination account
-        if (transaction.toAccountId) {
-          const destAccount = accounts.find((a) => a.id === transaction.toAccountId)
+        // Handle transfer linking
+        if (transactionWithoutLinking.toAccountId) {
+          const destAccount = accounts.find((a) => a.id === transactionWithoutLinking.toAccountId)
           if (destAccount) {
-            // Create deposit transaction for destination account
-            const depositTransaction: Transaction = {
-              ...transaction,
-              id: generateId(),
-              accountId: transaction.toAccountId,
-              amount: Math.abs(transaction.amount), // Positive amount for deposit
-              toAccountId: undefined, // Don't create circular reference
-              reconciled: transaction.reconciled ?? false,
-              description: transaction.description || 'Transfer from ' + sourceAccount?.name,
-              createdAt: now,
-              updatedAt: now,
-            }
-            transactions.push(depositTransaction)
+            if (linkingOption === 'create_paired') {
+              // Create paired transaction and link both
+              const depositTransaction: Transaction = {
+                ...transactionWithoutLinking,
+                id: pairedTransactionId,
+                accountId: transactionWithoutLinking.toAccountId,
+                amount: Math.abs(transactionWithoutLinking.amount), // Positive amount for deposit
+                budgetType: destAccount.budgetType,
+                toAccountId: undefined, // Don't create circular reference
+                linkedTransactionId: mainTransactionId, // Link to source transaction
+                reconciled: transactionWithoutLinking.reconciled ?? false,
+                description: transactionWithoutLinking.description || 'Transfer from ' + sourceAccount?.name,
+                createdAt: now,
+                updatedAt: now,
+              }
+              transactions.push(depositTransaction)
 
-            // Update destination account balance
-            accounts = accounts.map((a) =>
-              a.id === destAccount.id
-                ? { ...a, balance: a.balance + Math.abs(transaction.amount), updatedAt: now }
-                : a
-            )
+              // Update main transaction to link to paired transaction
+              const mainTxIndex = transactions.findIndex(t => t.id === mainTransactionId)
+              if (mainTxIndex >= 0) {
+                transactions[mainTxIndex] = {
+                  ...transactions[mainTxIndex],
+                  linkedTransactionId: pairedTransactionId,
+                }
+              }
+
+              // Update destination account balance
+              accounts = accounts.map((a) =>
+                a.id === destAccount.id
+                  ? { ...a, balance: a.balance + Math.abs(transactionWithoutLinking.amount), updatedAt: now }
+                  : a
+              )
+            } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
+              // Link to existing transaction - update both
+              const existingTx = prev.transactions.find(t => t.id === transactionWithoutLinking.linkedTransactionId)
+              if (existingTx) {
+                // Update existing transaction to link back
+                const existingTxIndex = transactions.findIndex(t => t.id === existingTx.id)
+                if (existingTxIndex >= 0) {
+                  transactions[existingTxIndex] = {
+                    ...transactions[existingTxIndex],
+                    linkedTransactionId: mainTransactionId,
+                    updatedAt: now,
+                  }
+                }
+              }
+            }
+            // If linkingOption is 'no_link', don't create paired transaction (no balance update for dest account)
           }
         }
 

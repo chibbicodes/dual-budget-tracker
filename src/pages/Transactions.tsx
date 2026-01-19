@@ -10,6 +10,7 @@ import {
   Filter,
   CheckCircle,
   Upload,
+  Link2,
 } from 'lucide-react'
 import { formatCurrency } from '../utils/calculations'
 import { format, parseISO } from 'date-fns'
@@ -177,20 +178,96 @@ export default function Transactions() {
     return grouped
   }, [appData.categories, currentView, budgetFilter])
 
-  const handleAddTransaction = (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
-    addTransaction(transaction)
+  const handleAddTransaction = (transactionData: any) => {
+    // BudgetContext's addTransaction now handles all linking logic
+    addTransaction(transactionData)
     setIsAddModalOpen(false)
   }
 
   const handleEditTransaction = (updates: Partial<Transaction>) => {
-    if (selectedTransaction) {
-      updateTransaction(selectedTransaction.id, updates)
-      setIsEditModalOpen(false)
-      setSelectedTransaction(null)
+    if (!selectedTransaction) return
+
+    // Check if this transaction is linked
+    if (selectedTransaction.linkedTransactionId) {
+      const linkedTx = appData.transactions.find(t => t.id === selectedTransaction.linkedTransactionId)
+      if (linkedTx) {
+        // Ask if user wants to update both transactions
+        const updateBothMessage = `This transaction is linked to another transaction.\n\n` +
+          `Do you want to apply changes to BOTH transactions?\n\n` +
+          `• Click OK to update both (date, description, amount, notes will sync)\n` +
+          `• Click Cancel to update only this transaction`
+
+        const updateBoth = confirm(updateBothMessage)
+
+        if (updateBoth) {
+          // Update both transactions with synced fields
+          updateTransaction(selectedTransaction.id, updates)
+
+          // Create updates for linked transaction (sync certain fields)
+          const linkedUpdates: Partial<Transaction> = {}
+          if (updates.date) linkedUpdates.date = updates.date
+          if (updates.description) linkedUpdates.description = updates.description
+          if (updates.amount) {
+            // Keep opposite sign - if main is negative, linked is positive and vice versa
+            const mainIsNegative = (updates.amount < 0)
+            linkedUpdates.amount = mainIsNegative ? Math.abs(updates.amount) : -Math.abs(updates.amount)
+          }
+          if (updates.notes) linkedUpdates.notes = updates.notes
+          if (updates.taxDeductible !== undefined) linkedUpdates.taxDeductible = updates.taxDeductible
+
+          if (Object.keys(linkedUpdates).length > 0) {
+            updateTransaction(selectedTransaction.linkedTransactionId, linkedUpdates)
+          }
+        } else {
+          // Update only this transaction
+          updateTransaction(selectedTransaction.id, updates)
+        }
+
+        setIsEditModalOpen(false)
+        setSelectedTransaction(null)
+        return
+      }
     }
+
+    // No linked transaction, proceed with normal update
+    updateTransaction(selectedTransaction.id, updates)
+    setIsEditModalOpen(false)
+    setSelectedTransaction(null)
   }
 
   const handleDeleteTransaction = (id: string) => {
+    const transaction = appData.transactions.find(t => t.id === id)
+    if (!transaction) return
+
+    // Check if this transaction is linked to another transaction
+    if (transaction.linkedTransactionId) {
+      const linkedTx = appData.transactions.find(t => t.id === transaction.linkedTransactionId)
+      if (linkedTx) {
+        const deleteLinkedMessage = `This transaction is linked to another transaction:\n\n` +
+          `Linked: ${format(parseISO(linkedTx.date), 'MMM dd, yyyy')} - ${linkedTx.description} - ${formatCurrency(linkedTx.amount)}\n\n` +
+          `Do you want to delete BOTH transactions?\n\n` +
+          `• Click OK to delete both\n` +
+          `• Click Cancel to delete only this transaction`
+
+        const deleteBoth = confirm(deleteLinkedMessage)
+
+        if (deleteBoth) {
+          // Delete both transactions
+          deleteTransaction(id)
+          deleteTransaction(transaction.linkedTransactionId)
+        } else {
+          // Delete only this transaction and unlink the other
+          if (confirm('Are you sure you want to delete this transaction? The linked transaction will be unlinked.')) {
+            deleteTransaction(id)
+            // Unlink the other transaction
+            updateTransaction(transaction.linkedTransactionId, { linkedTransactionId: undefined })
+          }
+        }
+        return
+      }
+    }
+
+    // No linked transaction, proceed with normal deletion
     if (confirm('Are you sure you want to delete this transaction?')) {
       deleteTransaction(id)
     }
@@ -1040,12 +1117,20 @@ export default function Transactions() {
                                 {transaction.notes}
                               </p>
                             )}
-                            {transaction.taxDeductible && (
-                              <div className="flex items-center mt-1">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-1" />
-                                <span className="text-xs text-green-600">Tax Deductible</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-3 mt-1">
+                              {transaction.linkedTransactionId && (
+                                <div className="flex items-center">
+                                  <Link2 className="w-3 h-3 text-blue-500 mr-1" />
+                                  <span className="text-xs text-blue-600">Linked</span>
+                                </div>
+                              )}
+                              {transaction.taxDeductible && (
+                                <div className="flex items-center">
+                                  <CheckCircle className="w-3 h-3 text-green-500 mr-1" />
+                                  <span className="text-xs text-green-600">Tax Deductible</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -1233,17 +1318,34 @@ export default function Transactions() {
         size="lg"
       >
         {selectedTransaction && (
-          <TransactionForm
-            transaction={selectedTransaction}
-            accounts={appData.accounts}
-            categories={appData.categories}
-            onSubmit={handleEditTransaction}
-            onCancel={() => {
-              setIsEditModalOpen(false)
-              setSelectedTransaction(null)
-            }}
-            defaultBudgetType={selectedTransaction.budgetType}
-          />
+          <>
+            {selectedTransaction.linkedTransactionId && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start">
+                  <Link2 className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                      This transaction is linked
+                    </h4>
+                    <p className="text-xs text-blue-700">
+                      When you save changes, you'll be asked if you want to update both linked transactions or just this one.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <TransactionForm
+              transaction={selectedTransaction}
+              accounts={appData.accounts}
+              categories={appData.categories}
+              onSubmit={handleEditTransaction}
+              onCancel={() => {
+                setIsEditModalOpen(false)
+                setSelectedTransaction(null)
+              }}
+              defaultBudgetType={selectedTransaction.budgetType}
+            />
+          </>
         )}
       </Modal>
 
@@ -1643,6 +1745,8 @@ function TransactionForm({
     taxDeductible: transaction?.taxDeductible || false,
     incomeSourceId: transaction?.incomeSourceId || '',
     notes: transaction?.notes || '',
+    linkingOption: 'create_paired' as 'create_paired' | 'link_existing' | 'no_link',
+    linkedTransactionId: transaction?.linkedTransactionId || '',
   })
 
   // Get unique vendors from past transactions
@@ -1699,6 +1803,39 @@ function TransactionForm({
     }
     return false
   }, [formData.transactionType, formData.toAccountId, formData.accountId, accounts])
+
+  // Find potential matching transactions for linking (opposite amount in destination account)
+  const potentialMatches = useMemo(() => {
+    if (formData.transactionType !== 'transfer' || !formData.toAccountId || !formData.amount) {
+      return []
+    }
+
+    const transferAmount = parseFloat(formData.amount)
+    if (isNaN(transferAmount)) return []
+
+    // Look for transactions in the destination account with opposite amount
+    const oppositeAmount = Math.abs(transferAmount)
+
+    return appData.transactions
+      .filter((t) => {
+        // Must be in the destination account
+        if (t.accountId !== formData.toAccountId) return false
+
+        // Must have opposite amount (positive, since we're looking for inflow to destination)
+        if (Math.abs(t.amount) !== oppositeAmount) return false
+        if (t.amount <= 0) return false // Must be positive (inflow)
+
+        // Should not already be linked (unless it's the current transaction being edited)
+        if (t.linkedTransactionId && t.id !== transaction?.linkedTransactionId) return false
+
+        // Exclude the current transaction if editing
+        if (transaction && t.id === transaction.id) return false
+
+        return true
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)) // Sort by date, newest first
+  }, [formData.transactionType, formData.toAccountId, formData.amount, appData.transactions, transaction])
+
 
   // Show all accounts (cross-view access)
   const filteredAccounts = accounts
@@ -1818,6 +1955,12 @@ function TransactionForm({
       // Add incomeSourceId if destination is checking and source is selected
       if (formData.incomeSourceId) {
         transactionData.incomeSourceId = formData.incomeSourceId
+      }
+
+      // Add linking information
+      transactionData.linkingOption = formData.linkingOption
+      if (formData.linkingOption === 'link_existing' && formData.linkedTransactionId) {
+        transactionData.linkedTransactionId = formData.linkedTransactionId
       }
     }
 
@@ -1995,6 +2138,99 @@ function TransactionForm({
                   </option>
                 ))}
             </select>
+          </div>
+        )}
+
+        {/* Transaction Linking Options (for transfers only) */}
+        {formData.transactionType === 'transfer' && formData.toAccountId && (
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Transaction Linking
+            </label>
+            <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <label className="flex items-start cursor-pointer">
+                <input
+                  type="radio"
+                  name="linkingOption"
+                  value="create_paired"
+                  checked={formData.linkingOption === 'create_paired'}
+                  onChange={() => setFormData({ ...formData, linkingOption: 'create_paired', linkedTransactionId: '' })}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-3">
+                  <span className="block text-sm font-medium text-gray-900">
+                    Create paired transaction (Recommended)
+                  </span>
+                  <span className="block text-xs text-gray-600">
+                    Automatically create a matching transaction in the destination account
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start cursor-pointer">
+                <input
+                  type="radio"
+                  name="linkingOption"
+                  value="link_existing"
+                  checked={formData.linkingOption === 'link_existing'}
+                  onChange={() => setFormData({ ...formData, linkingOption: 'link_existing' })}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-3">
+                  <span className="block text-sm font-medium text-gray-900">
+                    Link to existing transaction
+                  </span>
+                  <span className="block text-xs text-gray-600">
+                    Connect to a transaction already in the destination account
+                  </span>
+                </span>
+              </label>
+
+              {formData.linkingOption === 'link_existing' && (
+                <div className="ml-7 mt-2">
+                  <select
+                    value={formData.linkedTransactionId}
+                    onChange={(e) => setFormData({ ...formData, linkedTransactionId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">Select a transaction to link...</option>
+                    {potentialMatches.length === 0 ? (
+                      <option value="" disabled>No matching transactions found</option>
+                    ) : (
+                      potentialMatches.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {format(parseISO(t.date), 'MMM dd, yyyy')} - {t.description} - {formatCurrency(t.amount)}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {potentialMatches.length === 0 && formData.amount && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No matching transactions found with amount ${formData.amount} in destination account
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <label className="flex items-start cursor-pointer">
+                <input
+                  type="radio"
+                  name="linkingOption"
+                  value="no_link"
+                  checked={formData.linkingOption === 'no_link'}
+                  onChange={() => setFormData({ ...formData, linkingOption: 'no_link', linkedTransactionId: '' })}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-3">
+                  <span className="block text-sm font-medium text-gray-900">
+                    Don't create or link
+                  </span>
+                  <span className="block text-xs text-gray-600">
+                    This transfer will only appear in the source account
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
         )}
 

@@ -50,6 +50,7 @@ export interface Transaction {
   budgetType: BudgetType // Auto-assigned from account, but can be overridden
   accountId: string
   toAccountId?: string // For transfers: destination account
+  linkedTransactionId?: string // For transfers: links to the paired transaction in the other account
   incomeSourceId?: string // For transfers into checking: link to income source for tracking
   taxDeductible: boolean // Primarily for business, available for household
   reconciled: boolean // Has transaction been reviewed/confirmed

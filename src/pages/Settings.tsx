@@ -276,12 +276,12 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Organize Categories */}
+          {/* Migrate Categories */}
           <div className="bg-white rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Organize Business Categories</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Migrate Business Categories</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Group business expense categories by type (Travel, Craft, Marketing, etc.)
+                Update old business categories to new bucket structure
               </p>
             </div>
             <div className="p-6">
@@ -290,11 +290,11 @@ export default function Settings() {
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <SettingsIcon className="h-4 w-4" />
-                Organize into Groups
+                Migrate to New Buckets
               </button>
               <p className="text-sm text-gray-500 mt-4">
-                This will organize your business expense categories into 5 logical groups for better organization in dropdowns and the Budget page:
-                Travel & Performance, Craft Business, Online & Marketing, Professional Services, and Administrative.
+                This will migrate your business expense categories to the new 6-bucket structure:
+                Travel & Performance, Craft Business, Online & Marketing, Professional Services, Administrative, and Personnel.
               </p>
             </div>
           </div>

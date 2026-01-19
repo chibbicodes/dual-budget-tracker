@@ -11,6 +11,7 @@ import type {
   BudgetViewType,
   BudgetContextState,
   MonthlyBudget,
+  BucketId,
 } from '../types'
 import StorageService from '../services/storage'
 import { generateDefaultCategories } from '../data/defaultCategories'
@@ -599,7 +600,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [appData.categories])
 
   const cleanupOldBusinessExpenseCategories = useCallback(() => {
-    // List of the ONLY 27 tailored category names that should remain active
+    // List of the 34 tailored category names that should remain active
     const tailoredCategoryNames = [
       // Travel & Performance (7)
       'Travel - Airfare',
@@ -634,6 +635,24 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       'Legal & Professional Services',
       'Taxes & Compliance',
       'Other Business Expenses',
+      // Personnel (7)
+      'Owner Salary/Draw',
+      'Owner Health Insurance',
+      'Owner Retirement Contributions',
+      'Contractor Payments',
+      'Employee Wages',
+      'Payroll Taxes',
+      'Employee Benefits',
+    ]
+
+    // Valid new bucket IDs
+    const validBucketIds = [
+      'travel_performance',
+      'craft_business',
+      'online_marketing',
+      'professional_services',
+      'administrative',
+      'personnel',
     ]
 
     let deactivatedCount = 0
@@ -643,16 +662,16 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       categories: prev.categories.map((category) => {
         // Process ALL active business categories
         if (category.budgetType === 'business' && category.isActive) {
-          // Deactivate if it's in a non-business_expenses bucket (Operating, Growth, Compensation, etc.)
-          if (category.bucketId !== 'business_expenses') {
+          // Deactivate if it's in an old bucket (Operating, Growth, Compensation, etc.)
+          if (!validBucketIds.includes(category.bucketId as any)) {
             deactivatedCount++
             return {
               ...category,
               isActive: false,
             }
           }
-          // Or if it's in business_expenses but not in the tailored list
-          if (category.bucketId === 'business_expenses' && !tailoredCategoryNames.includes(category.name)) {
+          // Or if it's in a valid bucket but not in the tailored list
+          if (validBucketIds.includes(category.bucketId as any) && !tailoredCategoryNames.includes(category.name)) {
             deactivatedCount++
             return {
               ...category,
@@ -668,41 +687,50 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [appData.categories])
 
   const addCategoryGroupsToBusinessExpenses = useCallback(() => {
-    // Map of category names to their groups
-    const categoryGroupMap: { [name: string]: string } = {
+    // Map of category names to their new bucket IDs
+    // This migrates old business_expenses categories to the new bucket structure
+    const categoryBucketMap: { [name: string]: string } = {
       // Travel & Performance
-      'Travel - Airfare': 'Travel & Performance',
-      'Travel - Lodging': 'Travel & Performance',
-      'Travel - Meals': 'Travel & Performance',
-      'Travel - Transportation (rental, taxi, etc)': 'Travel & Performance',
-      'Mileage & Vehicle Expenses': 'Travel & Performance',
-      'Speaking Engagement Fees': 'Travel & Performance',
-      'Performance Equipment & Gear': 'Travel & Performance',
+      'Travel - Airfare': 'travel_performance',
+      'Travel - Lodging': 'travel_performance',
+      'Travel - Meals': 'travel_performance',
+      'Travel - Transportation (rental, taxi, etc)': 'travel_performance',
+      'Mileage & Vehicle Expenses': 'travel_performance',
+      'Speaking Engagement Fees': 'travel_performance',
+      'Performance Equipment & Gear': 'travel_performance',
       // Craft Business
-      'Craft Supplies & Materials': 'Craft Business',
-      'Packaging & Labels': 'Craft Business',
-      'Shipping & Postage': 'Craft Business',
-      'Booth/Vendor Fees': 'Craft Business',
-      'Event Registration Fees': 'Craft Business',
+      'Craft Supplies & Materials': 'craft_business',
+      'Packaging & Labels': 'craft_business',
+      'Shipping & Postage': 'craft_business',
+      'Booth/Vendor Fees': 'craft_business',
+      'Event Registration Fees': 'craft_business',
       // Online & Marketing
-      'Website & Online Store Fees': 'Online & Marketing',
-      'Marketing & Advertising': 'Online & Marketing',
-      'Business Cards & Promotional Materials': 'Online & Marketing',
-      'Photography & Media': 'Online & Marketing',
+      'Website & Online Store Fees': 'online_marketing',
+      'Marketing & Advertising': 'online_marketing',
+      'Business Cards & Promotional Materials': 'online_marketing',
+      'Photography & Media': 'online_marketing',
       // Professional Services
-      'Software & Subscriptions': 'Professional Services',
-      'Professional Development': 'Professional Services',
-      'Workshops & Classes': 'Professional Services',
-      'Licenses & Permits': 'Professional Services',
-      'Insurance': 'Professional Services',
+      'Software & Subscriptions': 'professional_services',
+      'Professional Development': 'professional_services',
+      'Workshops & Classes': 'professional_services',
+      'Licenses & Permits': 'professional_services',
+      'Insurance': 'professional_services',
       // Administrative
-      'Bank & Merchant Fees': 'Administrative',
-      'Office Supplies': 'Administrative',
-      'Internet & Phone': 'Administrative',
-      'Accounting & Bookkeeping': 'Administrative',
-      'Legal & Professional Services': 'Administrative',
-      'Taxes & Compliance': 'Administrative',
-      'Other Business Expenses': 'Administrative',
+      'Bank & Merchant Fees': 'administrative',
+      'Office Supplies': 'administrative',
+      'Internet & Phone': 'administrative',
+      'Accounting & Bookkeeping': 'administrative',
+      'Legal & Professional Services': 'administrative',
+      'Taxes & Compliance': 'administrative',
+      'Other Business Expenses': 'administrative',
+      // Personnel
+      'Owner Salary/Draw': 'personnel',
+      'Owner Health Insurance': 'personnel',
+      'Owner Retirement Contributions': 'personnel',
+      'Contractor Payments': 'personnel',
+      'Employee Wages': 'personnel',
+      'Payroll Taxes': 'personnel',
+      'Employee Benefits': 'personnel',
     }
 
     let updatedCount = 0
@@ -710,18 +738,20 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setAppDataState((prev) => ({
       ...prev,
       categories: prev.categories.map((category) => {
-        // Only process business_expenses categories without categoryGroup
+        // Migrate old business_expenses categories to new bucket IDs
         if (
           category.budgetType === 'business' &&
           category.bucketId === 'business_expenses' &&
-          !category.categoryGroup &&
-          categoryGroupMap[category.name]
+          categoryBucketMap[category.name]
         ) {
           updatedCount++
-          return {
+          const newCategory = {
             ...category,
-            categoryGroup: categoryGroupMap[category.name],
+            bucketId: categoryBucketMap[category.name] as BucketId,
           }
+          // Remove categoryGroup if it exists (no longer used)
+          delete (newCategory as any).categoryGroup
+          return newCategory
         }
         return category
       }),

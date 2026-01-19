@@ -344,7 +344,7 @@ export default function Budget() {
         .map((bucket) => {
         const bucketInfo = buckets.find((b) => b.id === bucket.bucketId)
         const categoriesInBucket = appData.categories.filter(
-          (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget
+          (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && !c.isIncomeCategory && !c.excludeFromBudget
         )
 
         return (

@@ -80,11 +80,11 @@ export default function Settings() {
   }
 
   const handleSyncCategories = () => {
-    const addedCount = addMissingDefaultCategories()
-    if (addedCount > 0) {
-      alert(`Successfully added ${addedCount} new categories to your budget!`)
+    const count = addMissingDefaultCategories()
+    if (count > 0) {
+      alert(`Successfully synced ${count} categories! This includes any missing default categories and reactivated income/transfer categories.`)
     } else {
-      alert('No new categories to add. You already have all default categories.')
+      alert('All categories are already synced and active!')
     }
   }
 

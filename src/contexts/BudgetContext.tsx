@@ -589,14 +589,38 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return !existingCategoryKeys.has(key)
     })
 
-    if (missingCategories.length > 0) {
-      setAppDataState((prev) => ({
-        ...prev,
-        categories: [...prev.categories, ...missingCategories],
-      }))
-      return missingCategories.length
-    }
-    return 0
+    let addedCount = 0
+    let reactivatedCount = 0
+
+    setAppDataState((prev) => {
+      const updatedCategories = prev.categories.map((category) => {
+        // Reactivate any deactivated income categories or transfer categories
+        if ((category.isIncomeCategory || category.excludeFromBudget) && !category.isActive) {
+          reactivatedCount++
+          return { ...category, isActive: true }
+        }
+        return category
+      })
+
+      if (missingCategories.length > 0) {
+        addedCount = missingCategories.length
+        return {
+          ...prev,
+          categories: [...updatedCategories, ...missingCategories],
+        }
+      }
+
+      if (reactivatedCount > 0) {
+        return {
+          ...prev,
+          categories: updatedCategories,
+        }
+      }
+
+      return prev
+    })
+
+    return addedCount + reactivatedCount
   }, [appData.categories])
 
   const cleanupOldBusinessExpenseCategories = useCallback(() => {

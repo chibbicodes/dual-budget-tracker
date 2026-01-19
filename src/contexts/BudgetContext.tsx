@@ -660,6 +660,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setAppDataState((prev) => ({
       ...prev,
       categories: prev.categories.map((category) => {
+        // Skip income categories and transfer categories - never deactivate these
+        if (category.isIncomeCategory || category.excludeFromBudget) {
+          return category
+        }
+
         // Process ALL active business categories
         if (category.budgetType === 'business' && category.isActive) {
           // Deactivate if it's in an old bucket (Operating, Growth, Compensation, etc.)

@@ -1604,6 +1604,33 @@ function TransactionForm({
 }: TransactionFormProps) {
   const { appData } = useBudget()
 
+  // Combine legacy income and new incomeSources for dropdown
+  const allIncomeSources = useMemo(() => {
+    const sources: Array<{ id: string; name: string; budgetType: BudgetType }> = []
+
+    // Add new IncomeSource records
+    appData.incomeSources
+      .filter((source) => source.isActive)
+      .forEach((source) => {
+        sources.push({
+          id: source.id,
+          name: source.name,
+          budgetType: source.budgetType,
+        })
+      })
+
+    // Add legacy Income records
+    appData.income.forEach((income) => {
+      sources.push({
+        id: income.id,
+        name: income.source,
+        budgetType: income.budgetType,
+      })
+    })
+
+    return sources.sort((a, b) => a.name.localeCompare(b.name))
+  }, [appData.incomeSources, appData.income])
+
   const [formData, setFormData] = useState({
     date: transaction?.date || new Date().toISOString().split('T')[0],
     description: transaction?.description || '',
@@ -1979,13 +2006,11 @@ function TransactionForm({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">None (not tracked as income)</option>
-              {appData.incomeSources
-                .filter((source) => source.isActive)
-                .map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.name} ({source.budgetType === 'household' ? 'H' : 'B'})
-                  </option>
-                ))}
+              {allIncomeSources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.name} ({source.budgetType === 'household' ? 'H' : 'B'})
+                </option>
+              ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
               Link this transfer to an income source to track it in Income Tracking

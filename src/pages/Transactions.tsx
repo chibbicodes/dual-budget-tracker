@@ -1686,14 +1686,19 @@ function TransactionForm({
     })
   }
 
-  // Check if destination account is a checking account (for income source field)
-  const isDestinationChecking = useMemo(() => {
+  // Check if should show income source field (for income transactions and transfers to checking)
+  const showIncomeSource = useMemo(() => {
+    // Show for income transactions
+    if (formData.transactionType === 'income') {
+      return true
+    }
+    // Show for transfers to checking accounts
     if (formData.transactionType === 'transfer' && formData.toAccountId) {
       const destAccount = accounts.find(a => a.id === formData.toAccountId)
       return destAccount?.accountType === 'checking'
     }
     return false
-  }, [formData.transactionType, formData.toAccountId, accounts])
+  }, [formData.transactionType, formData.toAccountId, formData.accountId, accounts])
 
   // Show all accounts (cross-view access)
   const filteredAccounts = accounts
@@ -1993,8 +1998,8 @@ function TransactionForm({
           </div>
         )}
 
-        {/* Income Source (for transfers to checking accounts) */}
-        {isDestinationChecking && (
+        {/* Income Source (for income transactions and transfers to checking accounts) */}
+        {showIncomeSource && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Income Source

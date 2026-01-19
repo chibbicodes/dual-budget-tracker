@@ -95,6 +95,20 @@ export default function Income() {
     return appData.transactions
       .filter((t) => {
         const transDate = new Date(t.date)
+
+        // For transfers, check the destination account's budget type
+        if (t.toAccountId) {
+          const toAccount = appData.accounts.find(a => a.id === t.toAccountId)
+          if (toAccount) {
+            const matchesBudget =
+              currentView === 'combined'
+                ? budgetFilter === 'all' || toAccount.budgetType === budgetFilter
+                : toAccount.budgetType === currentView
+            return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
+          }
+        }
+
+        // For regular income, use transaction's budget type
         const matchesBudget =
           currentView === 'combined'
             ? budgetFilter === 'all' || t.budgetType === budgetFilter
@@ -102,7 +116,7 @@ export default function Income() {
         return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
       })
       .reduce((sum, t) => sum + t.amount, 0)
-  }, [appData.transactions, currentView, budgetFilter, selectedMonth])
+  }, [appData.transactions, appData.accounts, currentView, budgetFilter, selectedMonth])
 
   // Calculate expected income for selected month (with recurring occurrences)
   const expectedIncomeThisMonth = useMemo(() => {
@@ -135,6 +149,20 @@ export default function Income() {
     appData.transactions
       .filter((t) => {
         const transDate = new Date(t.date)
+
+        // For transfers, check the destination account's budget type
+        if (t.toAccountId) {
+          const toAccount = appData.accounts.find(a => a.id === t.toAccountId)
+          if (toAccount) {
+            const matchesBudget =
+              currentView === 'combined'
+                ? budgetFilter === 'all' || toAccount.budgetType === budgetFilter
+                : toAccount.budgetType === currentView
+            return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
+          }
+        }
+
+        // For regular income, use transaction's budget type
         const matchesBudget =
           currentView === 'combined'
             ? budgetFilter === 'all' || t.budgetType === budgetFilter
@@ -142,10 +170,24 @@ export default function Income() {
         return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
       })
       .forEach((transaction) => {
-        // Try to match transaction to income source by description
+        // If transaction has an income source ID, use that directly
+        if (transaction.incomeSourceId) {
+          const existing = sourceMap.get(transaction.incomeSourceId)
+          if (existing) {
+            existing.actual += transaction.amount
+          }
+          return
+        }
+
+        // Otherwise, try to match transaction to income source by description
+        // For transfers, use destination account's budget type; for regular income, use transaction budget type
+        const budgetTypeToMatch = transaction.toAccountId
+          ? appData.accounts.find(a => a.id === transaction.toAccountId)?.budgetType
+          : transaction.budgetType
+
         const matchingIncome = filteredIncome.find(
           (income) =>
-            income.budgetType === transaction.budgetType &&
+            income.budgetType === budgetTypeToMatch &&
             (transaction.description.toLowerCase().includes(income.source.toLowerCase()) ||
               (income.client && transaction.description.toLowerCase().includes(income.client.toLowerCase())))
         )

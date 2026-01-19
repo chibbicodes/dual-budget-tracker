@@ -10,9 +10,10 @@ import { startOfMonth, endOfMonth, format, parseISO, addMonths, subMonths, diffe
 type BudgetFilter = 'all' | BudgetType
 
 export default function Income() {
-  const { currentView, appData, addIncome, updateIncome, deleteIncome } = useBudget()
+  const { currentView, appData, addIncome, updateIncome, deleteIncome, addCategory } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState<IncomeType | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
 
@@ -49,6 +50,30 @@ export default function Income() {
 
     return income.sort((a, b) => a.source.localeCompare(b.source))
   }, [appData.income, currentView, budgetFilter])
+
+  // Group income sources by category
+  const incomeByCategory = useMemo(() => {
+    const grouped = new Map<string, { category: any; sources: IncomeType[] }>()
+
+    filteredIncome.forEach(income => {
+      const categoryId = income.categoryId || 'uncategorized'
+      const category = categoryId === 'uncategorized'
+        ? { id: 'uncategorized', name: 'Uncategorized' }
+        : appData.categories.find(c => c.id === categoryId)
+
+      if (!grouped.has(categoryId)) {
+        grouped.set(categoryId, { category, sources: [] })
+      }
+      grouped.get(categoryId)!.sources.push(income)
+    })
+
+    // Convert to array and sort: categorized first, then uncategorized
+    return Array.from(grouped.values()).sort((a, b) => {
+      if (a.category.id === 'uncategorized') return 1
+      if (b.category.id === 'uncategorized') return -1
+      return a.category.name.localeCompare(b.category.name)
+    })
+  }, [filteredIncome, appData.categories])
 
   // Helper function to calculate recurring income occurrences in a month
   const calculateRecurringOccurrences = (income: IncomeType, monthDate: Date): number => {
@@ -267,6 +292,14 @@ export default function Income() {
           )}
 
           <button
+            onClick={() => setIsAddCategoryModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Income Category
+          </button>
+
+          <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
@@ -471,44 +504,57 @@ export default function Income() {
                   </td>
                 </tr>
               ) : (
-                filteredIncome.map((income) => (
-                  <tr key={income.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{income.source}</div>
-                        {income.client && <div className="text-sm text-gray-500">{income.client}</div>}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <BudgetBadge budgetType={income.budgetType} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          income.isRecurring ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {income.isRecurring ? 'Recurring' : 'One-time'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(income.expectedAmount || 0)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.expectedDate ? format(parseISO(income.expectedDate), 'MMM d, yyyy') : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
-                      <button
-                        onClick={() => setEditingIncome(income)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleDelete(income.id)} className="text-red-600 hover:text-red-800">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                incomeByCategory.map((group) => (
+                  <>
+                    {/* Category Header */}
+                    <tr key={`header-${group.category.id}`} className="bg-indigo-50">
+                      <td colSpan={6} className="px-6 py-3">
+                        <h4 className="text-sm font-semibold text-indigo-900">
+                          {group.category.name}
+                        </h4>
+                      </td>
+                    </tr>
+                    {/* Income Sources in this category */}
+                    {group.sources.map((income) => (
+                      <tr key={income.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{income.source}</div>
+                            {income.client && <div className="text-sm text-gray-500">{income.client}</div>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <BudgetBadge budgetType={income.budgetType} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              income.isRecurring ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {income.isRecurring ? 'Recurring' : 'One-time'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(income.expectedAmount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {income.expectedDate ? format(parseISO(income.expectedDate), 'MMM d, yyyy') : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
+                          <button
+                            onClick={() => setEditingIncome(income)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => handleDelete(income.id)} className="text-red-600 hover:text-red-800">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
                 ))
               )}
             </tbody>
@@ -535,6 +581,20 @@ export default function Income() {
             onSubmit={handleUpdate}
             onCancel={() => setEditingIncome(null)}
             defaultBudgetType={editingIncome.budgetType}
+          />
+        </Modal>
+      )}
+
+      {/* Add Income Category modal */}
+      {isAddCategoryModalOpen && (
+        <Modal isOpen={true} onClose={() => setIsAddCategoryModalOpen(false)} title="Add Income Category">
+          <IncomeCategoryForm
+            onSubmit={(categoryData) => {
+              addCategory(categoryData)
+              setIsAddCategoryModalOpen(false)
+            }}
+            onCancel={() => setIsAddCategoryModalOpen(false)}
+            defaultBudgetType={currentView === 'combined' ? 'household' : (currentView as BudgetType)}
           />
         </Modal>
       )}
@@ -742,6 +802,87 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
           {income ? 'Update' : 'Add'} Income Source
+        </button>
+      </div>
+    </form>
+  )
+}
+
+interface IncomeCategoryFormProps {
+  onSubmit: (category: any) => void
+  onCancel: () => void
+  defaultBudgetType: BudgetType
+}
+
+function IncomeCategoryForm({ onSubmit, onCancel, defaultBudgetType }: IncomeCategoryFormProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    budgetType: defaultBudgetType,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Get the appropriate bucket ID based on budget type
+    const bucketId = formData.budgetType === 'household' ? 'needs' : 'administrative'
+
+    onSubmit({
+      name: formData.name,
+      budgetType: formData.budgetType,
+      bucketId,
+      monthlyBudget: 0,
+      isFixedExpense: false,
+      isActive: true,
+      taxDeductibleByDefault: false,
+      isIncomeCategory: true,
+      excludeFromBudget: true,
+      autoCategorization: [],
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="e.g., Consulting Income, Contract Work"
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Create a custom income category to organize your income sources
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Budget Type *</label>
+        <select
+          value={formData.budgetType}
+          onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as BudgetType })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        >
+          <option value="household">Household</option>
+          <option value="business">Business</option>
+        </select>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          Add Income Category
         </button>
       </div>
     </form>

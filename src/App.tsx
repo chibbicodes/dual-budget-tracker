@@ -9,6 +9,7 @@ import BudgetArchive from './pages/BudgetArchive'
 import BudgetAnalysis from './pages/BudgetAnalysis'
 import Transactions from './pages/Transactions'
 import Income from './pages/Income'
+import Projects from './pages/Projects'
 import BusinessReports from './pages/BusinessReports'
 import Settings from './pages/Settings'
 import Welcome from './pages/Welcome'
@@ -26,6 +27,7 @@ function App() {
           <Route path="budget-analysis" element={<BudgetAnalysis />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="income" element={<Income />} />
+          <Route path="projects" element={<Projects />} />
           <Route path="business-reports" element={<BusinessReports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="welcome" element={<Welcome />} />

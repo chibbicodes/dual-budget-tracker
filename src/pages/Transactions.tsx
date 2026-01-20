@@ -1752,6 +1752,7 @@ function TransactionForm({
     budgetType: transaction?.budgetType || defaultBudgetType,
     taxDeductible: transaction?.taxDeductible || false,
     incomeSourceId: transaction?.incomeSourceId || '',
+    projectId: transaction?.projectId || '',
     notes: transaction?.notes || '',
     linkingOption: 'create_paired' as 'create_paired' | 'link_existing' | 'no_link',
     linkedTransactionId: transaction?.linkedTransactionId || '',
@@ -1959,6 +1960,11 @@ function TransactionForm({
     // Add incomeSourceId for income transactions (not just transfers)
     if (formData.incomeSourceId && (formData.transactionType === 'income' || formData.transactionType === 'transfer')) {
       transactionData.incomeSourceId = formData.incomeSourceId
+    }
+
+    // Add projectId if selected
+    if (formData.projectId) {
+      transactionData.projectId = formData.projectId
     }
 
     // Add toAccountId and linking info for transfers
@@ -2272,6 +2278,32 @@ function TransactionForm({
             </p>
           </div>
         )}
+
+        {/* Project (Optional) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Project
+            <span className="text-xs text-gray-500 ml-2">(Optional - for P&L tracking)</span>
+          </label>
+          <select
+            value={formData.projectId}
+            onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">None (not linked to project)</option>
+            {appData.projects
+              .filter((p) => p.budgetType === formData.budgetType)
+              .sort((a, b) => b.dateCreated.localeCompare(a.dateCreated))
+              .map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name} - {project.status}
+                </option>
+              ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Link to a project to track revenue and expenses for P&L analysis
+          </p>
+        </div>
 
         {/* Category */}
         <div>

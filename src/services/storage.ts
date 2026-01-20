@@ -30,6 +30,9 @@ export class StorageService {
       if (!data.monthlyBudgets) {
         data.monthlyBudgets = []
       }
+      if (!data.projects) {
+        data.projects = []
+      }
 
       return data
     } catch (error) {
@@ -161,6 +164,7 @@ export class StorageService {
             ...(importedData.autoCategorization || []),
           ],
           monthlyBudgets: [...existing.monthlyBudgets, ...(importedData.monthlyBudgets || [])],
+          projects: [...existing.projects, ...(importedData.projects || [])],
           settings: importedData.settings || existing.settings,
           version: CURRENT_VERSION,
         }
@@ -198,6 +202,7 @@ export class StorageService {
       income: [],
       autoCategorization: [],
       monthlyBudgets: [],
+      projects: [],
       settings: {
         defaultBudgetView: 'household',
         householdTargets: {

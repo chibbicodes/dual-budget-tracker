@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Receipt,
   DollarSign,
+  FolderOpen,
   FileText,
   Settings,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Analysis', path: '/budget-analysis', icon: TrendingUp },
   { name: 'Transactions', path: '/transactions', icon: Receipt },
   { name: 'Income', path: '/income', icon: DollarSign },
+  { name: 'Projects', path: '/projects', icon: FolderOpen },
   { name: 'Reports', path: '/business-reports', icon: FileText, businessOnly: true },
   { name: 'Settings', path: '/settings', icon: Settings },
 ]

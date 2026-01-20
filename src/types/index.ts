@@ -51,9 +51,53 @@ export interface Transaction {
   accountId: string
   toAccountId?: string // For transfers: destination account
   linkedTransactionId?: string // For transfers: links to the paired transaction in the other account
+  projectId?: string // For project tracking: link to project
   incomeSourceId?: string // For transfers into checking: link to income source for tracking
   taxDeductible: boolean // Primarily for business, available for household
   reconciled: boolean // Has transaction been reviewed/confirmed
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ============================================================================
+// Project Types
+// ============================================================================
+
+export type PerformanceProjectStatus =
+  | 'holding'
+  | 'issued'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+
+export type GeneralProjectStatus =
+  | 'submitted'
+  | 'quoted'
+  | 'confirmed'
+  | 'active'
+  | 'delivered'
+  | 'completed'
+
+export type ProjectStatus = PerformanceProjectStatus | GeneralProjectStatus
+
+export type ProjectType =
+  | 'performance'
+  | 'craft'
+  | 'home_improvement'
+  | 'party'
+  | 'event'
+  | 'other'
+
+export interface Project {
+  id: string
+  name: string
+  budgetType: BudgetType
+  projectType: ProjectType
+  status: ProjectStatus
+  dateCreated: string // ISO date string
+  dateCompleted?: string // ISO date string
+  commissionPaid: boolean
   notes?: string
   createdAt: string
   updatedAt: string
@@ -254,6 +298,7 @@ export interface AppData {
   income: Income[] // Legacy income tracking
   autoCategorization: AutoCategorizationRule[]
   monthlyBudgets: MonthlyBudget[] // Monthly budget overrides
+  projects: Project[] // Project tracking for P&L analysis
   settings: AppSettings
   version: string // For data migration
 }
@@ -410,6 +455,11 @@ export interface BudgetContextState {
   updateMonthlyBudget: (id: string, updates: Partial<MonthlyBudget>) => void
   deleteMonthlyBudget: (id: string) => void
   getMonthlyBudget: (month: string, categoryId: string) => MonthlyBudget | undefined
+
+  // Project operations
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateProject: (id: string, updates: Partial<Project>) => void
+  deleteProject: (id: string) => void
 
   // Settings operations
   updateSettings: (updates: Partial<AppSettings>) => void

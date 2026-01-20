@@ -407,6 +407,25 @@ export interface DateRange {
 }
 
 // ============================================================================
+// Profile Types
+// ============================================================================
+
+export interface Profile {
+  id: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+  lastAccessedAt: string
+}
+
+export interface ProfileMetadata {
+  profiles: Profile[]
+  activeProfileId: string | null
+  version: string
+}
+
+// ============================================================================
 // UI State Types
 // ============================================================================
 
@@ -478,4 +497,17 @@ export interface BudgetContextState {
   addMissingDefaultCategories: () => number
   cleanupOldBusinessExpenseCategories: () => number
   addCategoryGroupsToBusinessExpenses: () => number
+}
+
+export interface ProfileContextState {
+  profiles: Profile[]
+  activeProfile: Profile | null
+  isLoading: boolean
+
+  // Profile operations
+  createProfile: (name: string, description?: string) => Promise<Profile>
+  switchProfile: (profileId: string) => Promise<void>
+  updateProfile: (profileId: string, updates: Partial<Pick<Profile, 'name' | 'description'>>) => void
+  deleteProfile: (profileId: string) => Promise<void>
+  refreshProfiles: () => void
 }

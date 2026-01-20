@@ -540,18 +540,52 @@ export default function Projects() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Revenue
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Expenses
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Profit/Loss
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Margin
-              </th>
+              {effectiveBudgetFilter === 'household' ? (
+                <>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Budget
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Spent
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Remaining
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    % Used
+                  </th>
+                </>
+              ) : effectiveBudgetFilter === 'business' ? (
+                <>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Revenue
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expenses
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Profit/Loss
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Margin
+                  </th>
+                </>
+              ) : (
+                <>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Revenue/Budget
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expenses/Spent
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Profit/Remaining
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Margin/% Used
+                  </th>
+                </>
+              )}
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -598,20 +632,77 @@ export default function Projects() {
                       {getStatusName(project.statusId)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                    {formatCurrency(revenue)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                    {formatCurrency(expenses)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {formatCurrency(profit)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                    {margin.toFixed(1)}%
-                  </td>
+                  {effectiveBudgetFilter === 'household' ? (
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {budget > 0 ? formatCurrency(budget) : '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {formatCurrency(spent)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <span className={isOverBudget ? 'text-red-600' : remaining >= 0 ? 'text-green-600' : 'text-gray-900'}>
+                          {formatCurrency(Math.abs(remaining))}
+                          {isOverBudget && ' over'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <span className={percentUsed > 100 ? 'text-red-600 font-semibold' : percentUsed > 80 ? 'text-yellow-600' : 'text-gray-900'}>
+                          {percentUsed.toFixed(1)}%
+                        </span>
+                      </td>
+                    </>
+                  ) : effectiveBudgetFilter === 'business' ? (
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {formatCurrency(revenue)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {formatCurrency(expenses)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {formatCurrency(profit)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {margin.toFixed(1)}%
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {project.budgetType === 'household'
+                          ? (budget > 0 ? formatCurrency(budget) : '—')
+                          : formatCurrency(revenue)
+                        }
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {project.budgetType === 'household' ? formatCurrency(spent) : formatCurrency(expenses)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {project.budgetType === 'household' ? (
+                          <span className={isOverBudget ? 'text-red-600' : remaining >= 0 ? 'text-green-600' : 'text-gray-900'}>
+                            {formatCurrency(Math.abs(remaining))}
+                            {isOverBudget && ' over'}
+                          </span>
+                        ) : (
+                          <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {formatCurrency(profit)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        {project.budgetType === 'household' ? (
+                          <span className={percentUsed > 100 ? 'text-red-600 font-semibold' : percentUsed > 80 ? 'text-yellow-600' : 'text-gray-900'}>
+                            {percentUsed.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-900">{margin.toFixed(1)}%</span>
+                        )}
+                      </td>
+                    </>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
                     <button
                       onClick={(e) => {
@@ -1005,6 +1096,55 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
   // Get all transactions for this project
   const transactions = appData.transactions.filter((t) => t.projectId === project.id)
 
+  // Calculate budget metrics (for household projects)
+  const budgetMetrics = useMemo(() => {
+    const budget = project.budget || 0
+    const spent = Math.abs(
+      transactions
+        .filter((t) => t.amount < 0)
+        .reduce((sum, t) => sum + t.amount, 0)
+    )
+    const remaining = budget - spent
+    const percentUsed = budget > 0 ? (spent / budget) * 100 : 0
+    const isOverBudget = spent > budget && budget > 0
+
+    return { budget, spent, remaining, percentUsed, isOverBudget }
+  }, [transactions, project.budget])
+
+  // Get similar completed projects for comparison (same project type)
+  const similarProjects = useMemo(() => {
+    return appData.projects
+      .filter((p) =>
+        p.id !== project.id && // Not the current project
+        p.projectTypeId === project.projectTypeId && // Same type
+        p.budgetType === 'household' && // Household only
+        p.dateCompleted // Only completed projects
+      )
+      .map((p) => {
+        const projectTransactions = appData.transactions.filter((t) => t.projectId === p.id)
+        const spent = Math.abs(
+          projectTransactions
+            .filter((t) => t.amount < 0)
+            .reduce((sum, t) => sum + t.amount, 0)
+        )
+        const budget = p.budget || 0
+        return { project: p, spent, budget }
+      })
+      .sort((a, b) => {
+        // Sort by date completed (most recent first)
+        if (!a.project.dateCompleted || !b.project.dateCompleted) return 0
+        return b.project.dateCompleted.localeCompare(a.project.dateCompleted)
+      })
+      .slice(0, 5) // Show top 5 similar projects
+  }, [appData.projects, appData.transactions, project.id, project.projectTypeId])
+
+  // Calculate average cost for similar projects
+  const avgSimilarCost = useMemo(() => {
+    if (similarProjects.length === 0) return 0
+    const totalSpent = similarProjects.reduce((sum, p) => sum + p.spent, 0)
+    return totalSpent / similarProjects.length
+  }, [similarProjects])
+
   // Calculate P&L by category
   const categoryBreakdown = useMemo(() => {
     const categoryMap = new Map<string, {
@@ -1087,6 +1227,248 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
+  // Render household or business view based on project type
+  if (project.budgetType === 'household') {
+    return (
+      <Modal isOpen={true} onClose={onClose} title={project.name} size="xl">
+        <div className="space-y-6">
+          {/* Project Info with Status Badge */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <BudgetBadge budgetType={project.budgetType} />
+                <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                  status?.name.toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' :
+                  status?.name.toLowerCase() === 'cancelled' ? 'bg-red-100 text-red-800' :
+                  status?.name.toLowerCase() === 'active' ? 'bg-blue-100 text-blue-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {status?.name || 'Unknown'}
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Project Type</p>
+                <p className="text-sm font-medium text-gray-900">{projectType?.name || 'Unknown'}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Date Created:</span>
+                <p className="font-medium">{format(parseISO(project.dateCreated + 'T12:00:00'), 'MMM d, yyyy')}</p>
+              </div>
+              {project.dateCompleted && (
+                <div>
+                  <span className="text-gray-600">Date Completed:</span>
+                  <p className="font-medium">{format(parseISO(project.dateCompleted + 'T12:00:00'), 'MMM d, yyyy')}</p>
+                </div>
+              )}
+              {incomeSource && (
+                <div>
+                  <span className="text-gray-600">Income Source:</span>
+                  <p className="font-medium text-blue-600">{incomeSource.source}</p>
+                </div>
+              )}
+            </div>
+
+            {project.notes && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <span className="text-gray-600 text-sm">Notes:</span>
+                <p className="mt-1 text-sm">{project.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Budget Tracking Summary */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Budget Tracking</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-900">Total Budget</h4>
+                <p className="text-xl font-bold text-blue-600 mt-1">{formatCurrency(budgetMetrics.budget)}</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-red-900">Amount Spent</h4>
+                <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(budgetMetrics.spent)}</p>
+              </div>
+              <div className={`${budgetMetrics.isOverBudget ? 'bg-red-50' : 'bg-green-50'} rounded-lg p-4`}>
+                <h4 className={`text-sm font-medium ${budgetMetrics.isOverBudget ? 'text-red-900' : 'text-green-900'}`}>
+                  {budgetMetrics.isOverBudget ? 'Over Budget' : 'Remaining'}
+                </h4>
+                <p className={`text-xl font-bold mt-1 ${budgetMetrics.isOverBudget ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatCurrency(Math.abs(budgetMetrics.remaining))}
+                </p>
+              </div>
+              <div className={`${budgetMetrics.percentUsed > 100 ? 'bg-red-50' : budgetMetrics.percentUsed > 80 ? 'bg-yellow-50' : 'bg-purple-50'} rounded-lg p-4`}>
+                <h4 className={`text-sm font-medium ${budgetMetrics.percentUsed > 100 ? 'text-red-900' : budgetMetrics.percentUsed > 80 ? 'text-yellow-900' : 'text-purple-900'}`}>
+                  % Used
+                </h4>
+                <p className={`text-xl font-bold mt-1 ${budgetMetrics.percentUsed > 100 ? 'text-red-600' : budgetMetrics.percentUsed > 80 ? 'text-yellow-600' : 'text-purple-600'}`}>
+                  {budgetMetrics.percentUsed.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+
+            {budgetMetrics.isOverBudget && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800 font-medium">
+                  ⚠️ This project is over budget by {formatCurrency(Math.abs(budgetMetrics.remaining))}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Category Breakdown (Expenses Only for Household) */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Spending by Category</h3>
+            {categoryBreakdown.filter(item => !item.isIncome).length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No expenses linked to this project yet.</p>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount Spent</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% of Total</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% of Budget</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {categoryBreakdown
+                      .filter(item => !item.isIncome)
+                      .map((item) => {
+                        const percentOfBudget = budgetMetrics.budget > 0 ? (item.amount / budgetMetrics.budget) * 100 : 0
+                        return (
+                          <tr
+                            key={item.category}
+                            className="hover:bg-gray-50 cursor-pointer"
+                            onClick={() => setSelectedCategory(item.category)}
+                          >
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.category}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                              {formatCurrency(item.amount)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-700">
+                              {item.percentage.toFixed(1)}%
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-700">
+                              {percentOfBudget.toFixed(1)}%
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Similar Projects Comparison */}
+          {similarProjects.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Similar Past Projects</h3>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
+                <p className="text-sm text-blue-900">
+                  <span className="font-semibold">Average cost for {projectType?.name || 'this type'}:</span>{' '}
+                  {formatCurrency(avgSimilarCost)}
+                  {budgetMetrics.spent > 0 && (
+                    <span className="ml-2">
+                      ({budgetMetrics.spent > avgSimilarCost ? (
+                        <span className="text-red-700 font-medium">
+                          +{formatCurrency(budgetMetrics.spent - avgSimilarCost)} more than average
+                        </span>
+                      ) : (
+                        <span className="text-green-700 font-medium">
+                          {formatCurrency(avgSimilarCost - budgetMetrics.spent)} less than average
+                        </span>
+                      )})
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Budget</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Spent</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {similarProjects.map(({ project: p, spent, budget }) => (
+                      <tr key={p.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900">{p.name}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                          {budget > 0 ? formatCurrency(budget) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                          {formatCurrency(spent)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-600">
+                          {p.dateCompleted ? format(parseISO(p.dateCompleted + 'T12:00:00'), 'MMM d, yyyy') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Transaction Details (if category selected) */}
+          {selectedCategory && (
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-md font-semibold text-gray-900">Transactions - {selectedCategory}</h4>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="bg-gray-50 rounded-lg max-h-64 overflow-y-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Description</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {transactions
+                      .filter((t) => {
+                        const category = appData.categories.find((c) => c.id === t.categoryId)
+                        return (category?.name || 'Uncategorized') === selectedCategory
+                      })
+                      .map((transaction) => (
+                        <tr key={transaction.id}>
+                          <td className="px-4 py-2 text-sm text-gray-600">
+                            {format(parseISO(transaction.date + 'T12:00:00'), 'MMM d, yyyy')}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900">{transaction.description}</td>
+                          <td className={`px-4 py-2 text-sm text-right font-medium ${
+                            transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(transaction.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+    )
+  }
+
+  // Business projects - show P&L view
   return (
     <Modal isOpen={true} onClose={onClose} title={project.name} size="xl">
       <div className="space-y-6">

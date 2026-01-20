@@ -88,6 +88,7 @@ export interface Project {
   projectTypeId: string // Reference to ProjectTypeConfig
   statusId: string // Reference to ProjectStatusConfig
   incomeSourceId?: string // Optional link to income source
+  budget?: number // Budget amount for tracking (especially for household projects)
   dateCreated: string // ISO date string
   dateCompleted?: string // ISO date string
   commissionPaid: boolean

@@ -80,7 +80,7 @@ export default function Income() {
     if (!income.isRecurring) {
       // One-time income: check if expected date falls in this month
       if (income.expectedDate) {
-        const expectedDate = parseISO(income.expectedDate)
+        const expectedDate = parseISO(income.expectedDate + 'T12:00:00')
         const monthStart = startOfMonth(monthDate)
         const monthEnd = endOfMonth(monthDate)
         return expectedDate >= monthStart && expectedDate <= monthEnd ? 1 : 0
@@ -90,18 +90,42 @@ export default function Income() {
 
     const monthStart = startOfMonth(monthDate)
     const monthEnd = endOfMonth(monthDate)
-    const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
 
     switch (income.recurringFrequency) {
       case 'weekly':
-        // Approximately 4-5 times per month
-        return Math.floor(daysInMonth / 7)
       case 'bi-weekly':
-        // Every 2 weeks = approximately 2 times per month
-        return Math.floor(daysInMonth / 14)
-      case 'every-15-days':
-        // Every 15 days = approximately 2 times per month
-        return Math.floor(daysInMonth / 15)
+      case 'every-15-days': {
+        // For these frequencies, we need to count actual occurrences
+        if (!income.expectedDate) {
+          // Fallback to old logic if no start date specified
+          const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
+          const interval = income.recurringFrequency === 'weekly' ? 7 :
+                          income.recurringFrequency === 'bi-weekly' ? 14 : 15
+          return Math.floor(daysInMonth / interval)
+        }
+
+        // Count actual occurrences starting from expected date
+        let count = 0
+        let currentDate = parseISO(income.expectedDate + 'T12:00:00')
+        const interval = income.recurringFrequency === 'weekly' ? 7 :
+                        income.recurringFrequency === 'bi-weekly' ? 14 : 15
+
+        // If start date is before this month, fast-forward to first occurrence in or after this month
+        while (currentDate < monthStart) {
+          currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+        }
+
+        // Count occurrences that fall within this month
+        while (currentDate <= monthEnd) {
+          if (currentDate >= monthStart) {
+            count++
+          }
+          // Add interval days to get next occurrence
+          currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+        }
+
+        return count
+      }
       case 'monthly':
       case 'same-day-each-month':
         // Once per month

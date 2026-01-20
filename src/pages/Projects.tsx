@@ -202,8 +202,8 @@ export default function Projects() {
 
   const getIncomeSourceName = (incomeSourceId?: string) => {
     if (!incomeSourceId) return null
-    const source = appData.incomeSources.find((s) => s.id === incomeSourceId)
-    return source?.name || 'Unknown'
+    const source = appData.income.find((s) => s.id === incomeSourceId)
+    return source?.source || 'Unknown'
   }
 
   return (
@@ -320,11 +320,11 @@ export default function Projects() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Sources</option>
-              {appData.incomeSources
+              {appData.income
                 .filter((s) => effectiveBudgetFilter === 'all' || s.budgetType === effectiveBudgetFilter)
                 .map((source) => (
                   <option key={source.id} value={source.id}>
-                    {source.name}
+                    {source.source}
                   </option>
                 ))}
             </select>
@@ -590,8 +590,8 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
 
   // Get available income sources for selected budget
   const availableIncomeSources = useMemo(() => {
-    return appData.incomeSources.filter((s) => s.budgetType === formData.budgetType)
-  }, [formData.budgetType, appData.incomeSources])
+    return appData.income.filter((s) => s.budgetType === formData.budgetType)
+  }, [formData.budgetType, appData.income])
 
   // When project type changes, reset status to first allowed status
   const handleProjectTypeChange = (projectTypeId: string) => {
@@ -716,7 +716,7 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
             <option value="">None</option>
             {availableIncomeSources.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.name}
+                {source.source}
               </option>
             ))}
           </select>
@@ -815,7 +815,7 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
   const projectType = appData.projectTypes.find((t) => t.id === project.projectTypeId)
   const status = appData.projectStatuses.find((s) => s.id === project.statusId)
   const incomeSource = project.incomeSourceId
-    ? appData.incomeSources.find((s) => s.id === project.incomeSourceId)
+    ? appData.income.find((s) => s.id === project.incomeSourceId)
     : null
 
   // Get all transactions for this project
@@ -930,7 +930,7 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
             {incomeSource && (
               <div>
                 <span className="text-gray-600">Income Source:</span>
-                <p className="font-medium text-blue-600">{incomeSource.name}</p>
+                <p className="font-medium text-blue-600">{incomeSource.source}</p>
               </div>
             )}
             {project.commissionPaid && (

@@ -17,6 +17,7 @@ import type {
   ProjectStatusConfig,
 } from '../types'
 import StorageService from '../services/storage'
+import ProfileService from '../services/profileService'
 import { generateDefaultCategories } from '../data/defaultCategories'
 
 const BudgetContext = createContext<BudgetContextState | null>(null)
@@ -28,12 +29,17 @@ function generateId(): string {
 export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [currentView, setCurrentView] = useState<BudgetViewType>('household')
   const [appData, setAppDataState] = useState<AppData>(() => {
-    // Load data from localStorage on initial render
-    const stored = StorageService.load()
-    if (stored) {
-      return stored
+    // Load data from active profile
+    const activeProfile = ProfileService.getActiveProfile()
+
+    if (activeProfile) {
+      const stored = ProfileService.loadProfileData(activeProfile.id)
+      if (stored) {
+        return stored
+      }
     }
-    // Return default data with pre-populated categories
+
+    // Fallback: Return default data with pre-populated categories
     const defaultData = StorageService.getDefaultData()
     return {
       ...defaultData,
@@ -41,9 +47,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
   })
 
-  // Save to localStorage whenever appData changes
+  // Save to active profile whenever appData changes
   useEffect(() => {
-    StorageService.save(appData)
+    const activeProfile = ProfileService.getActiveProfile()
+    if (activeProfile) {
+      ProfileService.saveProfileData(activeProfile.id, appData)
+    }
   }, [appData])
 
   // Set initial view based on settings

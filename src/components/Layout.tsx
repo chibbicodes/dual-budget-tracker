@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useBudget } from '../contexts/BudgetContext'
+import { useProfile } from '../contexts/ProfileContext'
 import {
   Home,
   Wallet,
@@ -11,6 +12,7 @@ import {
   FolderOpen,
   FileText,
   Settings,
+  User,
 } from 'lucide-react'
 import type { BudgetViewType } from '../types'
 
@@ -29,6 +31,7 @@ const navigation = [
 
 export default function Layout() {
   const { currentView, setCurrentView } = useBudget()
+  const { activeProfile } = useProfile()
   const location = useLocation()
 
   const handleViewChange = (view: BudgetViewType) => {
@@ -55,8 +58,22 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <div className="flex items-center">
+            <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-gray-900">Dual Budget Tracker</h1>
+
+              {/* Profile Indicator */}
+              {activeProfile && (
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group"
+                  title="View profile settings"
+                >
+                  <User className="h-4 w-4 text-gray-600 group-hover:text-gray-800" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                    {activeProfile.name}
+                  </span>
+                </Link>
+              )}
             </div>
 
             {/* Budget Selector */}

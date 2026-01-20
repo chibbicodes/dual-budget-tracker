@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import { BudgetProvider } from './contexts/BudgetContext'
+import { ProfileProvider, useProfile } from './contexts/ProfileContext'
 import Layout from './components/Layout'
+import ProfileSelector from './components/ProfileSelector'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
 import DueDates from './pages/DueDates'
@@ -14,7 +16,27 @@ import BusinessReports from './pages/BusinessReports'
 import Settings from './pages/Settings'
 import Welcome from './pages/Welcome'
 
-function App() {
+function AppContent() {
+  const { activeProfile, isLoading } = useProfile()
+
+  // Show loading state while initializing
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show profile selector if no active profile
+  if (!activeProfile) {
+    return <ProfileSelector />
+  }
+
+  // Show main app with active profile
   return (
     <BudgetProvider>
       <Routes>
@@ -34,6 +56,14 @@ function App() {
         </Route>
       </Routes>
     </BudgetProvider>
+  )
+}
+
+function App() {
+  return (
+    <ProfileProvider>
+      <AppContent />
+    </ProfileProvider>
   )
 }
 

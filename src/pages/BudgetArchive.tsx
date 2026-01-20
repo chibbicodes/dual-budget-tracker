@@ -203,7 +203,7 @@ Generated: ${format(new Date(), 'PPpp')}
               <option value="">-- Select a month --</option>
               {archivedMonths.map((month) => (
                 <option key={month} value={month}>
-                  {format(parseISO(month + '-01'), 'MMMM yyyy')}
+                  {format(parseISO(month + '-01T12:00:00'), 'MMMM yyyy')}
                 </option>
               ))}
             </select>

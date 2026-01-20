@@ -244,7 +244,7 @@ export default function Transactions() {
       const linkedTx = appData.transactions.find(t => t.id === transaction.linkedTransactionId)
       if (linkedTx) {
         const deleteLinkedMessage = `This transaction is linked to another transaction:\n\n` +
-          `Linked: ${format(parseISO(linkedTx.date), 'MMM dd, yyyy')} - ${linkedTx.description} - ${formatCurrency(linkedTx.amount)}\n\n` +
+          `Linked: ${format(parseISO(linkedTx.date + 'T12:00:00'), 'MMM dd, yyyy')} - ${linkedTx.description} - ${formatCurrency(linkedTx.amount)}\n\n` +
           `Do you want to delete BOTH transactions?\n\n` +
           `• Click OK to delete both\n` +
           `• Click Cancel to delete only this transaction`
@@ -1086,7 +1086,7 @@ export default function Transactions() {
                             className="text-sm text-gray-900 cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
                             onClick={() => startInlineEdit(transaction.id, 'date', transaction.date)}
                           >
-                            {format(new Date(transaction.date), 'MMM d, yyyy')}
+                            {format(parseISO(transaction.date + 'T12:00:00'), 'MMM d, yyyy')}
                           </p>
                         )}
                       </td>
@@ -2213,7 +2213,7 @@ function TransactionForm({
                     ) : (
                       potentialMatches.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {format(parseISO(t.date), 'MMM dd, yyyy')} - {t.description} - {formatCurrency(t.amount)}
+                          {format(parseISO(t.date + 'T12:00:00'), 'MMM dd, yyyy')} - {t.description} - {formatCurrency(t.amount)}
                         </option>
                       ))
                     )}

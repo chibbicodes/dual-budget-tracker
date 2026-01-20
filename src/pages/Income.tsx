@@ -539,7 +539,7 @@ export default function Income() {
                           {formatCurrency(income.expectedAmount || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {income.expectedDate ? format(parseISO(income.expectedDate), 'MMM d, yyyy') : '-'}
+                          {income.expectedDate ? format(parseISO(income.expectedDate + 'T12:00:00'), 'MMM d, yyyy') : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                           <button

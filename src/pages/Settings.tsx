@@ -4,7 +4,7 @@ import StorageService from '../services/storage'
 import { Download, Upload, Trash2, AlertTriangle, Settings as SettingsIcon } from 'lucide-react'
 import type { BudgetType } from '../types'
 
-type Tab = 'data' | 'preferences' | 'categories' | 'projects'
+type Tab = 'data' | 'preferences' | 'categories' | 'income' | 'projects'
 
 export default function Settings() {
   const {
@@ -15,6 +15,9 @@ export default function Settings() {
     addMissingDefaultCategories,
     cleanupOldBusinessExpenseCategories,
     addCategoryGroupsToBusinessExpenses,
+    addIncome,
+    updateIncome,
+    deleteIncome,
     addProjectType,
     updateProjectType,
     deleteProjectType,
@@ -167,6 +170,16 @@ export default function Settings() {
             }`}
           >
             Categories
+          </button>
+          <button
+            onClick={() => setActiveTab('income')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'income'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Income Sources
           </button>
           <button
             onClick={() => setActiveTab('projects')}
@@ -525,15 +538,20 @@ export default function Settings() {
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Category Management</h3>
             <p className="text-sm text-gray-500 mt-1">
-              Manage your budget categories from the Budget page for each budget type
+              Manage your budget categories. Note: Most category fields like bucket assignments and monthly budgets are best managed from the Budget page.
             </p>
           </div>
           <div className="p-6">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+              <p className="text-sm text-blue-700">
+                For now, detailed category management (budgets, buckets, etc.) should be done from the Budget page for each budget type. This section will be expanded in a future update.
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Household Categories</h4>
                 <p className="text-sm text-gray-600 mb-2">
-                  {appData.categories.filter((c) => c.budgetType === 'household').length} categories
+                  {appData.categories.filter((c) => c.budgetType === 'household' && c.isActive).length} active categories
                 </p>
                 <p className="text-sm text-gray-500">
                   View and edit categories from the Budget page in Household view
@@ -543,7 +561,7 @@ export default function Settings() {
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Business Categories</h4>
                 <p className="text-sm text-gray-600 mb-2">
-                  {appData.categories.filter((c) => c.budgetType === 'business').length} categories
+                  {appData.categories.filter((c) => c.budgetType === 'business' && c.isActive).length} active categories
                 </p>
                 <p className="text-sm text-gray-500">
                   View and edit categories from the Budget page in Business view
@@ -552,6 +570,16 @@ export default function Settings() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Income Sources Tab */}
+      {activeTab === 'income' && (
+        <IncomeSourceManager
+          incomeSources={appData.income}
+          onAddIncome={addIncome}
+          onUpdateIncome={updateIncome}
+          onDeleteIncome={deleteIncome}
+        />
       )}
 
       {/* Projects Tab */}
@@ -993,6 +1021,260 @@ function ProjectStatusesManager({
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             + Add Status
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Income Source Manager Component
+interface IncomeSourceManagerProps {
+  incomeSources: any[]
+  onAddIncome: (income: any) => void
+  onUpdateIncome: (id: string, updates: any) => void
+  onDeleteIncome: (id: string) => void
+}
+
+function IncomeSourceManager({
+  incomeSources,
+  onAddIncome,
+  onUpdateIncome,
+  onDeleteIncome,
+}: IncomeSourceManagerProps) {
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    source: '',
+    budgetType: 'household' as 'household' | 'business',
+    client: '',
+    expectedAmount: '',
+    isRecurring: false,
+  })
+
+  const handleAdd = () => {
+    if (!formData.source.trim()) {
+      alert('Please enter an income source name')
+      return
+    }
+    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : undefined
+    onAddIncome({
+      ...formData,
+      expectedAmount,
+      client: formData.client || undefined,
+    })
+    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+    setIsAdding(false)
+  }
+
+  const handleEdit = (income: any) => {
+    setEditingId(income.id)
+    setFormData({
+      source: income.source,
+      budgetType: income.budgetType,
+      client: income.client || '',
+      expectedAmount: income.expectedAmount?.toString() || '',
+      isRecurring: income.isRecurring || false,
+    })
+  }
+
+  const handleUpdate = () => {
+    if (!formData.source.trim()) {
+      alert('Please enter an income source name')
+      return
+    }
+    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : undefined
+    onUpdateIncome(editingId!, {
+      ...formData,
+      expectedAmount,
+      client: formData.client || undefined,
+    })
+    setEditingId(null)
+    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+  }
+
+  const handleCancel = () => {
+    setIsAdding(false)
+    setEditingId(null)
+    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+  }
+
+  const handleDelete = (id: string, source: string) => {
+    if (confirm(`Are you sure you want to delete the income source "${source}"?`)) {
+      onDeleteIncome(id)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">Income Sources</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage income sources for both household and business budgets
+        </p>
+      </div>
+      <div className="p-6 space-y-4">
+        {/* Income Sources List */}
+        <div className="space-y-3">
+          {incomeSources.map((income) =>
+            editingId === income.id ? (
+              <div key={income.id} className="border border-blue-300 rounded-lg p-4 bg-blue-50">
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={formData.source}
+                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Income Source Name"
+                  />
+                  <select
+                    value={formData.budgetType}
+                    onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="household">Household</option>
+                    <option value="business">Business</option>
+                  </select>
+                  {formData.budgetType === 'business' && (
+                    <input
+                      type="text"
+                      value={formData.client}
+                      onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Client Name (optional)"
+                    />
+                  )}
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.expectedAmount}
+                    onChange={(e) => setFormData({ ...formData, expectedAmount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Expected Amount (optional)"
+                  />
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isRecurring}
+                      onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Recurring Monthly</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpdate}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div key={income.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                <div>
+                  <div className="font-medium text-gray-900">{income.source}</div>
+                  <div className="text-sm text-gray-500">
+                    {income.budgetType === 'household' ? 'Household' : 'Business'}
+                    {income.client && ` • Client: ${income.client}`}
+                    {income.expectedAmount && ` • Expected: $${income.expectedAmount.toFixed(2)}`}
+                    {income.isRecurring && ' • Recurring'}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(income)}
+                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(income.id, income.source)}
+                    className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Add New Form */}
+        {isAdding ? (
+          <div className="border border-green-300 rounded-lg p-4 bg-green-50">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Add New Income Source</h4>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={formData.source}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Income Source Name (e.g., Salary, Freelance)"
+              />
+              <select
+                value={formData.budgetType}
+                onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="household">Household</option>
+                <option value="business">Business</option>
+              </select>
+              {formData.budgetType === 'business' && (
+                <input
+                  type="text"
+                  value={formData.client}
+                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Client Name (optional)"
+                />
+              )}
+              <input
+                type="number"
+                step="0.01"
+                value={formData.expectedAmount}
+                onChange={(e) => setFormData({ ...formData, expectedAmount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Expected Amount (optional)"
+              />
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isRecurring}
+                  onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Recurring Monthly</span>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAdd}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Add Income Source
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            + Add Income Source
           </button>
         )}
       </div>

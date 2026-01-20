@@ -8,7 +8,7 @@ import { Plus, Edit2, Trash2, FolderOpen, TrendingUp, DollarSign } from 'lucide-
 import type { Project, BudgetType } from '../types'
 
 type BudgetFilter = 'all' | BudgetType
-type SortBy = 'date' | 'name' | 'profit' | 'margin'
+type SortBy = 'date' | 'name' | 'profit' | 'margin' | 'budget' | 'spent' | 'remaining' | 'percentUsed'
 type DateRangeFilter = 'all' | 'this-month' | 'last-month' | '1-month' | '3-months' | '6-months' | '9-months' | 'this-year' | 'last-year' | string
 
 export default function Projects() {
@@ -140,12 +140,24 @@ export default function Projects() {
       const profit = revenue - expenses
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0
 
+      // Budget tracking metrics (primarily for household)
+      const budget = project.budget || 0
+      const spent = expenses // For household, "spent" is typically expenses
+      const remaining = budget - spent
+      const percentUsed = budget > 0 ? (spent / budget) * 100 : 0
+      const isOverBudget = spent > budget && budget > 0
+
       return {
         project,
         revenue,
         expenses,
         profit,
         margin,
+        budget,
+        spent,
+        remaining,
+        percentUsed,
+        isOverBudget,
       }
     })
   }, [filteredProjects, appData.transactions])
@@ -161,6 +173,14 @@ export default function Projects() {
         return sorted.sort((a, b) => b.profit - a.profit)
       case 'margin':
         return sorted.sort((a, b) => b.margin - a.margin)
+      case 'budget':
+        return sorted.sort((a, b) => b.budget - a.budget)
+      case 'spent':
+        return sorted.sort((a, b) => b.spent - a.spent)
+      case 'remaining':
+        return sorted.sort((a, b) => b.remaining - a.remaining)
+      case 'percentUsed':
+        return sorted.sort((a, b) => b.percentUsed - a.percentUsed)
       case 'date':
       default:
         return sorted.sort((a, b) => b.project.dateCreated.localeCompare(a.project.dateCreated))
@@ -171,16 +191,36 @@ export default function Projects() {
   const summary = useMemo(() => {
     return sortedProjects.reduce(
       (acc, pm) => ({
+        // P&L metrics (for business)
         totalRevenue: acc.totalRevenue + pm.revenue,
         totalExpenses: acc.totalExpenses + pm.expenses,
         totalProfit: acc.totalProfit + pm.profit,
+        // Budget tracking metrics (for household)
+        totalBudget: acc.totalBudget + pm.budget,
+        totalSpent: acc.totalSpent + pm.spent,
+        totalRemaining: acc.totalRemaining + pm.remaining,
+        projectsWithBudget: acc.projectsWithBudget + (pm.budget > 0 ? 1 : 0),
+        projectsOverBudget: acc.projectsOverBudget + (pm.isOverBudget ? 1 : 0),
       }),
-      { totalRevenue: 0, totalExpenses: 0, totalProfit: 0 }
+      {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        totalProfit: 0,
+        totalBudget: 0,
+        totalSpent: 0,
+        totalRemaining: 0,
+        projectsWithBudget: 0,
+        projectsOverBudget: 0,
+      }
     )
   }, [sortedProjects])
 
   const avgMargin = summary.totalRevenue > 0
     ? (summary.totalProfit / summary.totalRevenue) * 100
+    : 0
+
+  const avgPercentUsed = summary.totalBudget > 0
+    ? (summary.totalSpent / summary.totalBudget) * 100
     : 0
 
   const handleDelete = (id: string) => {
@@ -224,41 +264,140 @@ export default function Projects() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Revenue</h3>
-            <DollarSign className="h-5 w-5 text-green-600" />
+      {effectiveBudgetFilter === 'business' ? (
+        /* Business P&L View */
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Total Revenue</h3>
+              <DollarSign className="h-5 w-5 text-green-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalRevenue)}</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalRevenue)}</p>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
-            <DollarSign className="h-5 w-5 text-red-600" />
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
+              <DollarSign className="h-5 w-5 text-red-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalExpenses)}</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalExpenses)}</p>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Profit</h3>
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Total Profit</h3>
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+            </div>
+            <p className={`text-2xl font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(summary.totalProfit)}
+            </p>
           </div>
-          <p className={`text-2xl font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(summary.totalProfit)}
-          </p>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Avg Margin</h3>
-            <TrendingUp className="h-5 w-5 text-purple-600" />
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Avg Margin</h3>
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{avgMargin.toFixed(1)}%</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{avgMargin.toFixed(1)}%</p>
         </div>
-      </div>
+      ) : effectiveBudgetFilter === 'household' ? (
+        /* Household Budget View */
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Total Budget</h3>
+              <DollarSign className="h-5 w-5 text-blue-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalBudget)}</p>
+            <p className="text-xs text-gray-500 mt-1">{summary.projectsWithBudget} projects with budget</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Used So Far</h3>
+              <DollarSign className="h-5 w-5 text-red-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalSpent)}</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Still Available</h3>
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            </div>
+            <p className={`text-2xl font-bold ${summary.totalRemaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(Math.abs(summary.totalRemaining))}
+              {summary.totalRemaining < 0 && ' over'}
+            </p>
+            {summary.projectsOverBudget > 0 && (
+              <p className="text-xs text-red-500 mt-1">{summary.projectsOverBudget} over budget</p>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Avg % Used</h3>
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+            </div>
+            <p className={`text-2xl font-bold ${avgPercentUsed > 100 ? 'text-red-600' : 'text-gray-900'}`}>
+              {avgPercentUsed.toFixed(1)}%
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* Combined View - Show both sets */
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Business Projects (P&L)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Revenue</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(summary.totalRevenue)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Expenses</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(summary.totalExpenses)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Profit</p>
+                <p className={`text-lg font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(summary.totalProfit)}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Avg Margin</p>
+                <p className="text-lg font-bold text-gray-900">{avgMargin.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Household Projects (Budget)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Budget</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(summary.totalBudget)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Used So Far</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(summary.totalSpent)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Still Available</p>
+                <p className={`text-lg font-bold ${summary.totalRemaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(Math.abs(summary.totalRemaining))}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs text-gray-600">Avg % Used</p>
+                <p className={`text-lg font-bold ${avgPercentUsed > 100 ? 'text-red-600' : 'text-gray-900'}`}>
+                  {avgPercentUsed.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Sort */}
       <div className="bg-white rounded-lg shadow p-4">
@@ -363,8 +502,28 @@ export default function Projects() {
             >
               <option value="date">Date Created</option>
               <option value="name">Name</option>
-              <option value="profit">Profit</option>
-              <option value="margin">Margin</option>
+              {effectiveBudgetFilter === 'business' ? (
+                <>
+                  <option value="profit">Profit</option>
+                  <option value="margin">Margin</option>
+                </>
+              ) : effectiveBudgetFilter === 'household' ? (
+                <>
+                  <option value="budget">Budget</option>
+                  <option value="spent">Used</option>
+                  <option value="remaining">Available</option>
+                  <option value="percentUsed">% Used</option>
+                </>
+              ) : (
+                <>
+                  <option value="profit">Profit</option>
+                  <option value="margin">Margin</option>
+                  <option value="budget">Budget</option>
+                  <option value="spent">Used</option>
+                  <option value="remaining">Available</option>
+                  <option value="percentUsed">% Used</option>
+                </>
+              )}
             </select>
           </div>
         </div>
@@ -407,7 +566,7 @@ export default function Projects() {
                 </td>
               </tr>
             ) : (
-              sortedProjects.map(({ project, revenue, expenses, profit, margin }) => (
+              sortedProjects.map(({ project, revenue, expenses, profit, margin, budget, spent, remaining, percentUsed, isOverBudget }) => (
                 <tr
                   key={project.id}
                   className="hover:bg-gray-50 cursor-pointer"
@@ -567,6 +726,7 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
     projectTypeId: defaultProjectTypeId,
     statusId: project?.statusId || getDefaultStatusId(defaultProjectTypeId),
     incomeSourceId: project?.incomeSourceId || '',
+    budget: project?.budget?.toString() || '',
     dateCreated: project?.dateCreated || getLocalDateString(),
     dateCompleted: project?.dateCompleted || '',
     commissionPaid: project?.commissionPaid || false,
@@ -604,8 +764,10 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const budgetValue = formData.budget ? parseFloat(formData.budget) : undefined
     onSubmit({
       ...formData,
+      budget: budgetValue,
       incomeSourceId: formData.incomeSourceId || undefined,
       dateCompleted: formData.dateCompleted || undefined,
       notes: formData.notes || undefined,
@@ -722,6 +884,28 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
           </select>
           <p className="text-xs text-gray-500 mt-1">
             Link this project to an income source for better tracking
+          </p>
+        </div>
+
+        {/* Budget */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Budget
+            <span className="text-xs text-gray-500 ml-2">(Optional)</span>
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.budget}
+            onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="0.00"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.budgetType === 'household'
+              ? 'Set a budget to track spending against'
+              : 'Optional budget for this project'}
           </p>
         </div>
 

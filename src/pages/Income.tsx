@@ -225,7 +225,9 @@ export default function Income() {
         }
       })
 
-    return Array.from(sourceMap.values()).sort((a, b) => b.expected - a.expected)
+    return Array.from(sourceMap.values())
+      .filter(item => item.expected > 0 || item.actual > 0) // Only show sources with expected or actual income this month
+      .sort((a, b) => b.expected - a.expected)
   }, [filteredIncome, appData.transactions, currentView, budgetFilter, selectedMonth])
 
   const handleAdd = (income: Omit<IncomeType, 'id'>) => {

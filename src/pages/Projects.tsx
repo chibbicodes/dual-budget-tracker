@@ -23,6 +23,14 @@ export default function Projects() {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
+  // Get effective budget filter (considers both currentView and budgetFilter)
+  const effectiveBudgetFilter = useMemo(() => {
+    if (currentView !== 'combined') {
+      return currentView
+    }
+    return budgetFilter
+  }, [currentView, budgetFilter])
+
   // Get unique years from projects for date filter
   const availableYears = useMemo(() => {
     const years = new Set<number>()
@@ -279,7 +287,7 @@ export default function Projects() {
             >
               <option value="all">All Types</option>
               {appData.projectTypes
-                .filter((t) => budgetFilter === 'all' || t.budgetType === budgetFilter)
+                .filter((t) => effectiveBudgetFilter === 'all' || t.budgetType === effectiveBudgetFilter)
                 .map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.name}
@@ -313,7 +321,7 @@ export default function Projects() {
             >
               <option value="all">All Sources</option>
               {appData.incomeSources
-                .filter((s) => budgetFilter === 'all' || s.budgetType === budgetFilter)
+                .filter((s) => effectiveBudgetFilter === 'all' || s.budgetType === effectiveBudgetFilter)
                 .map((source) => (
                   <option key={source.id} value={source.id}>
                     {source.name}
@@ -815,7 +823,12 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
 
   // Calculate P&L by category
   const categoryBreakdown = useMemo(() => {
-    const categoryMap = new Map<string, { category: string; revenue: number; expenses: number; transactionIds: string[] }>()
+    const categoryMap = new Map<string, {
+      category: string
+      revenue: number
+      expenses: number
+      transactionIds: string[]
+    }>()
 
     transactions.forEach((transaction) => {
       const category = appData.categories.find((c) => c.id === transaction.categoryId)
@@ -839,9 +852,35 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
       item.transactionIds.push(transaction.id)
     })
 
-    return Array.from(categoryMap.values()).sort((a, b) =>
-      (b.revenue + b.expenses) - (a.revenue + a.expenses)
+    // Calculate totals for percentages
+    const totalRevenue = transactions
+      .filter((t) => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const totalExpenses = Math.abs(
+      transactions
+        .filter((t) => t.amount < 0)
+        .reduce((sum, t) => sum + t.amount, 0)
     )
+
+    // Convert to array with amount and percentage
+    return Array.from(categoryMap.values())
+      .map((item) => {
+        // Determine if this is primarily an income or expense category
+        const isIncome = item.revenue > item.expenses
+        const amount = isIncome ? item.revenue : item.expenses
+        const total = isIncome ? totalRevenue : totalExpenses
+        const percentage = total > 0 ? (amount / total) * 100 : 0
+
+        return {
+          category: item.category,
+          amount,
+          percentage,
+          isIncome,
+          transactionIds: item.transactionIds,
+        }
+      })
+      .sort((a, b) => b.amount - a.amount) // Sort by amount descending
   }, [transactions, appData.categories])
 
   // Calculate totals
@@ -942,33 +981,36 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Expenses</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% of Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {categoryBreakdown.map((item) => {
-                    const net = item.revenue - item.expenses
-                    return (
-                      <tr
-                        key={item.category}
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => setSelectedCategory(item.category)}
-                      >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.category}</td>
-                        <td className="px-4 py-3 text-sm text-right text-green-600">
-                          {item.revenue > 0 ? formatCurrency(item.revenue) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-red-600">
-                          {item.expenses > 0 ? formatCurrency(item.expenses) : '-'}
-                        </td>
-                        <td className={`px-4 py-3 text-sm text-right font-medium ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(net)}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {categoryBreakdown.map((item) => (
+                    <tr
+                      key={item.category}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedCategory(item.category)}
+                    >
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.category}</td>
+                      <td className="px-4 py-3 text-sm text-left">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          item.isIncome ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.isIncome ? 'Income' : 'Expense'}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 text-sm text-right font-medium ${
+                        item.isIncome ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(item.amount)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">
+                        {item.percentage.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

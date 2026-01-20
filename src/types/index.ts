@@ -64,37 +64,30 @@ export interface Transaction {
 // Project Types
 // ============================================================================
 
-export type PerformanceProjectStatus =
-  | 'holding'
-  | 'issued'
-  | 'confirmed'
-  | 'completed'
-  | 'cancelled'
+export interface ProjectTypeConfig {
+  id: string
+  name: string
+  budgetType: BudgetType
+  allowedStatuses: string[] // IDs of allowed statuses for this project type
+  createdAt: string
+  updatedAt: string
+}
 
-export type GeneralProjectStatus =
-  | 'submitted'
-  | 'quoted'
-  | 'confirmed'
-  | 'active'
-  | 'delivered'
-  | 'completed'
-
-export type ProjectStatus = PerformanceProjectStatus | GeneralProjectStatus
-
-export type ProjectType =
-  | 'performance'
-  | 'craft'
-  | 'home_improvement'
-  | 'party'
-  | 'event'
-  | 'other'
+export interface ProjectStatusConfig {
+  id: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
 
 export interface Project {
   id: string
   name: string
   budgetType: BudgetType
-  projectType: ProjectType
-  status: ProjectStatus
+  projectTypeId: string // Reference to ProjectTypeConfig
+  statusId: string // Reference to ProjectStatusConfig
+  incomeSourceId?: string // Optional link to income source
   dateCreated: string // ISO date string
   dateCompleted?: string // ISO date string
   commissionPaid: boolean
@@ -298,6 +291,8 @@ export interface AppData {
   income: Income[] // Legacy income tracking
   autoCategorization: AutoCategorizationRule[]
   monthlyBudgets: MonthlyBudget[] // Monthly budget overrides
+  projectTypes: ProjectTypeConfig[] // Customizable project types
+  projectStatuses: ProjectStatusConfig[] // Customizable project statuses
   projects: Project[] // Project tracking for P&L analysis
   settings: AppSettings
   version: string // For data migration
@@ -460,6 +455,16 @@ export interface BudgetContextState {
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateProject: (id: string, updates: Partial<Project>) => void
   deleteProject: (id: string) => void
+
+  // Project type operations
+  addProjectType: (projectType: Omit<ProjectTypeConfig, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateProjectType: (id: string, updates: Partial<ProjectTypeConfig>) => void
+  deleteProjectType: (id: string) => void
+
+  // Project status operations
+  addProjectStatus: (status: Omit<ProjectStatusConfig, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateProjectStatus: (id: string, updates: Partial<ProjectStatusConfig>) => void
+  deleteProjectStatus: (id: string) => void
 
   // Settings operations
   updateSettings: (updates: Partial<AppSettings>) => void

@@ -4,10 +4,24 @@ import StorageService from '../services/storage'
 import { Download, Upload, Trash2, AlertTriangle, Settings as SettingsIcon } from 'lucide-react'
 import type { BudgetType } from '../types'
 
-type Tab = 'data' | 'preferences' | 'categories'
+type Tab = 'data' | 'preferences' | 'categories' | 'projects'
 
 export default function Settings() {
-  const { appData, updateSettings, clearAllData, importData, addMissingDefaultCategories, cleanupOldBusinessExpenseCategories, addCategoryGroupsToBusinessExpenses } = useBudget()
+  const {
+    appData,
+    updateSettings,
+    clearAllData,
+    importData,
+    addMissingDefaultCategories,
+    cleanupOldBusinessExpenseCategories,
+    addCategoryGroupsToBusinessExpenses,
+    addProjectType,
+    updateProjectType,
+    deleteProjectType,
+    addProjectStatus,
+    updateProjectStatus,
+    deleteProjectStatus,
+  } = useBudget()
   const [activeTab, setActiveTab] = useState<Tab>('data')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -153,6 +167,16 @@ export default function Settings() {
             }`}
           >
             Categories
+          </button>
+          <button
+            onClick={() => setActiveTab('projects')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'projects'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Projects
           </button>
         </nav>
       </div>
@@ -529,6 +553,449 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* Projects Tab */}
+      {activeTab === 'projects' && (
+        <div className="space-y-6">
+          <ProjectTypesManager
+            projectTypes={appData.projectTypes}
+            projectStatuses={appData.projectStatuses}
+            onAddType={addProjectType}
+            onUpdateType={updateProjectType}
+            onDeleteType={deleteProjectType}
+          />
+          <ProjectStatusesManager
+            projectStatuses={appData.projectStatuses}
+            onAddStatus={addProjectStatus}
+            onUpdateStatus={updateProjectStatus}
+            onDeleteStatus={deleteProjectStatus}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Project Types Manager Component
+interface ProjectTypesManagerProps {
+  projectTypes: any[]
+  projectStatuses: any[]
+  onAddType: (type: any) => void
+  onUpdateType: (id: string, updates: any) => void
+  onDeleteType: (id: string) => void
+}
+
+function ProjectTypesManager({
+  projectTypes,
+  projectStatuses,
+  onAddType,
+  onUpdateType,
+  onDeleteType,
+}: ProjectTypesManagerProps) {
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    budgetType: 'business' as 'household' | 'business',
+    allowedStatuses: [] as string[],
+  })
+
+  const handleAdd = () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a project type name')
+      return
+    }
+    if (formData.allowedStatuses.length === 0) {
+      alert('Please select at least one allowed status')
+      return
+    }
+    onAddType(formData)
+    setFormData({ name: '', budgetType: 'business', allowedStatuses: [] })
+    setIsAdding(false)
+  }
+
+  const handleEdit = (type: any) => {
+    setEditingId(type.id)
+    setFormData({
+      name: type.name,
+      budgetType: type.budgetType,
+      allowedStatuses: type.allowedStatuses,
+    })
+  }
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a project type name')
+      return
+    }
+    if (formData.allowedStatuses.length === 0) {
+      alert('Please select at least one allowed status')
+      return
+    }
+    onUpdateType(editingId!, formData)
+    setEditingId(null)
+    setFormData({ name: '', budgetType: 'business', allowedStatuses: [] })
+  }
+
+  const handleCancel = () => {
+    setIsAdding(false)
+    setEditingId(null)
+    setFormData({ name: '', budgetType: 'business', allowedStatuses: [] })
+  }
+
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete the project type "${name}"? Existing projects will keep their type for historical records.`)) {
+      onDeleteType(id)
+    }
+  }
+
+  const toggleStatus = (statusId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      allowedStatuses: prev.allowedStatuses.includes(statusId)
+        ? prev.allowedStatuses.filter((id) => id !== statusId)
+        : [...prev.allowedStatuses, statusId],
+    }))
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">Project Types</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage project types and their allowed statuses
+        </p>
+      </div>
+      <div className="p-6 space-y-4">
+        {/* Project Types List */}
+        <div className="space-y-3">
+          {projectTypes.map((type) => {
+            const allowedStatusNames = type.allowedStatuses
+              .map((id: string) => projectStatuses.find((s) => s.id === id)?.name)
+              .filter(Boolean)
+              .join(', ')
+
+            return editingId === type.id ? (
+              <div key={type.id} className="border border-blue-300 rounded-lg p-4 bg-blue-50">
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Project Type Name"
+                  />
+                  <select
+                    value={formData.budgetType}
+                    onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="household">Household</option>
+                    <option value="business">Business</option>
+                  </select>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Allowed Statuses (select multiple):
+                    </label>
+                    <div className="space-y-2">
+                      {projectStatuses.map((status) => (
+                        <label key={status.id} className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.allowedStatuses.includes(status.id)}
+                            onChange={() => toggleStatus(status.id)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">{status.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpdate}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div key={type.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                <div>
+                  <div className="font-medium text-gray-900">{type.name}</div>
+                  <div className="text-sm text-gray-500">
+                    {type.budgetType === 'household' ? 'Household' : 'Business'} • Statuses: {allowedStatusNames}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(type)}
+                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(type.id, type.name)}
+                    className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Add New Form */}
+        {isAdding ? (
+          <div className="border border-green-300 rounded-lg p-4 bg-green-50">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Add New Project Type</h4>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Project Type Name (e.g., Workshop, Concert)"
+              />
+              <select
+                value={formData.budgetType}
+                onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="household">Household</option>
+                <option value="business">Business</option>
+              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Allowed Statuses (select multiple):
+                </label>
+                <div className="space-y-2">
+                  {projectStatuses.map((status) => (
+                    <label key={status.id} className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.allowedStatuses.includes(status.id)}
+                        onChange={() => toggleStatus(status.id)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{status.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAdd}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Add Project Type
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            + Add Project Type
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Project Statuses Manager Component
+interface ProjectStatusesManagerProps {
+  projectStatuses: any[]
+  onAddStatus: (status: any) => void
+  onUpdateStatus: (id: string, updates: any) => void
+  onDeleteStatus: (id: string) => void
+}
+
+function ProjectStatusesManager({
+  projectStatuses,
+  onAddStatus,
+  onUpdateStatus,
+  onDeleteStatus,
+}: ProjectStatusesManagerProps) {
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+  })
+
+  const handleAdd = () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a status name')
+      return
+    }
+    onAddStatus(formData)
+    setFormData({ name: '', description: '' })
+    setIsAdding(false)
+  }
+
+  const handleEdit = (status: any) => {
+    setEditingId(status.id)
+    setFormData({
+      name: status.name,
+      description: status.description || '',
+    })
+  }
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a status name')
+      return
+    }
+    onUpdateStatus(editingId!, formData)
+    setEditingId(null)
+    setFormData({ name: '', description: '' })
+  }
+
+  const handleCancel = () => {
+    setIsAdding(false)
+    setEditingId(null)
+    setFormData({ name: '', description: '' })
+  }
+
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete the status "${name}"? Existing projects will keep their status for historical records.`)) {
+      onDeleteStatus(id)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">Project Statuses</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage available project statuses
+        </p>
+      </div>
+      <div className="p-6 space-y-4">
+        {/* Statuses List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {projectStatuses.map((status) =>
+            editingId === status.id ? (
+              <div key={status.id} className="border border-blue-300 rounded-lg p-4 bg-blue-50 md:col-span-2">
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Status Name"
+                  />
+                  <input
+                    type="text"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Description (optional)"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpdate}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div key={status.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                <div>
+                  <div className="font-medium text-gray-900">{status.name}</div>
+                  {status.description && <div className="text-sm text-gray-500">{status.description}</div>}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(status)}
+                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(status.id, status.name)}
+                    className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Add New Form */}
+        {isAdding ? (
+          <div className="border border-green-300 rounded-lg p-4 bg-green-50">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Add New Status</h4>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Status Name (e.g., Planning, In Progress)"
+              />
+              <input
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Description (optional)"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAdd}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Add Status
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            + Add Status
+          </button>
+        )}
+      </div>
     </div>
   )
 }

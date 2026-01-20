@@ -1,4 +1,5 @@
 import type { AppData, BudgetType } from '../types'
+import { generateDefaultProjectTypes, generateDefaultProjectStatuses } from '../data/defaultProjects'
 
 const STORAGE_KEY = 'dual-budget-tracker-data'
 const CURRENT_VERSION = '1.0.0'
@@ -29,6 +30,12 @@ export class StorageService {
       }
       if (!data.monthlyBudgets) {
         data.monthlyBudgets = []
+      }
+      if (!data.projectStatuses) {
+        data.projectStatuses = generateDefaultProjectStatuses()
+      }
+      if (!data.projectTypes) {
+        data.projectTypes = generateDefaultProjectTypes()
       }
       if (!data.projects) {
         data.projects = []
@@ -164,6 +171,8 @@ export class StorageService {
             ...(importedData.autoCategorization || []),
           ],
           monthlyBudgets: [...existing.monthlyBudgets, ...(importedData.monthlyBudgets || [])],
+          projectStatuses: [...existing.projectStatuses, ...(importedData.projectStatuses || [])],
+          projectTypes: [...existing.projectTypes, ...(importedData.projectTypes || [])],
           projects: [...existing.projects, ...(importedData.projects || [])],
           settings: importedData.settings || existing.settings,
           version: CURRENT_VERSION,
@@ -202,6 +211,8 @@ export class StorageService {
       income: [],
       autoCategorization: [],
       monthlyBudgets: [],
+      projectStatuses: generateDefaultProjectStatuses(),
+      projectTypes: generateDefaultProjectTypes(),
       projects: [],
       settings: {
         defaultBudgetView: 'household',

@@ -2294,11 +2294,14 @@ function TransactionForm({
             {appData.projects
               .filter((p) => p.budgetType === formData.budgetType)
               .sort((a, b) => b.dateCreated.localeCompare(a.dateCreated))
-              .map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} - {project.status}
-                </option>
-              ))}
+              .map((project) => {
+                const status = appData.projectStatuses.find((s) => s.id === project.statusId)
+                return (
+                  <option key={project.id} value={project.id}>
+                    {project.name} - {status?.name || 'Unknown'}
+                  </option>
+                )
+              })}
           </select>
           <p className="text-xs text-gray-500 mt-1">
             Link to a project to track revenue and expenses for P&L analysis

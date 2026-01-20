@@ -13,6 +13,8 @@ import type {
   MonthlyBudget,
   BucketId,
   Project,
+  ProjectTypeConfig,
+  ProjectStatusConfig,
 } from '../types'
 import StorageService from '../services/storage'
 import { generateDefaultCategories } from '../data/defaultCategories'
@@ -546,6 +548,96 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ============================================================================
+  // Project Type Operations
+  // ============================================================================
+
+  const addProjectType = useCallback(
+    (projectType: Omit<ProjectTypeConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const now = new Date().toISOString()
+      const newProjectType: ProjectTypeConfig = {
+        ...projectType,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      setAppDataState((prev) => ({
+        ...prev,
+        projectTypes: [...prev.projectTypes, newProjectType],
+      }))
+    },
+    []
+  )
+
+  const updateProjectType = useCallback((id: string, updates: Partial<ProjectTypeConfig>) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      projectTypes: prev.projectTypes.map((type) =>
+        type.id === id
+          ? {
+              ...type,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            }
+          : type
+      ),
+    }))
+  }, [])
+
+  const deleteProjectType = useCallback((id: string) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      projectTypes: prev.projectTypes.filter((t) => t.id !== id),
+      // Note: We don't delete projects using this type, as they should remain for historical records
+    }))
+  }, [])
+
+  // ============================================================================
+  // Project Status Operations
+  // ============================================================================
+
+  const addProjectStatus = useCallback(
+    (status: Omit<ProjectStatusConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const now = new Date().toISOString()
+      const newStatus: ProjectStatusConfig = {
+        ...status,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      setAppDataState((prev) => ({
+        ...prev,
+        projectStatuses: [...prev.projectStatuses, newStatus],
+      }))
+    },
+    []
+  )
+
+  const updateProjectStatus = useCallback((id: string, updates: Partial<ProjectStatusConfig>) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      projectStatuses: prev.projectStatuses.map((status) =>
+        status.id === id
+          ? {
+              ...status,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            }
+          : status
+      ),
+    }))
+  }, [])
+
+  const deleteProjectStatus = useCallback((id: string) => {
+    setAppDataState((prev) => ({
+      ...prev,
+      projectStatuses: prev.projectStatuses.filter((s) => s.id !== id),
+      // Note: We don't update projects using this status, as they should remain for historical records
+    }))
+  }, [])
+
+  // ============================================================================
   // Rule Operations
   // ============================================================================
 
@@ -917,6 +1009,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     addProject,
     updateProject,
     deleteProject,
+    addProjectType,
+    updateProjectType,
+    deleteProjectType,
+    addProjectStatus,
+    updateProjectStatus,
+    deleteProjectStatus,
     addRule,
     updateRule,
     deleteRule,

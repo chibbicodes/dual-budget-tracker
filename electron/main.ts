@@ -12,7 +12,7 @@ let databaseServicePromise: Promise<any> | null = null
 let databaseService: any = null
 
 // Start loading database service immediately
-databaseServicePromise = import('../src/services/database/databaseService.js').then(module => {
+databaseServicePromise = import('./services/database/databaseService.js').then(module => {
   databaseService = module.databaseService
   return databaseService
 }).catch(error => {
@@ -150,7 +150,7 @@ app.whenReady().then(async () => {
     console.log('Database initialized successfully')
 
     // Check for and run migration from localStorage
-    const { migrateFromLocalStorage, hasLocalStorageData } = await import('../src/services/database/migration.js')
+    const { migrateFromLocalStorage, hasLocalStorageData } = await import('./services/database/migration.js')
     if (hasLocalStorageData()) {
       console.log('Migrating localStorage data to SQLite...')
       const result = await migrateFromLocalStorage()

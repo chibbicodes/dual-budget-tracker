@@ -25,6 +25,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "date-fns": "^3.0.6",
     "lucide-react": "^0.309.0",
     "react": "^18.2.0",
@@ -33,6 +34,7 @@
     "recharts": "^2.10.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.18.1",

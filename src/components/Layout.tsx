@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useBudget } from '../contexts/BudgetContext'
 import { useProfile } from '../contexts/ProfileContext'
+import { useElectron } from '../hooks/useElectron'
 import {
   Home,
   Wallet,
@@ -34,6 +35,9 @@ export default function Layout() {
   const { currentView, setCurrentView } = useBudget()
   const { activeProfile, logout } = useProfile()
   const location = useLocation()
+
+  // Initialize Electron IPC listeners for keyboard shortcuts and menu navigation
+  useElectron()
 
   const handleLogout = () => {
     if (confirm('Are you sure you want to logout? You will be returned to the profile selection screen.')) {

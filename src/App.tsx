@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { BudgetProvider } from './contexts/BudgetContext'
 import { ProfileProvider, useProfile } from './contexts/ProfileContext'
-import { useElectron } from './hooks/useElectron'
 import Layout from './components/Layout'
 import ProfileSelector from './components/ProfileSelector'
 import Dashboard from './pages/Dashboard'
@@ -19,9 +18,6 @@ import Welcome from './pages/Welcome'
 
 function AppContent() {
   const { activeProfile, isLoading } = useProfile()
-
-  // Initialize Electron IPC listeners for keyboard shortcuts and menu navigation
-  useElectron()
 
   // Show loading state while initializing
   if (isLoading) {

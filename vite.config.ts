@@ -10,6 +10,11 @@ export default defineConfig({
       {
         // Main process entry point
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+          },
+        },
       },
       {
         // Preload scripts
@@ -17,6 +22,11 @@ export default defineConfig({
         onstart(options) {
           // Notify the Renderer process to reload the page when the Preload scripts build is complete
           options.reload()
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+          },
         },
       },
     ]),

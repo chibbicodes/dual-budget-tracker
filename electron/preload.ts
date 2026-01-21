@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -7,29 +7,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
 
   // Listen for navigation commands from menu
-  onNavigate: (callback: (path: string) => void) => {
+  onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_event, path) => callback(path))
   },
 
   // Listen for view switching commands from menu
-  onSwitchView: (callback: (view: string) => void) => {
+  onSwitchView: (callback) => {
     ipcRenderer.on('switch-view', (_event, view) => callback(view))
   },
 
   // Listen for logout command from menu
-  onLogout: (callback: () => void) => {
+  onLogout: (callback) => {
     ipcRenderer.on('logout', () => callback())
   },
 })
-
-// Type definitions for TypeScript
-declare global {
-  interface Window {
-    electronAPI: {
-      getAppPath: () => Promise<string>
-      onNavigate: (callback: (path: string) => void) => void
-      onSwitchView: (callback: (view: string) => void) => void
-      onLogout: (callback: () => void) => void
-    }
-  }
-}

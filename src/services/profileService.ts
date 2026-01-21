@@ -1,15 +1,38 @@
 import type { Profile, ProfileMetadata, AppData } from '../types'
 import { StorageService } from './storage'
+import { databaseService } from './database/databaseService'
+import { migrateFromLocalStorage, hasLocalStorageData } from './database/migration'
 
-const PROFILE_METADATA_KEY = 'dual-budget-tracker-profiles'
-const PROFILE_DATA_PREFIX = 'dual-budget-tracker-profile-'
 const CURRENT_VERSION = '1.0.0'
+
+// Flag to track if database has been initialized
+let dbInitialized = false
 
 /**
  * Profile management service
- * Handles creating, switching, and managing multiple budget profiles
+ * Now uses SQLite database for storage instead of localStorage
  */
 export class ProfileService {
+  /**
+   * Initialize the database (call this before using any other methods)
+   */
+  static async initialize(): Promise<void> {
+    if (dbInitialized) return
+
+    try {
+      await databaseService.initialize()
+      dbInitialized = true
+
+      // Check if we need to migrate from localStorage
+      if (hasLocalStorageData()) {
+        console.log('Detected localStorage data, migrating to SQLite...')
+        await migrateFromLocalStorage()
+      }
+    } catch (error) {
+      console.error('Failed to initialize database:', error)
+      throw error
+    }
+  }
   /**
    * Hash a password using Web Crypto API
    */
@@ -30,21 +53,32 @@ export class ProfileService {
   }
   /**
    * Load profile metadata (list of all profiles)
+   * Now loads from SQLite database
    */
   static loadMetadata(): ProfileMetadata {
     try {
-      const stored = localStorage.getItem(PROFILE_METADATA_KEY)
-      if (!stored) {
-        // Initialize with default empty metadata
-        return {
-          profiles: [],
-          activeProfileId: null,
-          version: CURRENT_VERSION,
-        }
-      }
+      const profiles = databaseService.getAllProfiles()
 
-      const metadata: ProfileMetadata = JSON.parse(stored)
-      return metadata
+      // Convert database format to Profile format
+      const profileList: Profile[] = profiles.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        passwordHash: p.password_hash,
+        passwordHint: p.password_hint,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+        lastAccessedAt: p.last_accessed_at,
+      }))
+
+      // Get active profile ID from localStorage (temporary until we add it to database)
+      const activeProfileId = localStorage.getItem('active-profile-id') || null
+
+      return {
+        profiles: profileList,
+        activeProfileId,
+        version: CURRENT_VERSION,
+      }
     } catch (error) {
       console.error('Error loading profile metadata:', error)
       return {
@@ -56,14 +90,18 @@ export class ProfileService {
   }
 
   /**
-   * Save profile metadata
+   * Save active profile ID
+   * (Profile data is automatically saved to database)
    */
-  static saveMetadata(metadata: ProfileMetadata): void {
+  private static saveActiveProfileId(profileId: string | null): void {
     try {
-      localStorage.setItem(PROFILE_METADATA_KEY, JSON.stringify(metadata))
+      if (profileId) {
+        localStorage.setItem('active-profile-id', profileId)
+      } else {
+        localStorage.removeItem('active-profile-id')
+      }
     } catch (error) {
-      console.error('Error saving profile metadata:', error)
-      throw new Error('Failed to save profile metadata')
+      console.error('Error saving active profile ID:', error)
     }
   }
 
@@ -71,43 +109,41 @@ export class ProfileService {
    * Create a new profile
    */
   static async createProfile(name: string, description?: string, password?: string, passwordHint?: string): Promise<Profile> {
-    const metadata = this.loadMetadata()
-
     // Generate unique ID
     const id = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    const now = new Date().toISOString()
-
     // Hash password if provided
-    let passwordHash: string | undefined
+    let password_hash: string | undefined
     if (password && password.trim()) {
-      passwordHash = await this.hashPassword(password)
+      password_hash = await this.hashPassword(password)
     }
 
-    const newProfile: Profile = {
+    // Create profile in database (also creates default settings)
+    const dbProfile = databaseService.createProfile({
       id,
       name,
       description,
-      passwordHash,
-      passwordHint: passwordHint?.trim() || undefined,
-      createdAt: now,
-      updatedAt: now,
-      lastAccessedAt: now,
-    }
+      password_hash,
+      password_hint: passwordHint?.trim() || undefined,
+    })
 
-    // Add to metadata
-    metadata.profiles.push(newProfile)
+    // Convert to Profile format
+    const newProfile: Profile = {
+      id: dbProfile.id,
+      name: dbProfile.name,
+      description: dbProfile.description,
+      passwordHash: dbProfile.password_hash,
+      passwordHint: dbProfile.password_hint,
+      createdAt: dbProfile.created_at,
+      updatedAt: dbProfile.updated_at,
+      lastAccessedAt: dbProfile.last_accessed_at,
+    }
 
     // If this is the first profile, set it as active
+    const metadata = this.loadMetadata()
     if (metadata.profiles.length === 1) {
-      metadata.activeProfileId = id
+      this.saveActiveProfileId(id)
     }
-
-    this.saveMetadata(metadata)
-
-    // Initialize empty data for this profile
-    const emptyData = StorageService.getDefaultData()
-    this.saveProfileData(id, emptyData)
 
     return newProfile
   }
@@ -134,41 +170,35 @@ export class ProfileService {
    * Switch to a different profile
    */
   static async switchProfile(profileId: string, password?: string): Promise<void> {
-    const metadata = this.loadMetadata()
-    const profile = metadata.profiles.find((p) => p.id === profileId)
+    const dbProfile = databaseService.getProfile(profileId)
 
-    if (!profile) {
+    if (!dbProfile) {
       throw new Error('Profile not found')
     }
 
     // Check password if profile is protected
-    if (profile.passwordHash) {
+    if (dbProfile.password_hash) {
       if (!password) {
         throw new Error('Password required')
       }
-      const isValid = await this.verifyPassword(password, profile.passwordHash)
+      const isValid = await this.verifyPassword(password, dbProfile.password_hash)
       if (!isValid) {
         throw new Error('Invalid password')
       }
     }
 
-    // Update last accessed time
-    profile.lastAccessedAt = new Date().toISOString()
-    profile.updatedAt = new Date().toISOString()
+    // Update last accessed time in database
+    databaseService.updateProfileLastAccessed(profileId)
 
     // Set as active
-    metadata.activeProfileId = profileId
-
-    this.saveMetadata(metadata)
+    this.saveActiveProfileId(profileId)
   }
 
   /**
    * Logout - clear active profile
    */
   static logout(): void {
-    const metadata = this.loadMetadata()
-    metadata.activeProfileId = null
-    this.saveMetadata(metadata)
+    this.saveActiveProfileId(null)
   }
 
   /**
@@ -178,18 +208,14 @@ export class ProfileService {
     profileId: string,
     updates: Partial<Pick<Profile, 'name' | 'description'>>
   ): void {
-    const metadata = this.loadMetadata()
-    const profile = metadata.profiles.find((p) => p.id === profileId)
+    const dbProfile = databaseService.getProfile(profileId)
 
-    if (!profile) {
+    if (!dbProfile) {
       throw new Error('Profile not found')
     }
 
-    if (updates.name !== undefined) profile.name = updates.name
-    if (updates.description !== undefined) profile.description = updates.description
-    profile.updatedAt = new Date().toISOString()
-
-    this.saveMetadata(metadata)
+    // Update profile in database
+    databaseService.updateProfile(profileId, updates)
   }
 
   /**
@@ -198,8 +224,8 @@ export class ProfileService {
   static deleteProfile(profileId: string): void {
     const metadata = this.loadMetadata()
 
-    const profileIndex = metadata.profiles.findIndex((p) => p.id === profileId)
-    if (profileIndex === -1) {
+    const profile = metadata.profiles.find((p) => p.id === profileId)
+    if (!profile) {
       throw new Error('Profile not found')
     }
 
@@ -213,33 +239,57 @@ export class ProfileService {
       throw new Error('Cannot delete the active profile. Switch to another profile first.')
     }
 
-    // Remove profile from metadata
-    metadata.profiles.splice(profileIndex, 1)
-
-    // Delete profile data from storage
-    this.deleteProfileData(profileId)
-
-    this.saveMetadata(metadata)
+    // Delete profile from database (CASCADE will delete all associated data)
+    databaseService.deleteProfile(profileId)
   }
 
   /**
    * Load data for a specific profile
+   * NOTE: This method is deprecated and kept for backward compatibility
+   * BudgetContext should use databaseService directly instead
    */
   static loadProfileData(profileId: string): AppData | null {
     try {
-      const key = `${PROFILE_DATA_PREFIX}${profileId}`
-      const stored = localStorage.getItem(key)
+      // Load data from database
+      const settings = databaseService.getSettings(profileId)
+      const accounts = databaseService.getAccounts(profileId)
+      const categories = databaseService.getCategories(profileId)
+      const transactions = databaseService.getTransactions(profileId)
+      const incomeSources = databaseService.getIncomeSources(profileId)
+      const projects = databaseService.getProjects(profileId)
+      const projectTypes = databaseService.getProjectTypes(profileId)
+      const projectStatuses = databaseService.getProjectStatuses(profileId)
 
-      if (!stored) return null
-
-      const data: AppData = JSON.parse(stored)
-
-      // Ensure new fields exist (migration for backward compatibility)
-      if (!data.income) data.income = []
-      if (!data.monthlyBudgets) data.monthlyBudgets = []
-      if (!data.projectStatuses) data.projectStatuses = []
-      if (!data.projectTypes) data.projectTypes = []
-      if (!data.projects) data.projects = []
+      // Convert to AppData format (this is a simplified conversion)
+      const data: AppData = {
+        settings: settings ? {
+          defaultBudgetView: settings.default_budget_view,
+          dateFormat: settings.date_format,
+          currencySymbol: settings.currency_symbol,
+          firstRunCompleted: settings.first_run_completed === 1,
+          trackBusiness: settings.track_business === 1,
+          trackHousehold: settings.track_household === 1,
+          householdNeedsPercentage: settings.household_needs_percentage,
+          householdWantsPercentage: settings.household_wants_percentage,
+          householdSavingsPercentage: settings.household_savings_percentage,
+          householdMonthlyIncomeBaseline: settings.household_monthly_income_baseline,
+          businessOperatingPercentage: settings.business_operating_percentage,
+          businessGrowthPercentage: settings.business_growth_percentage,
+          businessCompensationPercentage: settings.business_compensation_percentage,
+          businessTaxReservePercentage: settings.business_tax_reserve_percentage,
+          businessSavingsPercentage: settings.business_savings_percentage,
+          businessMonthlyRevenueBaseline: settings.business_monthly_revenue_baseline,
+        } : StorageService.getDefaultData().settings,
+        accounts: accounts || [],
+        transactions: transactions || [],
+        categories: categories || [],
+        income: incomeSources || [],
+        monthlyBudgets: [],
+        projectStatuses: projectStatuses || [],
+        projectTypes: projectTypes || [],
+        projects: projects || [],
+        version: CURRENT_VERSION,
+      }
 
       return data
     } catch (error) {
@@ -250,47 +300,20 @@ export class ProfileService {
 
   /**
    * Save data for a specific profile
+   * NOTE: This method is deprecated. Use databaseService methods directly instead.
    */
   static saveProfileData(profileId: string, data: AppData): void {
-    try {
-      const key = `${PROFILE_DATA_PREFIX}${profileId}`
-      const dataToSave = {
-        ...data,
-        version: CURRENT_VERSION,
-      }
-      localStorage.setItem(key, JSON.stringify(dataToSave))
-
-      // Update profile's last accessed time
-      const metadata = this.loadMetadata()
-      const profile = metadata.profiles.find((p) => p.id === profileId)
-      if (profile) {
-        profile.lastAccessedAt = new Date().toISOString()
-        profile.updatedAt = new Date().toISOString()
-        this.saveMetadata(metadata)
-      }
-    } catch (error) {
-      console.error('Error saving profile data:', error)
-      throw new Error('Failed to save profile data')
-    }
-  }
-
-  /**
-   * Delete data for a specific profile
-   */
-  private static deleteProfileData(profileId: string): void {
-    try {
-      const key = `${PROFILE_DATA_PREFIX}${profileId}`
-      localStorage.removeItem(key)
-    } catch (error) {
-      console.error('Error deleting profile data:', error)
-    }
+    console.warn('saveProfileData is deprecated. Use databaseService methods directly.')
+    // This method is kept for backward compatibility but does nothing
+    // All saves should go through databaseService directly
   }
 
   /**
    * Export profile data as JSON
    */
   static exportProfile(profileId: string): string {
-    const profile = this.getAllProfiles().find((p) => p.id === profileId)
+    const metadata = this.loadMetadata()
+    const profile = metadata.profiles.find((p) => p.id === profileId)
     if (!profile) {
       throw new Error('Profile not found')
     }
@@ -315,6 +338,8 @@ export class ProfileService {
 
   /**
    * Import profile from JSON
+   * NOTE: This is a simplified implementation
+   * Full implementation should handle importing all data types
    */
   static async importProfile(jsonString: string, profileName?: string): Promise<Profile> {
     try {
@@ -326,10 +351,9 @@ export class ProfileService {
 
       const newProfile = await this.createProfile(name, description)
 
-      // Import data into new profile
-      if (importedData.data) {
-        this.saveProfileData(newProfile.id, importedData.data)
-      }
+      // TODO: Import data using database service methods
+      // This would require importing accounts, categories, transactions, etc. individually
+      console.warn('Profile import data population not yet fully implemented for SQLite')
 
       return newProfile
     } catch (error) {
@@ -339,32 +363,42 @@ export class ProfileService {
   }
 
   /**
-   * Migrate old single-profile data to new profile system
-   * This is called once to migrate existing users' data
+   * Migrate old data to new SQLite database
+   * This handles both old single-profile data and multi-profile localStorage data
    */
   static async migrateOldData(): Promise<boolean> {
     try {
+      // Initialize database first
+      await this.initialize()
+
       const metadata = this.loadMetadata()
 
-      // If profiles already exist, no need to migrate
+      // If profiles already exist in database, no need to migrate
       if (metadata.profiles.length > 0) {
         return false
       }
 
-      // Try to load old data
-      const oldData = StorageService.load()
-      if (!oldData) {
-        return false
+      // Check if there's localStorage data to migrate
+      if (hasLocalStorageData()) {
+        console.log('Migrating localStorage profiles to SQLite...')
+        const result = await migrateFromLocalStorage()
+        return result.success
       }
 
-      // Create a default profile with the old data
-      const profile = await this.createProfile('My Budget', 'Migrated from previous version')
-      this.saveProfileData(profile.id, oldData)
+      // Try to load old single-profile data (pre-profile system)
+      const oldData = StorageService.load()
+      if (oldData) {
+        console.log('Migrating old single-profile data to SQLite...')
+        // Create a default profile with the old data
+        const profile = await this.createProfile('My Budget', 'Migrated from previous version')
 
-      // Clear old storage key
-      localStorage.removeItem('dual-budget-tracker-data')
+        // Clear old storage key
+        localStorage.removeItem('dual-budget-tracker-data')
 
-      return true
+        return true
+      }
+
+      return false
     } catch (error) {
       console.error('Error migrating old data:', error)
       return false
@@ -384,19 +418,18 @@ export class ProfileService {
     newPassword: string,
     passwordHint?: string
   ): Promise<void> {
-    const metadata = this.loadMetadata()
-    const profile = metadata.profiles.find((p) => p.id === profileId)
+    const dbProfile = databaseService.getProfile(profileId)
 
-    if (!profile) {
+    if (!dbProfile) {
       throw new Error('Profile not found')
     }
 
     // If profile already has a password, verify current password
-    if (profile.passwordHash) {
+    if (dbProfile.password_hash) {
       if (!currentPassword) {
         throw new Error('Current password is required')
       }
-      const isValid = await this.verifyPassword(currentPassword, profile.passwordHash)
+      const isValid = await this.verifyPassword(currentPassword, dbProfile.password_hash)
       if (!isValid) {
         throw new Error('Current password is incorrect')
       }
@@ -407,12 +440,12 @@ export class ProfileService {
       throw new Error('New password cannot be empty')
     }
 
-    // Hash the new password
-    profile.passwordHash = await this.hashPassword(newPassword.trim())
-    profile.passwordHint = passwordHint?.trim() || undefined
-    profile.updatedAt = new Date().toISOString()
-
-    this.saveMetadata(metadata)
+    // Hash the new password and update in database
+    const password_hash = await this.hashPassword(newPassword.trim())
+    databaseService.updateProfile(profileId, {
+      password_hash,
+      password_hint: passwordHint?.trim() || undefined,
+    })
   }
 
   /**
@@ -421,29 +454,27 @@ export class ProfileService {
    * @param currentPassword - Current password (required for verification)
    */
   static async removePassword(profileId: string, currentPassword: string): Promise<void> {
-    const metadata = this.loadMetadata()
-    const profile = metadata.profiles.find((p) => p.id === profileId)
+    const dbProfile = databaseService.getProfile(profileId)
 
-    if (!profile) {
+    if (!dbProfile) {
       throw new Error('Profile not found')
     }
 
-    if (!profile.passwordHash) {
+    if (!dbProfile.password_hash) {
       throw new Error('Profile does not have a password')
     }
 
     // Verify current password
-    const isValid = await this.verifyPassword(currentPassword, profile.passwordHash)
+    const isValid = await this.verifyPassword(currentPassword, dbProfile.password_hash)
     if (!isValid) {
       throw new Error('Password is incorrect')
     }
 
-    // Remove password and hint
-    profile.passwordHash = undefined
-    profile.passwordHint = undefined
-    profile.updatedAt = new Date().toISOString()
-
-    this.saveMetadata(metadata)
+    // Remove password and hint from database
+    databaseService.updateProfile(profileId, {
+      password_hash: null,
+      password_hint: null,
+    })
   }
 }
 

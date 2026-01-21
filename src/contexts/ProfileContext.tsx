@@ -18,7 +18,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
 
     try {
-      // Try to migrate old data if this is first time using profile system
+      // Initialize database and migrate old data if needed
+      await ProfileService.initialize()
       await ProfileService.migrateOldData()
 
       // Load profiles

@@ -18,6 +18,7 @@ import type {
 } from '../types'
 import StorageService from '../services/storage'
 import ProfileService from '../services/profileService'
+import { databaseService } from '../services/database/databaseService'
 import { generateDefaultCategories } from '../data/defaultCategories'
 
 const BudgetContext = createContext<BudgetContextState | null>(null)
@@ -47,13 +48,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
   })
 
-  // Save to active profile whenever appData changes
-  useEffect(() => {
+  // Note: Individual operations now write directly to SQLite database
+  // No need for auto-save useEffect
+
+  // Helper to get current profile ID
+  const getProfileId = useCallback((): string | null => {
     const activeProfile = ProfileService.getActiveProfile()
-    if (activeProfile) {
-      ProfileService.saveProfileData(activeProfile.id, appData)
-    }
-  }, [appData])
+    return activeProfile?.id || null
+  }, [])
 
   // Set initial view based on settings
   useEffect(() => {
@@ -70,6 +72,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addAccount = useCallback(
     (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) return
+
       const now = new Date().toISOString()
       const newAccount: Account = {
         ...account,
@@ -87,15 +92,56 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             : undefined,
       }
 
+      // Save to database
+      try {
+        databaseService.createAccount({
+          id: newAccount.id,
+          profile_id: profileId,
+          name: newAccount.name,
+          budget_type: newAccount.budgetType,
+          account_type: newAccount.accountType,
+          balance: newAccount.balance,
+          interest_rate: newAccount.interestRate,
+          credit_limit: newAccount.creditLimit,
+          payment_due_date: newAccount.paymentDueDate,
+          minimum_payment: newAccount.minimumPayment,
+          website_url: newAccount.websiteUrl,
+          notes: newAccount.notes,
+        })
+      } catch (error) {
+        console.error('Failed to save account to database:', error)
+      }
+
+      // Update local state
       setAppDataState((prev) => ({
         ...prev,
         accounts: [...prev.accounts, newAccount],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateAccount = useCallback((id: string, updates: Partial<Account>) => {
+    // Save to database
+    try {
+      const dbUpdates: Record<string, any> = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.balance !== undefined) dbUpdates.balance = updates.balance
+      if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+      if (updates.accountType !== undefined) dbUpdates.account_type = updates.accountType
+      if (updates.interestRate !== undefined) dbUpdates.interest_rate = updates.interestRate
+      if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit
+      if (updates.paymentDueDate !== undefined) dbUpdates.payment_due_date = updates.paymentDueDate
+      if (updates.minimumPayment !== undefined) dbUpdates.minimum_payment = updates.minimumPayment
+      if (updates.websiteUrl !== undefined) dbUpdates.website_url = updates.websiteUrl
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+      databaseService.updateAccount(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update account in database:', error)
+    }
+
+    // Update local state
     setAppDataState((prev) => ({
       ...prev,
       accounts: prev.accounts.map((account) => {
@@ -119,6 +165,15 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteAccount = useCallback((id: string) => {
+    // Delete from database
+    try {
+      databaseService.deleteAccount(id)
+      // Note: Transactions will be handled by database foreign key constraints or need separate deletion
+    } catch (error) {
+      console.error('Failed to delete account from database:', error)
+    }
+
+    // Update local state
     setAppDataState((prev) => ({
       ...prev,
       accounts: prev.accounts.filter((a) => a.id !== id),
@@ -368,6 +423,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addCategory = useCallback(
     (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) return
+
       const now = new Date().toISOString()
       const newCategory: Category = {
         ...category,
@@ -376,15 +434,58 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.createCategory({
+          id: newCategory.id,
+          profile_id: profileId,
+          name: newCategory.name,
+          budget_type: newCategory.budgetType,
+          bucket_id: newCategory.bucketId,
+          category_group: newCategory.categoryGroup,
+          monthly_budget: newCategory.monthlyBudget,
+          is_fixed_expense: newCategory.isFixedExpense ? 1 : 0,
+          is_active: newCategory.isActive !== false ? 1 : 0,
+          tax_deductible_by_default: newCategory.taxDeductibleByDefault ? 1 : 0,
+          is_income_category: newCategory.isIncomeCategory ? 1 : 0,
+          exclude_from_budget: newCategory.excludeFromBudget ? 1 : 0,
+          icon: newCategory.icon,
+        })
+      } catch (error) {
+        console.error('Failed to save category to database:', error)
+      }
+
+      // Update local state
       setAppDataState((prev) => ({
         ...prev,
         categories: [...prev.categories, newCategory],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateCategory = useCallback((id: string, updates: Partial<Category>) => {
+    // Save to database
+    try {
+      const dbUpdates: Record<string, any> = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+      if (updates.bucketId !== undefined) dbUpdates.bucket_id = updates.bucketId
+      if (updates.categoryGroup !== undefined) dbUpdates.category_group = updates.categoryGroup
+      if (updates.monthlyBudget !== undefined) dbUpdates.monthly_budget = updates.monthlyBudget
+      if (updates.isFixedExpense !== undefined) dbUpdates.is_fixed_expense = updates.isFixedExpense ? 1 : 0
+      if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive ? 1 : 0
+      if (updates.taxDeductibleByDefault !== undefined) dbUpdates.tax_deductible_by_default = updates.taxDeductibleByDefault ? 1 : 0
+      if (updates.isIncomeCategory !== undefined) dbUpdates.is_income_category = updates.isIncomeCategory ? 1 : 0
+      if (updates.excludeFromBudget !== undefined) dbUpdates.exclude_from_budget = updates.excludeFromBudget ? 1 : 0
+      if (updates.icon !== undefined) dbUpdates.icon = updates.icon
+
+      databaseService.updateCategory(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update category in database:', error)
+    }
+
+    // Update local state
     setAppDataState((prev) => ({
       ...prev,
       categories: prev.categories.map((cat) =>
@@ -404,7 +505,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       // Check if any transactions use this category
       const hasTransactions = prev.transactions.some((t) => t.categoryId === id)
       if (hasTransactions) {
-        // Instead of deleting, just mark as inactive
+        // Instead of deleting, just mark as inactive in database
+        try {
+          databaseService.updateCategory(id, { is_active: 0 })
+        } catch (error) {
+          console.error('Failed to deactivate category in database:', error)
+        }
+
+        // Update local state
         return {
           ...prev,
           categories: prev.categories.map((cat) =>
@@ -413,6 +521,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Delete from database
+      try {
+        databaseService.deleteCategory(id)
+      } catch (error) {
+        console.error('Failed to delete category from database:', error)
+      }
+
+      // Update local state
       return {
         ...prev,
         categories: prev.categories.filter((c) => c.id !== id),
@@ -745,6 +861,35 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ============================================================================
 
   const updateSettings = useCallback((updates: Partial<AppSettings>) => {
+    const profileId = getProfileId()
+    if (profileId) {
+      // Save to database
+      try {
+        const dbUpdates: Record<string, any> = {}
+        if (updates.defaultBudgetView !== undefined) dbUpdates.default_budget_view = updates.defaultBudgetView
+        if (updates.dateFormat !== undefined) dbUpdates.date_format = updates.dateFormat
+        if (updates.currencySymbol !== undefined) dbUpdates.currency_symbol = updates.currencySymbol
+        if (updates.firstRunCompleted !== undefined) dbUpdates.first_run_completed = updates.firstRunCompleted ? 1 : 0
+        if (updates.trackBusiness !== undefined) dbUpdates.track_business = updates.trackBusiness ? 1 : 0
+        if (updates.trackHousehold !== undefined) dbUpdates.track_household = updates.trackHousehold ? 1 : 0
+        if (updates.householdNeedsPercentage !== undefined) dbUpdates.household_needs_percentage = updates.householdNeedsPercentage
+        if (updates.householdWantsPercentage !== undefined) dbUpdates.household_wants_percentage = updates.householdWantsPercentage
+        if (updates.householdSavingsPercentage !== undefined) dbUpdates.household_savings_percentage = updates.householdSavingsPercentage
+        if (updates.householdMonthlyIncomeBaseline !== undefined) dbUpdates.household_monthly_income_baseline = updates.householdMonthlyIncomeBaseline
+        if (updates.businessOperatingPercentage !== undefined) dbUpdates.business_operating_percentage = updates.businessOperatingPercentage
+        if (updates.businessGrowthPercentage !== undefined) dbUpdates.business_growth_percentage = updates.businessGrowthPercentage
+        if (updates.businessCompensationPercentage !== undefined) dbUpdates.business_compensation_percentage = updates.businessCompensationPercentage
+        if (updates.businessTaxReservePercentage !== undefined) dbUpdates.business_tax_reserve_percentage = updates.businessTaxReservePercentage
+        if (updates.businessSavingsPercentage !== undefined) dbUpdates.business_savings_percentage = updates.businessSavingsPercentage
+        if (updates.businessMonthlyRevenueBaseline !== undefined) dbUpdates.business_monthly_revenue_baseline = updates.businessMonthlyRevenueBaseline
+
+        databaseService.updateSettings(profileId, dbUpdates)
+      } catch (error) {
+        console.error('Failed to update settings in database:', error)
+      }
+    }
+
+    // Update local state
     setAppDataState((prev) => ({
       ...prev,
       settings: {
@@ -752,7 +897,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         ...updates,
       },
     }))
-  }, [])
+  }, [getProfileId])
 
   // ============================================================================
   // Data Operations

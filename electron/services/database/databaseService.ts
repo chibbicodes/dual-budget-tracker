@@ -1,12 +1,16 @@
-import Database from 'better-sqlite3'
+import { createRequire } from 'module'
 import { createSchema } from './schema'
+
+// Use createRequire to load CommonJS native module in ES module context
+const require = createRequire(import.meta.url)
+const Database = require('better-sqlite3')
 
 /**
  * Local SQLite database service for Dual Budget Tracker
  * Handles all database operations with better-sqlite3
  */
 class DatabaseService {
-  private db: Database.Database | null = null
+  private db: any | null = null
   private dbPath: string = ''
 
   /**

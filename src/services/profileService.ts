@@ -1,7 +1,6 @@
 import type { Profile, ProfileMetadata, AppData } from '../types'
 import { StorageService } from './storage'
-import { databaseService } from './database/databaseService'
-import { migrateFromLocalStorage, hasLocalStorageData } from './database/migration'
+import { databaseService } from './database/databaseClient'
 
 const CURRENT_VERSION = '1.0.0'
 
@@ -15,6 +14,7 @@ let dbInitialized = false
 export class ProfileService {
   /**
    * Initialize the database (call this before using any other methods)
+   * Note: Migration from localStorage happens automatically in the main process
    */
   static async initialize(): Promise<void> {
     if (dbInitialized) return
@@ -22,12 +22,6 @@ export class ProfileService {
     try {
       await databaseService.initialize()
       dbInitialized = true
-
-      // Check if we need to migrate from localStorage
-      if (hasLocalStorageData()) {
-        console.log('Detected localStorage data, migrating to SQLite...')
-        await migrateFromLocalStorage()
-      }
     } catch (error) {
       console.error('Failed to initialize database:', error)
       throw error
@@ -370,43 +364,16 @@ export class ProfileService {
 
   /**
    * Migrate old data to new SQLite database
-   * This handles both old single-profile data and multi-profile localStorage data
+   * Note: Migration now happens automatically in the main process on app startup
+   * This method is kept for backward compatibility and just ensures database is initialized
    */
   static async migrateOldData(): Promise<boolean> {
     try {
-      // Initialize database first
+      // Initialize database (migration happens in main process)
       await this.initialize()
-
-      const metadata = this.loadMetadata()
-
-      // If profiles already exist in database, no need to migrate
-      if (metadata.profiles.length > 0) {
-        return false
-      }
-
-      // Check if there's localStorage data to migrate
-      if (hasLocalStorageData()) {
-        console.log('Migrating localStorage profiles to SQLite...')
-        const result = await migrateFromLocalStorage()
-        return result.success
-      }
-
-      // Try to load old single-profile data (pre-profile system)
-      const oldData = StorageService.load()
-      if (oldData) {
-        console.log('Migrating old single-profile data to SQLite...')
-        // Create a default profile with the old data
-        await this.createProfile('My Budget', 'Migrated from previous version')
-
-        // Clear old storage key
-        localStorage.removeItem('dual-budget-tracker-data')
-
-        return true
-      }
-
-      return false
+      return true
     } catch (error) {
-      console.error('Error migrating old data:', error)
+      console.error('Error during database initialization:', error)
       return false
     }
   }

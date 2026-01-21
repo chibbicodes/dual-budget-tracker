@@ -6,6 +6,130 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// Import database service (runs in main process only)
+import('../src/services/database/databaseService.js').then(({ databaseService }) => {
+  // Initialize database when app is ready
+  app.whenReady().then(async () => {
+    try {
+      await databaseService.initialize()
+      console.log('Database initialized successfully')
+
+      // Check for and run migration from localStorage
+      const { migrateFromLocalStorage, hasLocalStorageData } = await import('../src/services/database/migration.js')
+      if (hasLocalStorageData()) {
+        console.log('Migrating localStorage data to SQLite...')
+        const result = await migrateFromLocalStorage()
+        if (result.success) {
+          console.log(`Migration completed: ${result.profilesMigrated} profiles migrated`)
+        } else {
+          console.error('Migration had errors:', result.errors)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to initialize database:', error)
+    }
+  })
+
+  // Database IPC handlers
+  ipcMain.handle('db:initialize', async () => {
+    await databaseService.initialize()
+  })
+
+  ipcMain.handle('db:getAllProfiles', () => {
+    return databaseService.getAllProfiles()
+  })
+
+  ipcMain.handle('db:getProfile', (_event, id: string) => {
+    return databaseService.getProfile(id)
+  })
+
+  ipcMain.handle('db:createProfile', (_event, profile: any) => {
+    return databaseService.createProfile(profile)
+  })
+
+  ipcMain.handle('db:updateProfile', (_event, id: string, updates: any) => {
+    return databaseService.updateProfile(id, updates)
+  })
+
+  ipcMain.handle('db:updateProfileLastAccessed', (_event, id: string) => {
+    return databaseService.updateProfileLastAccessed(id)
+  })
+
+  ipcMain.handle('db:deleteProfile', (_event, id: string) => {
+    return databaseService.deleteProfile(id)
+  })
+
+  ipcMain.handle('db:getSettings', (_event, profileId: string) => {
+    return databaseService.getSettings(profileId)
+  })
+
+  ipcMain.handle('db:updateSettings', (_event, profileId: string, settings: any) => {
+    return databaseService.updateSettings(profileId, settings)
+  })
+
+  ipcMain.handle('db:getAccounts', (_event, profileId: string, budgetType?: string) => {
+    return databaseService.getAccounts(profileId, budgetType)
+  })
+
+  ipcMain.handle('db:getAccount', (_event, id: string) => {
+    return databaseService.getAccount(id)
+  })
+
+  ipcMain.handle('db:createAccount', (_event, account: any) => {
+    return databaseService.createAccount(account)
+  })
+
+  ipcMain.handle('db:updateAccount', (_event, id: string, updates: any) => {
+    return databaseService.updateAccount(id, updates)
+  })
+
+  ipcMain.handle('db:deleteAccount', (_event, id: string) => {
+    return databaseService.deleteAccount(id)
+  })
+
+  ipcMain.handle('db:getCategories', (_event, profileId: string, budgetType?: string) => {
+    return databaseService.getCategories(profileId, budgetType)
+  })
+
+  ipcMain.handle('db:getCategory', (_event, id: string) => {
+    return databaseService.getCategory(id)
+  })
+
+  ipcMain.handle('db:createCategory', (_event, category: any) => {
+    return databaseService.createCategory(category)
+  })
+
+  ipcMain.handle('db:updateCategory', (_event, id: string, updates: any) => {
+    return databaseService.updateCategory(id, updates)
+  })
+
+  ipcMain.handle('db:deleteCategory', (_event, id: string) => {
+    return databaseService.deleteCategory(id)
+  })
+
+  ipcMain.handle('db:getTransactions', (_event, profileId: string, options?: any) => {
+    return databaseService.getTransactions(profileId, options)
+  })
+
+  ipcMain.handle('db:getIncomeSources', (_event, profileId: string, budgetType?: string) => {
+    return databaseService.getIncomeSources(profileId, budgetType)
+  })
+
+  ipcMain.handle('db:getProjects', (_event, profileId: string, budgetType?: string) => {
+    return databaseService.getProjects(profileId, budgetType)
+  })
+
+  ipcMain.handle('db:getProjectTypes', (_event, profileId: string, budgetType?: string) => {
+    return databaseService.getProjectTypes(profileId, budgetType)
+  })
+
+  ipcMain.handle('db:getProjectStatuses', (_event, profileId: string) => {
+    return databaseService.getProjectStatuses(profileId)
+  })
+}).catch(error => {
+  console.error('Failed to load database service:', error)
+})
+
 let mainWindow: BrowserWindow | null = null
 
 const createWindow = () => {

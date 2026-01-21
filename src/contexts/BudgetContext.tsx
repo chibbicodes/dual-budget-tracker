@@ -18,7 +18,7 @@ import type {
 } from '../types'
 import StorageService from '../services/storage'
 import ProfileService from '../services/profileService'
-import { databaseService } from '../services/database/databaseService'
+import { databaseService } from '../services/database/databaseClient'
 import { generateDefaultCategories } from '../data/defaultCategories'
 
 const BudgetContext = createContext<BudgetContextState | null>(null)

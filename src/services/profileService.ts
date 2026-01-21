@@ -129,14 +129,14 @@ export class ProfileService {
 
     // Convert to Profile format
     const newProfile: Profile = {
-      id: dbProfile.id,
-      name: dbProfile.name,
-      description: dbProfile.description,
-      passwordHash: dbProfile.password_hash,
-      passwordHint: dbProfile.password_hint,
-      createdAt: dbProfile.created_at,
-      updatedAt: dbProfile.updated_at,
-      lastAccessedAt: dbProfile.last_accessed_at,
+      id: (dbProfile as any).id,
+      name: (dbProfile as any).name,
+      description: (dbProfile as any).description,
+      passwordHash: (dbProfile as any).password_hash,
+      passwordHint: (dbProfile as any).password_hint,
+      createdAt: (dbProfile as any).created_at,
+      updatedAt: (dbProfile as any).updated_at,
+      lastAccessedAt: (dbProfile as any).last_accessed_at,
     }
 
     // If this is the first profile, set it as active
@@ -177,11 +177,11 @@ export class ProfileService {
     }
 
     // Check password if profile is protected
-    if (dbProfile.password_hash) {
+    if ((dbProfile as any).password_hash) {
       if (!password) {
         throw new Error('Password required')
       }
-      const isValid = await this.verifyPassword(password, dbProfile.password_hash)
+      const isValid = await this.verifyPassword(password, (dbProfile as any).password_hash)
       if (!isValid) {
         throw new Error('Invalid password')
       }
@@ -263,31 +263,37 @@ export class ProfileService {
       // Convert to AppData format (this is a simplified conversion)
       const data: AppData = {
         settings: settings ? {
-          defaultBudgetView: settings.default_budget_view,
-          dateFormat: settings.date_format,
-          currencySymbol: settings.currency_symbol,
-          firstRunCompleted: settings.first_run_completed === 1,
-          trackBusiness: settings.track_business === 1,
-          trackHousehold: settings.track_household === 1,
-          householdNeedsPercentage: settings.household_needs_percentage,
-          householdWantsPercentage: settings.household_wants_percentage,
-          householdSavingsPercentage: settings.household_savings_percentage,
-          householdMonthlyIncomeBaseline: settings.household_monthly_income_baseline,
-          businessOperatingPercentage: settings.business_operating_percentage,
-          businessGrowthPercentage: settings.business_growth_percentage,
-          businessCompensationPercentage: settings.business_compensation_percentage,
-          businessTaxReservePercentage: settings.business_tax_reserve_percentage,
-          businessSavingsPercentage: settings.business_savings_percentage,
-          businessMonthlyRevenueBaseline: settings.business_monthly_revenue_baseline,
+          defaultBudgetView: (settings as any).default_budget_view,
+          dateFormat: (settings as any).date_format,
+          currencySymbol: (settings as any).currency_symbol,
+          firstRunCompleted: (settings as any).first_run_completed === 1,
+          trackBusiness: (settings as any).track_business === 1,
+          trackHousehold: (settings as any).track_household === 1,
+          householdTargets: {
+            needsPercentage: (settings as any).household_needs_percentage,
+            wantsPercentage: (settings as any).household_wants_percentage,
+            savingsPercentage: (settings as any).household_savings_percentage,
+            monthlyIncomeBaseline: (settings as any).household_monthly_income_baseline,
+          },
+          businessTargets: {
+            operatingPercentage: (settings as any).business_operating_percentage,
+            growthPercentage: (settings as any).business_growth_percentage,
+            compensationPercentage: (settings as any).business_compensation_percentage,
+            taxReservePercentage: (settings as any).business_tax_reserve_percentage,
+            businessSavingsPercentage: (settings as any).business_savings_percentage,
+            monthlyRevenueBaseline: (settings as any).business_monthly_revenue_baseline,
+          },
         } : StorageService.getDefaultData().settings,
-        accounts: accounts || [],
-        transactions: transactions || [],
-        categories: categories || [],
-        income: incomeSources || [],
+        accounts: accounts as any || [],
+        transactions: transactions as any || [],
+        categories: categories as any || [],
+        autoCategorization: [],
+        incomeSources: incomeSources as any || [],
+        income: [],
         monthlyBudgets: [],
-        projectStatuses: projectStatuses || [],
-        projectTypes: projectTypes || [],
-        projects: projects || [],
+        projectStatuses: projectStatuses as any || [],
+        projectTypes: projectTypes as any || [],
+        projects: projects as any || [],
         version: CURRENT_VERSION,
       }
 
@@ -302,7 +308,7 @@ export class ProfileService {
    * Save data for a specific profile
    * NOTE: This method is deprecated. Use databaseService methods directly instead.
    */
-  static saveProfileData(profileId: string, data: AppData): void {
+  static saveProfileData(_profileId: string, _data: AppData): void {
     console.warn('saveProfileData is deprecated. Use databaseService methods directly.')
     // This method is kept for backward compatibility but does nothing
     // All saves should go through databaseService directly
@@ -390,7 +396,7 @@ export class ProfileService {
       if (oldData) {
         console.log('Migrating old single-profile data to SQLite...')
         // Create a default profile with the old data
-        const profile = await this.createProfile('My Budget', 'Migrated from previous version')
+        await this.createProfile('My Budget', 'Migrated from previous version')
 
         // Clear old storage key
         localStorage.removeItem('dual-budget-tracker-data')
@@ -425,11 +431,11 @@ export class ProfileService {
     }
 
     // If profile already has a password, verify current password
-    if (dbProfile.password_hash) {
+    if ((dbProfile as any).password_hash) {
       if (!currentPassword) {
         throw new Error('Current password is required')
       }
-      const isValid = await this.verifyPassword(currentPassword, dbProfile.password_hash)
+      const isValid = await this.verifyPassword(currentPassword, (dbProfile as any).password_hash)
       if (!isValid) {
         throw new Error('Current password is incorrect')
       }
@@ -460,20 +466,20 @@ export class ProfileService {
       throw new Error('Profile not found')
     }
 
-    if (!dbProfile.password_hash) {
+    if (!(dbProfile as any).password_hash) {
       throw new Error('Profile does not have a password')
     }
 
     // Verify current password
-    const isValid = await this.verifyPassword(currentPassword, dbProfile.password_hash)
+    const isValid = await this.verifyPassword(currentPassword, (dbProfile as any).password_hash)
     if (!isValid) {
       throw new Error('Password is incorrect')
     }
 
     // Remove password and hint from database
     databaseService.updateProfile(profileId, {
-      password_hash: null,
-      password_hint: null,
+      password_hash: undefined,
+      password_hint: undefined,
     })
   }
 }

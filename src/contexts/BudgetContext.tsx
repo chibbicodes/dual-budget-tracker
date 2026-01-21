@@ -872,16 +872,43 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (updates.firstRunCompleted !== undefined) dbUpdates.first_run_completed = updates.firstRunCompleted ? 1 : 0
         if (updates.trackBusiness !== undefined) dbUpdates.track_business = updates.trackBusiness ? 1 : 0
         if (updates.trackHousehold !== undefined) dbUpdates.track_household = updates.trackHousehold ? 1 : 0
-        if (updates.householdNeedsPercentage !== undefined) dbUpdates.household_needs_percentage = updates.householdNeedsPercentage
-        if (updates.householdWantsPercentage !== undefined) dbUpdates.household_wants_percentage = updates.householdWantsPercentage
-        if (updates.householdSavingsPercentage !== undefined) dbUpdates.household_savings_percentage = updates.householdSavingsPercentage
-        if (updates.householdMonthlyIncomeBaseline !== undefined) dbUpdates.household_monthly_income_baseline = updates.householdMonthlyIncomeBaseline
-        if (updates.businessOperatingPercentage !== undefined) dbUpdates.business_operating_percentage = updates.businessOperatingPercentage
-        if (updates.businessGrowthPercentage !== undefined) dbUpdates.business_growth_percentage = updates.businessGrowthPercentage
-        if (updates.businessCompensationPercentage !== undefined) dbUpdates.business_compensation_percentage = updates.businessCompensationPercentage
-        if (updates.businessTaxReservePercentage !== undefined) dbUpdates.business_tax_reserve_percentage = updates.businessTaxReservePercentage
-        if (updates.businessSavingsPercentage !== undefined) dbUpdates.business_savings_percentage = updates.businessSavingsPercentage
-        if (updates.businessMonthlyRevenueBaseline !== undefined) dbUpdates.business_monthly_revenue_baseline = updates.businessMonthlyRevenueBaseline
+        // Handle nested household targets
+        if (updates.householdTargets) {
+          if (updates.householdTargets.needsPercentage !== undefined) {
+            dbUpdates.household_needs_percentage = updates.householdTargets.needsPercentage
+          }
+          if (updates.householdTargets.wantsPercentage !== undefined) {
+            dbUpdates.household_wants_percentage = updates.householdTargets.wantsPercentage
+          }
+          if (updates.householdTargets.savingsPercentage !== undefined) {
+            dbUpdates.household_savings_percentage = updates.householdTargets.savingsPercentage
+          }
+          if (updates.householdTargets.monthlyIncomeBaseline !== undefined) {
+            dbUpdates.household_monthly_income_baseline = updates.householdTargets.monthlyIncomeBaseline
+          }
+        }
+
+        // Handle nested business targets
+        if (updates.businessTargets) {
+          if (updates.businessTargets.operatingPercentage !== undefined) {
+            dbUpdates.business_operating_percentage = updates.businessTargets.operatingPercentage
+          }
+          if (updates.businessTargets.growthPercentage !== undefined) {
+            dbUpdates.business_growth_percentage = updates.businessTargets.growthPercentage
+          }
+          if (updates.businessTargets.compensationPercentage !== undefined) {
+            dbUpdates.business_compensation_percentage = updates.businessTargets.compensationPercentage
+          }
+          if (updates.businessTargets.taxReservePercentage !== undefined) {
+            dbUpdates.business_tax_reserve_percentage = updates.businessTargets.taxReservePercentage
+          }
+          if (updates.businessTargets.businessSavingsPercentage !== undefined) {
+            dbUpdates.business_savings_percentage = updates.businessTargets.businessSavingsPercentage
+          }
+          if (updates.businessTargets.monthlyRevenueBaseline !== undefined) {
+            dbUpdates.business_monthly_revenue_baseline = updates.businessTargets.monthlyRevenueBaseline
+          }
+        }
 
         databaseService.updateSettings(profileId, dbUpdates)
       } catch (error) {

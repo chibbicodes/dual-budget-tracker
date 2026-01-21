@@ -1084,7 +1084,7 @@ class DatabaseService {
   /**
    * Get auto-categorization rules for a profile
    */
-  getAutoCategorization Rules(profileId: string) {
+  getAutoCategorizationRules(profileId: string) {
     const db = this.getDb()
     const stmt = db.prepare(`
       SELECT * FROM auto_categorization_rules

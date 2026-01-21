@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { createSchema } from './schema'
 
 /**
@@ -17,19 +18,13 @@ class DatabaseService {
 
   /**
    * Initialize the database connection
-   * In Electron, uses userData path; in browser, uses in-memory database
+   * Uses Electron's userData directory
    */
   async initialize(): Promise<void> {
     try {
-      // Get database path based on environment
-      if (window.electronAPI) {
-        // Electron environment - use userData directory
-        const appPath = await window.electronAPI.getAppPath()
-        this.dbPath = `${appPath}/dual-budget-tracker.db`
-      } else {
-        // Browser environment - use in-memory database for now
-        this.dbPath = ':memory:'
-      }
+      // Get database path from Electron's userData directory
+      const userDataPath = app.getPath('userData')
+      this.dbPath = `${userDataPath}/dual-budget-tracker.db`
 
       // Open database connection
       this.db = new this.DatabaseConstructor(this.dbPath)

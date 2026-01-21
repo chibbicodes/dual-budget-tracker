@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { BudgetProvider } from './contexts/BudgetContext'
 import { ProfileProvider, useProfile } from './contexts/ProfileContext'
+import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import ProfileSelector from './components/ProfileSelector'
 import Dashboard from './pages/Dashboard'
@@ -61,9 +62,11 @@ function AppContent() {
 
 function App() {
   return (
-    <ProfileProvider>
-      <AppContent />
-    </ProfileProvider>
+    <AuthProvider>
+      <ProfileProvider>
+        <AppContent />
+      </ProfileProvider>
+    </AuthProvider>
   )
 }
 

@@ -23,11 +23,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       await ProfileService.migrateOldData()
 
       // Load profiles
-      const loadedProfiles = ProfileService.getAllProfiles()
+      const loadedProfiles = await ProfileService.getAllProfiles()
       setProfiles(loadedProfiles)
 
       // Load active profile
-      const active = ProfileService.getActiveProfile()
+      const active = await ProfileService.getActiveProfile()
       setActiveProfile(active)
 
       // If no profiles exist, don't create one yet - let the UI handle it
@@ -44,7 +44,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const newProfile = await ProfileService.createProfile(name, description, password, passwordHint)
 
       // Refresh profiles list
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
 
       // Set as active profile
@@ -62,11 +62,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       await ProfileService.switchProfile(profileId, password)
 
       // Update active profile
-      const profile = ProfileService.getActiveProfile()
+      const profile = await ProfileService.getActiveProfile()
       setActiveProfile(profile)
 
       // Refresh profiles list (to update lastAccessedAt)
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
 
       // Force a page reload to ensure clean state
@@ -90,15 +90,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const updateProfile = (
+  const updateProfile = async (
     profileId: string,
     updates: Partial<Pick<Profile, 'name' | 'description'>>
-  ): void => {
+  ): Promise<void> => {
     try {
-      ProfileService.updateProfile(profileId, updates)
+      await ProfileService.updateProfile(profileId, updates)
 
       // Refresh profiles list
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
 
       // Update active profile if it was updated
@@ -116,10 +116,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const deleteProfile = async (profileId: string): Promise<void> => {
     try {
-      ProfileService.deleteProfile(profileId)
+      await ProfileService.deleteProfile(profileId)
 
       // Refresh profiles list
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
     } catch (error) {
       console.error('Error deleting profile:', error)
@@ -127,11 +127,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const refreshProfiles = (): void => {
-    const updatedProfiles = ProfileService.getAllProfiles()
+  const refreshProfiles = async (): Promise<void> => {
+    const updatedProfiles = await ProfileService.getAllProfiles()
     setProfiles(updatedProfiles)
 
-    const active = ProfileService.getActiveProfile()
+    const active = await ProfileService.getActiveProfile()
     setActiveProfile(active)
   }
 
@@ -145,7 +145,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       await ProfileService.setPassword(profileId, currentPassword, newPassword, passwordHint)
 
       // Refresh profiles list
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
 
       // Update active profile if it was updated
@@ -166,7 +166,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       await ProfileService.removePassword(profileId, currentPassword)
 
       // Refresh profiles list
-      const updatedProfiles = ProfileService.getAllProfiles()
+      const updatedProfiles = await ProfileService.getAllProfiles()
       setProfiles(updatedProfiles)
 
       // Update active profile if it was updated

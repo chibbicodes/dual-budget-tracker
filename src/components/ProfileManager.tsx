@@ -170,9 +170,9 @@ export default function ProfileManager() {
     }
   }
 
-  const handleExport = (profileId: string) => {
+  const handleExport = async (profileId: string) => {
     try {
-      const jsonData = ProfileService.exportProfile(profileId)
+      const jsonData = await ProfileService.exportProfile(profileId)
       const profile = profiles.find((p) => p.id === profileId)
       const filename = `${profile?.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.json`
 

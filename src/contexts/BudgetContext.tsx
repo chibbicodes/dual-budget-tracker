@@ -30,32 +30,43 @@ function generateId(): string {
 export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [currentView, setCurrentView] = useState<BudgetViewType>('household')
   const [appData, setAppDataState] = useState<AppData>(() => {
-    // Load data from active profile
-    const activeProfile = ProfileService.getActiveProfile()
-
-    if (activeProfile) {
-      const stored = ProfileService.loadProfileData(activeProfile.id)
-      if (stored) {
-        return stored
-      }
-    }
-
-    // Fallback: Return default data with pre-populated categories
+    // Initialize with default data - actual data will be loaded in useEffect
     const defaultData = StorageService.getDefaultData()
     return {
       ...defaultData,
       categories: generateDefaultCategories(),
     }
   })
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
+
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const activeProfile = await ProfileService.getActiveProfile()
+
+        if (activeProfile) {
+          setActiveProfileId(activeProfile.id)
+          const stored = await ProfileService.loadProfileData(activeProfile.id)
+          if (stored) {
+            setAppDataState(stored)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load profile data:', error)
+      }
+    }
+
+    loadProfileData()
+  }, [])
 
   // Note: Individual operations now write directly to SQLite database
   // No need for auto-save useEffect
 
   // Helper to get current profile ID
   const getProfileId = useCallback((): string | null => {
-    const activeProfile = ProfileService.getActiveProfile()
-    return activeProfile?.id || null
-  }, [])
+    return activeProfileId
+  }, [activeProfileId])
 
   // Set initial view based on settings
   useEffect(() => {

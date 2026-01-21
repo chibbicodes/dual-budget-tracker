@@ -8,8 +8,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Load better-sqlite3 using require from project root (where node_modules is)
-// Use process.cwd() instead of import.meta.url to resolve from project root, not bundled file location
-const require = createRequire(path.join(process.cwd(), 'package.json'))
+// __dirname is dist-electron, so go up one level to project root
+// createRequire needs a file path (not directory), so use a dummy .js path
+const require = createRequire(path.resolve(__dirname, '..', 'electron-main.js'))
 const Database = require('better-sqlite3')
 
 // Import database service (runs in main process only)

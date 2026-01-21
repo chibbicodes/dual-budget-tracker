@@ -38,5 +38,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      external: [
+        'better-sqlite3',
+      ],
+    },
+  },
+  optimizeDeps: {
+    exclude: [
+      'better-sqlite3',
+    ],
   },
 })

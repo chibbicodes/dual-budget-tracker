@@ -49,9 +49,9 @@ export class ProfileService {
    * Load profile metadata (list of all profiles)
    * Now loads from SQLite database
    */
-  static loadMetadata(): ProfileMetadata {
+  static async loadMetadata(): Promise<ProfileMetadata> {
     try {
-      const profiles = databaseService.getAllProfiles()
+      const profiles = await databaseService.getAllProfiles()
 
       // Convert database format to Profile format
       const profileList: Profile[] = profiles.map((p: any) => ({
@@ -113,7 +113,7 @@ export class ProfileService {
     }
 
     // Create profile in database (also creates default settings)
-    const dbProfile = databaseService.createProfile({
+    const dbProfile = await databaseService.createProfile({
       id,
       name,
       description,
@@ -134,7 +134,7 @@ export class ProfileService {
     }
 
     // If this is the first profile, set it as active
-    const metadata = this.loadMetadata()
+    const metadata = await this.loadMetadata()
     if (metadata.profiles.length === 1) {
       this.saveActiveProfileId(id)
     }
@@ -145,16 +145,16 @@ export class ProfileService {
   /**
    * Get all profiles
    */
-  static getAllProfiles(): Profile[] {
-    const metadata = this.loadMetadata()
+  static async getAllProfiles(): Promise<Profile[]> {
+    const metadata = await this.loadMetadata()
     return metadata.profiles
   }
 
   /**
    * Get active profile
    */
-  static getActiveProfile(): Profile | null {
-    const metadata = this.loadMetadata()
+  static async getActiveProfile(): Promise<Profile | null> {
+    const metadata = await this.loadMetadata()
     if (!metadata.activeProfileId) return null
 
     return metadata.profiles.find((p) => p.id === metadata.activeProfileId) || null
@@ -164,7 +164,7 @@ export class ProfileService {
    * Switch to a different profile
    */
   static async switchProfile(profileId: string, password?: string): Promise<void> {
-    const dbProfile = databaseService.getProfile(profileId)
+    const dbProfile = await databaseService.getProfile(profileId)
 
     if (!dbProfile) {
       throw new Error('Profile not found')
@@ -182,7 +182,7 @@ export class ProfileService {
     }
 
     // Update last accessed time in database
-    databaseService.updateProfileLastAccessed(profileId)
+    await databaseService.updateProfileLastAccessed(profileId)
 
     // Set as active
     this.saveActiveProfileId(profileId)
@@ -198,25 +198,25 @@ export class ProfileService {
   /**
    * Update profile information
    */
-  static updateProfile(
+  static async updateProfile(
     profileId: string,
     updates: Partial<Pick<Profile, 'name' | 'description'>>
-  ): void {
-    const dbProfile = databaseService.getProfile(profileId)
+  ): Promise<void> {
+    const dbProfile = await databaseService.getProfile(profileId)
 
     if (!dbProfile) {
       throw new Error('Profile not found')
     }
 
     // Update profile in database
-    databaseService.updateProfile(profileId, updates)
+    await databaseService.updateProfile(profileId, updates)
   }
 
   /**
    * Delete a profile
    */
-  static deleteProfile(profileId: string): void {
-    const metadata = this.loadMetadata()
+  static async deleteProfile(profileId: string): Promise<void> {
+    const metadata = await this.loadMetadata()
 
     const profile = metadata.profiles.find((p) => p.id === profileId)
     if (!profile) {
@@ -234,7 +234,7 @@ export class ProfileService {
     }
 
     // Delete profile from database (CASCADE will delete all associated data)
-    databaseService.deleteProfile(profileId)
+    await databaseService.deleteProfile(profileId)
   }
 
   /**
@@ -242,17 +242,17 @@ export class ProfileService {
    * NOTE: This method is deprecated and kept for backward compatibility
    * BudgetContext should use databaseService directly instead
    */
-  static loadProfileData(profileId: string): AppData | null {
+  static async loadProfileData(profileId: string): Promise<AppData | null> {
     try {
       // Load data from database
-      const settings = databaseService.getSettings(profileId)
-      const accounts = databaseService.getAccounts(profileId)
-      const categories = databaseService.getCategories(profileId)
-      const transactions = databaseService.getTransactions(profileId)
-      const incomeSources = databaseService.getIncomeSources(profileId)
-      const projects = databaseService.getProjects(profileId)
-      const projectTypes = databaseService.getProjectTypes(profileId)
-      const projectStatuses = databaseService.getProjectStatuses(profileId)
+      const settings = await databaseService.getSettings(profileId)
+      const accounts = await databaseService.getAccounts(profileId)
+      const categories = await databaseService.getCategories(profileId)
+      const transactions = await databaseService.getTransactions(profileId)
+      const incomeSources = await databaseService.getIncomeSources(profileId)
+      const projects = await databaseService.getProjects(profileId)
+      const projectTypes = await databaseService.getProjectTypes(profileId)
+      const projectStatuses = await databaseService.getProjectStatuses(profileId)
 
       // Convert to AppData format (this is a simplified conversion)
       const data: AppData = {
@@ -311,14 +311,14 @@ export class ProfileService {
   /**
    * Export profile data as JSON
    */
-  static exportProfile(profileId: string): string {
-    const metadata = this.loadMetadata()
+  static async exportProfile(profileId: string): Promise<string> {
+    const metadata = await this.loadMetadata()
     const profile = metadata.profiles.find((p) => p.id === profileId)
     if (!profile) {
       throw new Error('Profile not found')
     }
 
-    const data = this.loadProfileData(profileId)
+    const data = await this.loadProfileData(profileId)
     if (!data) {
       throw new Error('Profile data not found')
     }
@@ -391,7 +391,7 @@ export class ProfileService {
     newPassword: string,
     passwordHint?: string
   ): Promise<void> {
-    const dbProfile = databaseService.getProfile(profileId)
+    const dbProfile = await databaseService.getProfile(profileId)
 
     if (!dbProfile) {
       throw new Error('Profile not found')
@@ -415,7 +415,7 @@ export class ProfileService {
 
     // Hash the new password and update in database
     const password_hash = await this.hashPassword(newPassword.trim())
-    databaseService.updateProfile(profileId, {
+    await databaseService.updateProfile(profileId, {
       password_hash,
       password_hint: passwordHint?.trim() || undefined,
     })
@@ -427,7 +427,7 @@ export class ProfileService {
    * @param currentPassword - Current password (required for verification)
    */
   static async removePassword(profileId: string, currentPassword: string): Promise<void> {
-    const dbProfile = databaseService.getProfile(profileId)
+    const dbProfile = await databaseService.getProfile(profileId)
 
     if (!dbProfile) {
       throw new Error('Profile not found')
@@ -444,7 +444,7 @@ export class ProfileService {
     }
 
     // Remove password and hint from database
-    databaseService.updateProfile(profileId, {
+    await databaseService.updateProfile(profileId, {
       password_hash: undefined,
       password_hint: undefined,
     })

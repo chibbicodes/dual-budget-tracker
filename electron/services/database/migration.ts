@@ -1,5 +1,3 @@
-import { databaseService } from './databaseService'
-
 /**
  * Migration utility to move data from localStorage to SQLite
  */
@@ -58,7 +56,7 @@ function getProfileDataFromLocalStorage(profileId: string): any {
 /**
  * Migrate a single profile from localStorage to SQLite
  */
-async function migrateProfile(localProfile: LocalStorageProfile): Promise<void> {
+async function migrateProfile(localProfile: LocalStorageProfile, databaseService: any): Promise<void> {
   console.log(`Migrating profile: ${localProfile.name}`)
 
   // Create profile in SQLite
@@ -339,7 +337,7 @@ async function migrateProfile(localProfile: LocalStorageProfile): Promise<void> 
 /**
  * Migrate all data from localStorage to SQLite
  */
-export async function migrateFromLocalStorage(): Promise<{
+export async function migrateFromLocalStorage(databaseService: any): Promise<{
   success: boolean
   profilesMigrated: number
   errors: string[]
@@ -349,9 +347,6 @@ export async function migrateFromLocalStorage(): Promise<{
 
   try {
     console.log('Starting migration from localStorage to SQLite...')
-
-    // Initialize database
-    await databaseService.initialize()
 
     // Get all profiles from localStorage
     const localProfiles = getLocalStorageProfiles()
@@ -364,7 +359,7 @@ export async function migrateFromLocalStorage(): Promise<{
     // Migrate each profile
     for (const profile of localProfiles) {
       try {
-        await migrateProfile(profile)
+        await migrateProfile(profile, databaseService)
         profilesMigrated++
       } catch (error) {
         const errorMsg = `Failed to migrate profile ${profile.name}: ${error}`

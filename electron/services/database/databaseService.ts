@@ -1,17 +1,19 @@
-import { createRequire } from 'module'
 import { createSchema } from './schema'
-
-// Use createRequire to load CommonJS native module in ES module context
-const require = createRequire(import.meta.url)
-const Database = require('better-sqlite3')
 
 /**
  * Local SQLite database service for Dual Budget Tracker
  * Handles all database operations with better-sqlite3
+ *
+ * Database constructor is passed from main.ts to avoid module resolution issues
  */
 class DatabaseService {
   private db: any | null = null
   private dbPath: string = ''
+  private DatabaseConstructor: any
+
+  constructor(DatabaseConstructor: any) {
+    this.DatabaseConstructor = DatabaseConstructor
+  }
 
   /**
    * Initialize the database connection
@@ -30,7 +32,7 @@ class DatabaseService {
       }
 
       // Open database connection
-      this.db = new Database(this.dbPath)
+      this.db = new this.DatabaseConstructor(this.dbPath)
 
       // Enable WAL mode for better concurrent performance
       this.db.pragma('journal_mode = WAL')
@@ -1175,5 +1177,7 @@ class DatabaseService {
   }
 }
 
-// Export singleton instance
-export const databaseService = new DatabaseService()
+// Export factory function that creates database service with Database constructor
+export function createDatabaseService(DatabaseConstructor: any): DatabaseService {
+  return new DatabaseService(DatabaseConstructor)
+}

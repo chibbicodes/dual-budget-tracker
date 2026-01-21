@@ -1,19 +1,24 @@
 import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// Load better-sqlite3 using require in main.ts (has proper module resolution)
+const require = createRequire(import.meta.url)
+const Database = require('better-sqlite3')
+
 // Import database service (runs in main process only)
-// Using dynamic import but registering handlers synchronously
+// Pass Database constructor to avoid bundling issues
 let databaseServicePromise: Promise<any> | null = null
 let databaseService: any = null
 
 // Start loading database service immediately
 databaseServicePromise = import('./services/database/databaseService.js').then(module => {
-  databaseService = module.databaseService
+  databaseService = module.createDatabaseService(Database)
   return databaseService
 }).catch(error => {
   console.error('Failed to load database service:', error)
@@ -153,7 +158,7 @@ app.whenReady().then(async () => {
     const { migrateFromLocalStorage, hasLocalStorageData } = await import('./services/database/migration.js')
     if (hasLocalStorageData()) {
       console.log('Migrating localStorage data to SQLite...')
-      const result = await migrateFromLocalStorage()
+      const result = await migrateFromLocalStorage(databaseService)
       if (result.success) {
         console.log(`Migration completed: ${result.profilesMigrated} profiles migrated`)
       } else {

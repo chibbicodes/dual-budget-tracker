@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useProfile } from '../contexts/ProfileContext'
-import { FolderOpen, Plus, ArrowRight } from 'lucide-react'
+import { FolderOpen, Plus, ArrowRight, Lock } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
+import type { Profile } from '../types'
 
 export default function ProfileSelector() {
   const { profiles, createProfile, switchProfile } = useProfile()
   const [isCreating, setIsCreating] = useState(profiles.length === 0)
-  const [formData, setFormData] = useState({ name: '', description: '' })
+  const [formData, setFormData] = useState({ name: '', description: '', password: '' })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [passwordPrompt, setPasswordPrompt] = useState<{ profile: Profile; password: string } | null>(null)
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +23,11 @@ export default function ProfileSelector() {
 
     setIsLoading(true)
     try {
-      await createProfile(formData.name.trim(), formData.description.trim() || undefined)
+      await createProfile(
+        formData.name.trim(),
+        formData.description.trim() || undefined,
+        formData.password.trim() || undefined
+      )
       // Profile context will automatically set this as active
       // and trigger a reload
     } catch (err) {
@@ -30,14 +36,39 @@ export default function ProfileSelector() {
     }
   }
 
-  const handleSwitch = async (profileId: string) => {
+  const handleProfileClick = (profile: Profile) => {
+    if (profile.passwordHash) {
+      // Show password prompt for protected profiles
+      setPasswordPrompt({ profile, password: '' })
+    } else {
+      // Switch directly for unprotected profiles
+      handleSwitch(profile.id)
+    }
+  }
+
+  const handleSwitch = async (profileId: string, password?: string) => {
     setIsLoading(true)
+    setError('')
     try {
-      await switchProfile(profileId)
+      await switchProfile(profileId, password)
       // Will reload the page
-    } catch (err) {
-      setError('Failed to switch profile. Please try again.')
+    } catch (err: any) {
+      if (err.message === 'Invalid password') {
+        setError('Incorrect password. Please try again.')
+      } else if (err.message === 'Password required') {
+        setError('This profile requires a password.')
+      } else {
+        setError('Failed to switch profile. Please try again.')
+      }
       setIsLoading(false)
+      setPasswordPrompt(null)
+    }
+  }
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwordPrompt) {
+      handleSwitch(passwordPrompt.profile.id, passwordPrompt.password)
     }
   }
 
@@ -97,6 +128,21 @@ export default function ProfileSelector() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Leave blank for no password"
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Add a password to protect this profile</p>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
@@ -134,15 +180,22 @@ export default function ProfileSelector() {
                 {profiles.map((profile) => (
                   <button
                     key={profile.id}
-                    onClick={() => handleSwitch(profile.id)}
+                    onClick={() => handleProfileClick(profile)}
                     disabled={isLoading}
                     className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
-                          {profile.name}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
+                            {profile.name}
+                          </h3>
+                          {profile.passwordHash && (
+                            <span title="Password protected">
+                              <Lock className="h-4 w-4 text-gray-400" />
+                            </span>
+                          )}
+                        </div>
                         {profile.description && (
                           <p className="text-sm text-gray-500 mt-1">{profile.description}</p>
                         )}
@@ -173,6 +226,65 @@ export default function ProfileSelector() {
           Each profile stores its data separately
         </div>
       </div>
+
+      {/* Password Prompt Modal */}
+      {passwordPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Lock className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Password Required</h3>
+                  <p className="text-sm text-gray-500">{passwordPrompt.profile.name}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Enter Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordPrompt.password}
+                    onChange={(e) =>
+                      setPasswordPrompt({ ...passwordPrompt, password: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter profile password"
+                    disabled={isLoading}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isLoading || !passwordPrompt.password}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {isLoading ? 'Unlocking...' : 'Unlock'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordPrompt(null)
+                      setError('')
+                    }}
+                    disabled={isLoading}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

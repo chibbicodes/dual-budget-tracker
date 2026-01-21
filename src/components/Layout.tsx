@@ -13,6 +13,7 @@ import {
   FileText,
   Settings,
   User,
+  LogOut,
 } from 'lucide-react'
 import type { BudgetViewType } from '../types'
 
@@ -31,8 +32,14 @@ const navigation = [
 
 export default function Layout() {
   const { currentView, setCurrentView } = useBudget()
-  const { activeProfile } = useProfile()
+  const { activeProfile, logout } = useProfile()
   const location = useLocation()
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout? You will be returned to the profile selection screen.')) {
+      logout()
+    }
+  }
 
   const handleViewChange = (view: BudgetViewType) => {
     setCurrentView(view)
@@ -63,16 +70,28 @@ export default function Layout() {
 
               {/* Profile Indicator */}
               {activeProfile && (
-                <Link
-                  to="/settings"
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group"
-                  title="View profile settings"
-                >
-                  <User className="h-4 w-4 text-gray-600 group-hover:text-gray-800" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                    {activeProfile.name}
-                  </span>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/settings"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group"
+                    title="View profile settings"
+                  >
+                    <User className="h-4 w-4 text-gray-600 group-hover:text-gray-800" />
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                      {activeProfile.name}
+                    </span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 hover:bg-red-200 rounded-lg transition-colors group"
+                    title="Logout"
+                  >
+                    <LogOut className="h-4 w-4 text-red-600 group-hover:text-red-800" />
+                    <span className="text-sm font-medium text-red-700 group-hover:text-red-900">
+                      Logout
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
 

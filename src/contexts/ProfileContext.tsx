@@ -14,12 +14,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     initializeProfiles()
   }, [])
 
-  const initializeProfiles = () => {
+  const initializeProfiles = async () => {
     setIsLoading(true)
 
     try {
       // Try to migrate old data if this is first time using profile system
-      ProfileService.migrateOldData()
+      await ProfileService.migrateOldData()
 
       // Load profiles
       const loadedProfiles = ProfileService.getAllProfiles()
@@ -38,9 +38,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const createProfile = async (name: string, description?: string): Promise<Profile> => {
+  const createProfile = async (name: string, description?: string, password?: string): Promise<Profile> => {
     try {
-      const newProfile = ProfileService.createProfile(name, description)
+      const newProfile = await ProfileService.createProfile(name, description, password)
 
       // Refresh profiles list
       const updatedProfiles = ProfileService.getAllProfiles()
@@ -56,9 +56,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const switchProfile = async (profileId: string): Promise<void> => {
+  const switchProfile = async (profileId: string, password?: string): Promise<void> => {
     try {
-      ProfileService.switchProfile(profileId)
+      await ProfileService.switchProfile(profileId, password)
 
       // Update active profile
       const profile = ProfileService.getActiveProfile()
@@ -73,6 +73,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       window.location.reload()
     } catch (error) {
       console.error('Error switching profile:', error)
+      throw error
+    }
+  }
+
+  const logout = (): void => {
+    try {
+      ProfileService.logout()
+      setActiveProfile(null)
+      // Reload to show ProfileSelector
+      window.location.reload()
+    } catch (error) {
+      console.error('Error logging out:', error)
       throw error
     }
   }
@@ -130,6 +142,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     switchProfile,
     updateProfile,
     deleteProfile,
+    logout,
     refreshProfiles,
   }
 

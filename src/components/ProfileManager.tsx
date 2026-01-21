@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useProfile } from '../contexts/ProfileContext'
-import { FolderOpen, Edit2, Trash2, Download, Upload, AlertTriangle } from 'lucide-react'
+import { FolderOpen, Edit2, Trash2, Download, Upload, AlertTriangle, Lock } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import ProfileService from '../services/profileService'
+import type { Profile } from '../types'
 
 export default function ProfileManager() {
   const { profiles, activeProfile, updateProfile, deleteProfile, switchProfile } = useProfile()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '' })
   const [error, setError] = useState('')
+  const [passwordPrompt, setPasswordPrompt] = useState<{ profile: Profile; password: string } | null>(null)
 
   const handleEdit = (profile: any) => {
     setEditingId(profile.id)
@@ -69,16 +71,40 @@ export default function ProfileManager() {
     }
   }
 
-  const handleSwitch = async (profileId: string) => {
-    if (activeProfile?.id === profileId) {
+  const handleProfileClick = (profile: Profile) => {
+    if (activeProfile?.id === profile.id) {
       return // Already active
     }
 
+    if (profile.passwordHash) {
+      // Show password prompt for protected profiles
+      setPasswordPrompt({ profile, password: '' })
+    } else {
+      // Switch directly for unprotected profiles
+      handleSwitch(profile.id)
+    }
+  }
+
+  const handleSwitch = async (profileId: string, password?: string) => {
     try {
-      await switchProfile(profileId)
+      await switchProfile(profileId, password)
       // Will reload the page
-    } catch (err) {
-      alert('Failed to switch profile')
+    } catch (err: any) {
+      if (err.message === 'Invalid password') {
+        setError('Incorrect password. Please try again.')
+      } else if (err.message === 'Password required') {
+        setError('This profile requires a password.')
+      } else {
+        setError('Failed to switch profile')
+      }
+      setPasswordPrompt(null)
+    }
+  }
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwordPrompt) {
+      handleSwitch(passwordPrompt.profile.id, passwordPrompt.password)
     }
   }
 
@@ -111,7 +137,7 @@ export default function ProfileManager() {
       const profileName = prompt('Enter a name for the imported profile:', 'Imported Profile')
       if (!profileName) return
 
-      ProfileService.importProfile(content, profileName)
+      await ProfileService.importProfile(content, profileName)
       alert('Profile imported successfully! You can now switch to it.')
       window.location.reload()
     } catch (err) {
@@ -241,12 +267,17 @@ export default function ProfileManager() {
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 cursor-pointer'
                   }`}
-                  onClick={() => activeProfile?.id !== profile.id && handleSwitch(profile.id)}
+                  onClick={() => activeProfile?.id !== profile.id && handleProfileClick(profile)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h4 className="font-semibold text-gray-900">{profile.name}</h4>
+                        {profile.passwordHash && (
+                          <span title="Password protected">
+                            <Lock className="h-4 w-4 text-gray-500" />
+                          </span>
+                        )}
                         {activeProfile?.id === profile.id && (
                           <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">
                             Active
@@ -318,6 +349,63 @@ export default function ProfileManager() {
           </div>
         </div>
       </div>
+
+      {/* Password Prompt Modal */}
+      {passwordPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Lock className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Password Required</h3>
+                  <p className="text-sm text-gray-500">{passwordPrompt.profile.name}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Enter Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordPrompt.password}
+                    onChange={(e) =>
+                      setPasswordPrompt({ ...passwordPrompt, password: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter profile password"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={!passwordPrompt.password}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    Unlock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordPrompt(null)
+                      setError('')
+                    }}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

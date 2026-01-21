@@ -11,6 +11,24 @@ const CURRENT_VERSION = '1.0.0'
  */
 export class ProfileService {
   /**
+   * Hash a password using Web Crypto API
+   */
+  private static async hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(password)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  /**
+   * Verify a password against a hash
+   */
+  private static async verifyPassword(password: string, hash: string): Promise<boolean> {
+    const passwordHash = await this.hashPassword(password)
+    return passwordHash === hash
+  }
+  /**
    * Load profile metadata (list of all profiles)
    */
   static loadMetadata(): ProfileMetadata {
@@ -52,17 +70,25 @@ export class ProfileService {
   /**
    * Create a new profile
    */
-  static createProfile(name: string, description?: string): Profile {
+  static async createProfile(name: string, description?: string, password?: string): Promise<Profile> {
     const metadata = this.loadMetadata()
 
     // Generate unique ID
     const id = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     const now = new Date().toISOString()
+
+    // Hash password if provided
+    let passwordHash: string | undefined
+    if (password && password.trim()) {
+      passwordHash = await this.hashPassword(password)
+    }
+
     const newProfile: Profile = {
       id,
       name,
       description,
+      passwordHash,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
@@ -106,12 +132,23 @@ export class ProfileService {
   /**
    * Switch to a different profile
    */
-  static switchProfile(profileId: string): void {
+  static async switchProfile(profileId: string, password?: string): Promise<void> {
     const metadata = this.loadMetadata()
     const profile = metadata.profiles.find((p) => p.id === profileId)
 
     if (!profile) {
       throw new Error('Profile not found')
+    }
+
+    // Check password if profile is protected
+    if (profile.passwordHash) {
+      if (!password) {
+        throw new Error('Password required')
+      }
+      const isValid = await this.verifyPassword(password, profile.passwordHash)
+      if (!isValid) {
+        throw new Error('Invalid password')
+      }
     }
 
     // Update last accessed time
@@ -121,6 +158,15 @@ export class ProfileService {
     // Set as active
     metadata.activeProfileId = profileId
 
+    this.saveMetadata(metadata)
+  }
+
+  /**
+   * Logout - clear active profile
+   */
+  static logout(): void {
+    const metadata = this.loadMetadata()
+    metadata.activeProfileId = null
     this.saveMetadata(metadata)
   }
 
@@ -269,7 +315,7 @@ export class ProfileService {
   /**
    * Import profile from JSON
    */
-  static importProfile(jsonString: string, profileName?: string): Profile {
+  static async importProfile(jsonString: string, profileName?: string): Promise<Profile> {
     try {
       const importedData = JSON.parse(jsonString)
 
@@ -277,7 +323,7 @@ export class ProfileService {
       const name = profileName || importedData.profile?.name || `Imported Profile ${Date.now()}`
       const description = importedData.profile?.description || 'Imported from file'
 
-      const newProfile = this.createProfile(name, description)
+      const newProfile = await this.createProfile(name, description)
 
       // Import data into new profile
       if (importedData.data) {
@@ -295,7 +341,7 @@ export class ProfileService {
    * Migrate old single-profile data to new profile system
    * This is called once to migrate existing users' data
    */
-  static migrateOldData(): boolean {
+  static async migrateOldData(): Promise<boolean> {
     try {
       const metadata = this.loadMetadata()
 
@@ -311,7 +357,7 @@ export class ProfileService {
       }
 
       // Create a default profile with the old data
-      const profile = this.createProfile('My Budget', 'Migrated from previous version')
+      const profile = await this.createProfile('My Budget', 'Migrated from previous version')
       this.saveProfileData(profile.id, oldData)
 
       // Clear old storage key

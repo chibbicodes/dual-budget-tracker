@@ -414,6 +414,7 @@ export interface Profile {
   id: string
   name: string
   description?: string
+  passwordHash?: string // Optional password protection
   createdAt: string
   updatedAt: string
   lastAccessedAt: string
@@ -505,9 +506,10 @@ export interface ProfileContextState {
   isLoading: boolean
 
   // Profile operations
-  createProfile: (name: string, description?: string) => Promise<Profile>
-  switchProfile: (profileId: string) => Promise<void>
+  createProfile: (name: string, description?: string, password?: string) => Promise<Profile>
+  switchProfile: (profileId: string, password?: string) => Promise<void>
   updateProfile: (profileId: string, updates: Partial<Pick<Profile, 'name' | 'description'>>) => void
   deleteProfile: (profileId: string) => Promise<void>
+  logout: () => void
   refreshProfiles: () => void
 }

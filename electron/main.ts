@@ -7,8 +7,9 @@ import { createRequire } from 'module'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load better-sqlite3 using require in main.ts (has proper module resolution)
-const require = createRequire(import.meta.url)
+// Load better-sqlite3 using require from project root (where node_modules is)
+// Use process.cwd() instead of import.meta.url to resolve from project root, not bundled file location
+const require = createRequire(path.join(process.cwd(), 'package.json'))
 const Database = require('better-sqlite3')
 
 // Import database service (runs in main process only)

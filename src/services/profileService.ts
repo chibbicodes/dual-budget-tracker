@@ -70,7 +70,7 @@ export class ProfileService {
   /**
    * Create a new profile
    */
-  static async createProfile(name: string, description?: string, password?: string): Promise<Profile> {
+  static async createProfile(name: string, description?: string, password?: string, passwordHint?: string): Promise<Profile> {
     const metadata = this.loadMetadata()
 
     // Generate unique ID
@@ -89,6 +89,7 @@ export class ProfileService {
       name,
       description,
       passwordHash,
+      passwordHint: passwordHint?.trim() || undefined,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
@@ -368,6 +369,81 @@ export class ProfileService {
       console.error('Error migrating old data:', error)
       return false
     }
+  }
+
+  /**
+   * Set or change password for a profile
+   * @param profileId - The profile to update
+   * @param currentPassword - Current password (required if profile already has a password)
+   * @param newPassword - New password to set
+   * @param passwordHint - Optional hint to help remember the password
+   */
+  static async setPassword(
+    profileId: string,
+    currentPassword: string | undefined,
+    newPassword: string,
+    passwordHint?: string
+  ): Promise<void> {
+    const metadata = this.loadMetadata()
+    const profile = metadata.profiles.find((p) => p.id === profileId)
+
+    if (!profile) {
+      throw new Error('Profile not found')
+    }
+
+    // If profile already has a password, verify current password
+    if (profile.passwordHash) {
+      if (!currentPassword) {
+        throw new Error('Current password is required')
+      }
+      const isValid = await this.verifyPassword(currentPassword, profile.passwordHash)
+      if (!isValid) {
+        throw new Error('Current password is incorrect')
+      }
+    }
+
+    // Validate new password
+    if (!newPassword || !newPassword.trim()) {
+      throw new Error('New password cannot be empty')
+    }
+
+    // Hash the new password
+    profile.passwordHash = await this.hashPassword(newPassword.trim())
+    profile.passwordHint = passwordHint?.trim() || undefined
+    profile.updatedAt = new Date().toISOString()
+
+    this.saveMetadata(metadata)
+  }
+
+  /**
+   * Remove password from a profile
+   * @param profileId - The profile to update
+   * @param currentPassword - Current password (required for verification)
+   */
+  static async removePassword(profileId: string, currentPassword: string): Promise<void> {
+    const metadata = this.loadMetadata()
+    const profile = metadata.profiles.find((p) => p.id === profileId)
+
+    if (!profile) {
+      throw new Error('Profile not found')
+    }
+
+    if (!profile.passwordHash) {
+      throw new Error('Profile does not have a password')
+    }
+
+    // Verify current password
+    const isValid = await this.verifyPassword(currentPassword, profile.passwordHash)
+    if (!isValid) {
+      throw new Error('Password is incorrect')
+    }
+
+    // Remove password and hint
+    profile.passwordHash = undefined
+    profile.passwordHint = undefined
+    profile.updatedAt = new Date().toISOString()
+
+    this.saveMetadata(metadata)
   }
 }
 

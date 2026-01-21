@@ -7,7 +7,7 @@ import type { Profile } from '../types'
 export default function ProfileSelector() {
   const { profiles, createProfile, switchProfile } = useProfile()
   const [isCreating, setIsCreating] = useState(profiles.length === 0)
-  const [formData, setFormData] = useState({ name: '', description: '', password: '' })
+  const [formData, setFormData] = useState({ name: '', description: '', password: '', passwordHint: '' })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [passwordPrompt, setPasswordPrompt] = useState<{ profile: Profile; password: string } | null>(null)
@@ -26,7 +26,8 @@ export default function ProfileSelector() {
       await createProfile(
         formData.name.trim(),
         formData.description.trim() || undefined,
-        formData.password.trim() || undefined
+        formData.password.trim() || undefined,
+        formData.passwordHint.trim() || undefined
       )
       // Profile context will automatically set this as active
       // and trigger a reload
@@ -143,6 +144,23 @@ export default function ProfileSelector() {
                 <p className="text-xs text-gray-500 mt-1">Add a password to protect this profile</p>
               </div>
 
+              {formData.password && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password Hint (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.passwordHint}
+                    onChange={(e) => setFormData({ ...formData, passwordHint: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., First pet's name"
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">A hint to help you remember your password</p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
@@ -258,6 +276,11 @@ export default function ProfileSelector() {
                     disabled={isLoading}
                     autoFocus
                   />
+                  {passwordPrompt.profile.passwordHint && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      <span className="font-medium">Hint:</span> {passwordPrompt.profile.passwordHint}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">

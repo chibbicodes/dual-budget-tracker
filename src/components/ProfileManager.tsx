@@ -1,16 +1,24 @@
 import { useState } from 'react'
 import { useProfile } from '../contexts/ProfileContext'
-import { FolderOpen, Edit2, Trash2, Download, Upload, AlertTriangle, Lock } from 'lucide-react'
+import { FolderOpen, Edit2, Trash2, Download, Upload, AlertTriangle, Lock, Key } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import ProfileService from '../services/profileService'
 import type { Profile } from '../types'
 
 export default function ProfileManager() {
-  const { profiles, activeProfile, updateProfile, deleteProfile, switchProfile } = useProfile()
+  const { profiles, activeProfile, updateProfile, deleteProfile, switchProfile, setPassword, removePassword } = useProfile()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '' })
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [passwordPrompt, setPasswordPrompt] = useState<{ profile: Profile; password: string } | null>(null)
+  const [passwordManagement, setPasswordManagement] = useState<{
+    profile: Profile
+    mode: 'set' | 'change' | 'remove'
+    currentPassword: string
+    newPassword: string
+    passwordHint: string
+  } | null>(null)
 
   const handleEdit = (profile: any) => {
     setEditingId(profile.id)
@@ -105,6 +113,60 @@ export default function ProfileManager() {
     e.preventDefault()
     if (passwordPrompt) {
       handleSwitch(passwordPrompt.profile.id, passwordPrompt.password)
+    }
+  }
+
+  const openPasswordManagement = (profile: Profile, mode: 'set' | 'change' | 'remove') => {
+    setPasswordManagement({
+      profile,
+      mode,
+      currentPassword: '',
+      newPassword: '',
+      passwordHint: profile.passwordHint || '',
+    })
+    setError('')
+    setSuccessMessage('')
+  }
+
+  const handlePasswordManagementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!passwordManagement) return
+
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      const { profile, mode, currentPassword, newPassword, passwordHint } = passwordManagement
+
+      if (mode === 'remove') {
+        if (!currentPassword) {
+          setError('Please enter your current password')
+          return
+        }
+        await removePassword(profile.id, currentPassword)
+        setSuccessMessage('Password removed successfully')
+      } else {
+        // set or change
+        if (!newPassword || newPassword.length < 4) {
+          setError('Password must be at least 4 characters')
+          return
+        }
+        const currentPw = profile.passwordHash ? currentPassword : undefined
+        if (profile.passwordHash && !currentPassword) {
+          setError('Please enter your current password')
+          return
+        }
+        await setPassword(profile.id, currentPw, newPassword, passwordHint)
+        setSuccessMessage(mode === 'set' ? 'Password set successfully' : 'Password changed successfully')
+      }
+
+      // Close modal after short delay
+      setTimeout(() => {
+        setPasswordManagement(null)
+        setSuccessMessage('')
+      }, 1500)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update password')
     }
   }
 
@@ -291,6 +353,43 @@ export default function ProfileManager() {
                         <span>Created: {format(parseISO(profile.createdAt), 'MMM d, yyyy')}</span>
                         <span>Last accessed: {format(parseISO(profile.lastAccessedAt), 'MMM d, h:mm a')}</span>
                       </div>
+                      {/* Password management link */}
+                      <div className="mt-2">
+                        {profile.passwordHash ? (
+                          <div className="flex items-center gap-2 text-xs">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openPasswordManagement(profile, 'change')
+                              }}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Change password
+                            </button>
+                            <span className="text-gray-400">•</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openPasswordManagement(profile, 'remove')
+                              }}
+                              className="text-red-600 hover:underline"
+                            >
+                              Remove password
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openPasswordManagement(profile, 'set')
+                            }}
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Key className="h-3 w-3" />
+                            Add password protection
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex gap-2 ml-4">
@@ -380,6 +479,11 @@ export default function ProfileManager() {
                     placeholder="Enter profile password"
                     autoFocus
                   />
+                  {passwordPrompt.profile.passwordHint && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      <span className="font-medium">Hint:</span> {passwordPrompt.profile.passwordHint}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -395,6 +499,120 @@ export default function ProfileManager() {
                     onClick={() => {
                       setPasswordPrompt(null)
                       setError('')
+                    }}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Management Modal */}
+      {passwordManagement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Key className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {passwordManagement.mode === 'set' && 'Set Password'}
+                    {passwordManagement.mode === 'change' && 'Change Password'}
+                    {passwordManagement.mode === 'remove' && 'Remove Password'}
+                  </h3>
+                  <p className="text-sm text-gray-500">{passwordManagement.profile.name}</p>
+                </div>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                  {successMessage}
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordManagementSubmit} className="space-y-4">
+                {passwordManagement.mode !== 'set' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Password *
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordManagement.currentPassword}
+                      onChange={(e) =>
+                        setPasswordManagement({ ...passwordManagement, currentPassword: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter current password"
+                      autoFocus
+                    />
+                  </div>
+                )}
+
+                {passwordManagement.mode !== 'remove' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        New Password *
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordManagement.newPassword}
+                        onChange={(e) =>
+                          setPasswordManagement({ ...passwordManagement, newPassword: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter new password"
+                        autoFocus={passwordManagement.mode === 'set'}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Minimum 4 characters</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password Hint (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={passwordManagement.passwordHint}
+                        onChange={(e) =>
+                          setPasswordManagement({ ...passwordManagement, passwordHint: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="e.g., First pet's name"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">A hint to help you remember your password</p>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    {passwordManagement.mode === 'set' && 'Set Password'}
+                    {passwordManagement.mode === 'change' && 'Change Password'}
+                    {passwordManagement.mode === 'remove' && 'Remove Password'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordManagement(null)
+                      setError('')
+                      setSuccessMessage('')
                     }}
                     className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >

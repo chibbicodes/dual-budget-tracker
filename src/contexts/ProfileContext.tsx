@@ -38,9 +38,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const createProfile = async (name: string, description?: string, password?: string): Promise<Profile> => {
+  const createProfile = async (name: string, description?: string, password?: string, passwordHint?: string): Promise<Profile> => {
     try {
-      const newProfile = await ProfileService.createProfile(name, description, password)
+      const newProfile = await ProfileService.createProfile(name, description, password, passwordHint)
 
       // Refresh profiles list
       const updatedProfiles = ProfileService.getAllProfiles()
@@ -134,6 +134,53 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setActiveProfile(active)
   }
 
+  const setPassword = async (
+    profileId: string,
+    currentPassword: string | undefined,
+    newPassword: string,
+    passwordHint?: string
+  ): Promise<void> => {
+    try {
+      await ProfileService.setPassword(profileId, currentPassword, newPassword, passwordHint)
+
+      // Refresh profiles list
+      const updatedProfiles = ProfileService.getAllProfiles()
+      setProfiles(updatedProfiles)
+
+      // Update active profile if it was updated
+      if (activeProfile?.id === profileId) {
+        const updated = updatedProfiles.find((p) => p.id === profileId)
+        if (updated) {
+          setActiveProfile(updated)
+        }
+      }
+    } catch (error) {
+      console.error('Error setting password:', error)
+      throw error
+    }
+  }
+
+  const removePassword = async (profileId: string, currentPassword: string): Promise<void> => {
+    try {
+      await ProfileService.removePassword(profileId, currentPassword)
+
+      // Refresh profiles list
+      const updatedProfiles = ProfileService.getAllProfiles()
+      setProfiles(updatedProfiles)
+
+      // Update active profile if it was updated
+      if (activeProfile?.id === profileId) {
+        const updated = updatedProfiles.find((p) => p.id === profileId)
+        if (updated) {
+          setActiveProfile(updated)
+        }
+      }
+    } catch (error) {
+      console.error('Error removing password:', error)
+      throw error
+    }
+  }
+
   const value: ProfileContextState = {
     profiles,
     activeProfile,
@@ -144,6 +191,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     deleteProfile,
     logout,
     refreshProfiles,
+    setPassword,
+    removePassword,
   }
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>

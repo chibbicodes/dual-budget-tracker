@@ -155,18 +155,6 @@ app.whenReady().then(async () => {
     await databaseServicePromise
     await databaseService.initialize()
     console.log('Database initialized successfully')
-
-    // Check for and run migration from localStorage
-    const { migrateFromLocalStorage, hasLocalStorageData } = await import('./services/database/migration.js')
-    if (hasLocalStorageData()) {
-      console.log('Migrating localStorage data to SQLite...')
-      const result = await migrateFromLocalStorage(databaseService)
-      if (result.success) {
-        console.log(`Migration completed: ${result.profilesMigrated} profiles migrated`)
-      } else {
-        console.error('Migration had errors:', result.errors)
-      }
-    }
   } catch (error) {
     console.error('Failed to initialize database:', error)
   }

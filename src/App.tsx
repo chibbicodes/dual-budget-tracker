@@ -16,6 +16,7 @@ import Projects from './pages/Projects'
 import BusinessReports from './pages/BusinessReports'
 import Settings from './pages/Settings'
 import Welcome from './pages/Welcome'
+import CloudAuth from './pages/auth/CloudAuth'
 
 function AppContent() {
   const { activeProfile, isLoading } = useProfile()
@@ -41,6 +42,7 @@ function AppContent() {
   return (
     <BudgetProvider>
       <Routes>
+        <Route path="/cloud-auth" element={<CloudAuth />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="accounts" element={<Accounts />} />

@@ -142,6 +142,149 @@ class SyncService {
   }
 
   /**
+   * Sync transactions to cloud
+   */
+  private async syncTransactions(profileId: string): Promise<void> {
+    try {
+      const transactions = await databaseService.getTransactions(profileId)
+
+      for (const transaction of transactions) {
+        await syncRecordToCloud('transactions', {
+          id: transaction.id,
+          profileId: transaction.profile_id,
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          categoryId: transaction.category_id,
+          bucketId: transaction.bucket_id,
+          budgetType: transaction.budget_type,
+          accountId: transaction.account_id,
+          toAccountId: transaction.to_account_id,
+          linkedTransactionId: transaction.linked_transaction_id,
+          projectId: transaction.project_id,
+          incomeSourceId: transaction.income_source_id,
+          taxDeductible: transaction.tax_deductible,
+          reconciled: transaction.reconciled,
+          notes: transaction.notes,
+          createdAt: transaction.created_at,
+          updatedAt: transaction.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync transactions:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync income sources to cloud
+   */
+  private async syncIncomeSources(profileId: string): Promise<void> {
+    try {
+      const incomeSources = await databaseService.getIncomeSources(profileId)
+
+      for (const source of incomeSources) {
+        await syncRecordToCloud('incomeSources', {
+          id: source.id,
+          profileId: source.profile_id,
+          name: source.name,
+          budgetType: source.budget_type,
+          incomeType: source.income_type,
+          categoryId: source.category_id,
+          expectedAmount: source.expected_amount,
+          frequency: source.frequency,
+          nextExpectedDate: source.next_expected_date,
+          clientSource: source.client_source,
+          isActive: source.is_active,
+          createdAt: source.created_at,
+          updatedAt: source.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync income sources:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync projects to cloud
+   */
+  private async syncProjects(profileId: string): Promise<void> {
+    try {
+      const projects = await databaseService.getProjects(profileId)
+
+      for (const project of projects) {
+        await syncRecordToCloud('projects', {
+          id: project.id,
+          profileId: project.profile_id,
+          name: project.name,
+          budgetType: project.budget_type,
+          projectTypeId: project.project_type_id,
+          statusId: project.status_id,
+          incomeSourceId: project.income_source_id,
+          budget: project.budget,
+          dateCreated: project.date_created,
+          dateCompleted: project.date_completed,
+          commissionPaid: project.commission_paid,
+          notes: project.notes,
+          createdAt: project.created_at,
+          updatedAt: project.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync projects:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync project types to cloud
+   */
+  private async syncProjectTypes(profileId: string): Promise<void> {
+    try {
+      const projectTypes = await databaseService.getProjectTypes(profileId)
+
+      for (const type of projectTypes) {
+        await syncRecordToCloud('projectTypes', {
+          id: type.id,
+          profileId: type.profile_id,
+          name: type.name,
+          budgetType: type.budget_type,
+          allowedStatuses: type.allowed_statuses,
+          createdAt: type.created_at,
+          updatedAt: type.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync project types:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync project statuses to cloud
+   */
+  private async syncProjectStatuses(profileId: string): Promise<void> {
+    try {
+      const projectStatuses = await databaseService.getProjectStatuses(profileId)
+
+      for (const status of projectStatuses) {
+        await syncRecordToCloud('projectStatuses', {
+          id: status.id,
+          profileId: status.profile_id,
+          name: status.name,
+          description: status.description,
+          createdAt: status.created_at,
+          updatedAt: status.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync project statuses:', error)
+      throw error
+    }
+  }
+
+  /**
    * Pull profiles from cloud and update local database
    */
   private async pullProfiles(profileId: string): Promise<void> {
@@ -304,12 +447,14 @@ class SyncService {
     try {
       this.notifyProgress({ status: 'syncing', message: 'Starting sync...' })
 
+      const totalSteps = 16 // 8 push + 8 pull
+
       // Step 1: Push local changes to cloud
       this.notifyProgress({
         status: 'syncing',
         message: 'Syncing profiles...',
         current: 1,
-        total: 6,
+        total: totalSteps,
       })
       await this.syncProfiles(profileId)
 
@@ -317,7 +462,7 @@ class SyncService {
         status: 'syncing',
         message: 'Syncing accounts...',
         current: 2,
-        total: 6,
+        total: totalSteps,
       })
       await this.syncAccounts(profileId)
 
@@ -325,34 +470,77 @@ class SyncService {
         status: 'syncing',
         message: 'Syncing categories...',
         current: 3,
-        total: 6,
+        total: totalSteps,
       })
       await this.syncCategories(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing transactions...',
+        current: 4,
+        total: totalSteps,
+      })
+      await this.syncTransactions(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing income sources...',
+        current: 5,
+        total: totalSteps,
+      })
+      await this.syncIncomeSources(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing projects...',
+        current: 6,
+        total: totalSteps,
+      })
+      await this.syncProjects(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing project types...',
+        current: 7,
+        total: totalSteps,
+      })
+      await this.syncProjectTypes(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing project statuses...',
+        current: 8,
+        total: totalSteps,
+      })
+      await this.syncProjectStatuses(profileId)
 
       // Step 2: Pull remote changes from cloud
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling profiles...',
-        current: 4,
-        total: 6,
+        current: 9,
+        total: totalSteps,
       })
       await this.pullProfiles(profileId)
 
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling accounts...',
-        current: 5,
-        total: 6,
+        current: 10,
+        total: totalSteps,
       })
       await this.pullAccounts(profileId)
 
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling categories...',
-        current: 6,
-        total: 6,
+        current: 11,
+        total: totalSteps,
       })
       await this.pullCategories(profileId)
+
+      // Store last synced timestamp
+      localStorage.setItem('lastSyncedAt', new Date().toISOString())
 
       this.notifyProgress({ status: 'success', message: 'Sync completed successfully' })
     } catch (error) {
@@ -421,6 +609,82 @@ class SyncService {
    */
   isSyncInProgress(): boolean {
     return this.isSyncing
+  }
+
+  /**
+   * Get last synced timestamp
+   */
+  getLastSyncedAt(): Date | null {
+    const timestamp = localStorage.getItem('lastSyncedAt')
+    return timestamp ? new Date(timestamp) : null
+  }
+
+  /**
+   * Enable auto-sync (sync every X minutes)
+   */
+  private autoSyncInterval: NodeJS.Timeout | null = null
+  private autoSyncProfileId: string | null = null
+
+  startAutoSync(profileId: string, intervalMinutes: number = 5): void {
+    if (this.autoSyncInterval) {
+      console.warn('Auto-sync already running')
+      return
+    }
+
+    if (!this.isAuthenticated()) {
+      console.warn('User not authenticated, cannot start auto-sync')
+      return
+    }
+
+    this.autoSyncProfileId = profileId
+    console.log(`Starting auto-sync every ${intervalMinutes} minutes`)
+
+    // Initial sync
+    this.syncProfile(profileId).catch((error) => {
+      console.error('Initial auto-sync failed:', error)
+    })
+
+    // Set up interval
+    this.autoSyncInterval = setInterval(() => {
+      if (this.autoSyncProfileId) {
+        this.syncProfile(this.autoSyncProfileId).catch((error) => {
+          console.error('Auto-sync failed:', error)
+        })
+      }
+    }, intervalMinutes * 60 * 1000)
+  }
+
+  /**
+   * Stop auto-sync
+   */
+  stopAutoSync(): void {
+    if (this.autoSyncInterval) {
+      clearInterval(this.autoSyncInterval)
+      this.autoSyncInterval = null
+      this.autoSyncProfileId = null
+      console.log('Auto-sync stopped')
+    }
+  }
+
+  /**
+   * Check if auto-sync is running
+   */
+  isAutoSyncRunning(): boolean {
+    return this.autoSyncInterval !== null
+  }
+
+  /**
+   * Get auto-sync settings
+   */
+  getAutoSyncEnabled(): boolean {
+    return localStorage.getItem('autoSyncEnabled') === 'true'
+  }
+
+  /**
+   * Set auto-sync settings
+   */
+  setAutoSyncEnabled(enabled: boolean): void {
+    localStorage.setItem('autoSyncEnabled', enabled ? 'true' : 'false')
   }
 }
 

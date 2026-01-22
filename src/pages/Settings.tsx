@@ -37,14 +37,32 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<Tab>('profiles')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [syncProgress, setSyncProgress] = useState<SyncProgress>({ status: 'idle', message: '' })
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(syncService.getAutoSyncEnabled())
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(syncService.getLastSyncedAt())
 
   // Subscribe to sync progress
   useEffect(() => {
     const unsubscribe = syncService.onSyncProgress((progress) => {
       setSyncProgress(progress)
+      if (progress.status === 'success') {
+        setLastSyncedAt(syncService.getLastSyncedAt())
+      }
     })
     return unsubscribe
   }, [])
+
+  // Start/stop auto-sync when enabled changes or user signs in/out
+  useEffect(() => {
+    if (user && activeProfile && autoSyncEnabled) {
+      syncService.startAutoSync(activeProfile.id, 5) // Sync every 5 minutes
+    } else {
+      syncService.stopAutoSync()
+    }
+
+    return () => {
+      syncService.stopAutoSync()
+    }
+  }, [user, activeProfile, autoSyncEnabled])
 
   // Cloud sync handlers
   const handleSync = async () => {
@@ -60,9 +78,16 @@ export default function Settings() {
     }
   }
 
+  const handleToggleAutoSync = () => {
+    const newValue = !autoSyncEnabled
+    setAutoSyncEnabled(newValue)
+    syncService.setAutoSyncEnabled(newValue)
+  }
+
   const handleSignOut = async () => {
     if (confirm('Are you sure you want to sign out of cloud sync?')) {
       try {
+        syncService.stopAutoSync()
         await logOut()
         alert('Signed out successfully')
       } catch (error) {
@@ -70,6 +95,24 @@ export default function Settings() {
         alert('Failed to sign out')
       }
     }
+  }
+
+  // Format last synced time
+  const formatLastSynced = (date: Date | null): string => {
+    if (!date) return 'Never'
+
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
   }
 
   // Data export handlers
@@ -705,6 +748,35 @@ export default function Settings() {
                   </div>
                 </div>
 
+                {/* Auto-Sync Toggle */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Auto-Sync</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Automatically sync every 5 minutes
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggleAutoSync}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        autoSyncEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          autoSyncEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {lastSyncedAt && (
+                    <p className="text-xs text-gray-500">
+                      Last synced: {formatLastSynced(lastSyncedAt)}
+                    </p>
+                  )}
+                </div>
+
                 {/* Sync Controls */}
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <h4 className="font-medium text-gray-900 mb-3">Manual Sync</h4>
@@ -767,13 +839,15 @@ export default function Settings() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2">
-                    How It Works
+                    What's Synced
                   </h4>
                   <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Your data is stored locally on this device</li>
-                    <li>• Click "Sync Now" to backup to cloud</li>
-                    <li>• Synced data is accessible from other devices</li>
-                    <li>• Conflicts are resolved using latest timestamp</li>
+                    <li>✓ Profiles and settings</li>
+                    <li>✓ Accounts and categories</li>
+                    <li>✓ Transactions and income sources</li>
+                    <li>✓ Projects and project types</li>
+                    <li>• Auto-sync keeps everything up-to-date</li>
+                    <li>• Conflicts resolved using latest timestamp</li>
                   </ul>
                 </div>
 

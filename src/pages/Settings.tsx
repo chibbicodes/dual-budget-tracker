@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBudget } from '../contexts/BudgetContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useProfile } from '../contexts/ProfileContext'
 import StorageService from '../services/storage'
-import { Download, Upload, Trash2, AlertTriangle, Settings as SettingsIcon, Cloud, LogOut } from 'lucide-react'
+import { Download, Upload, Trash2, AlertTriangle, Settings as SettingsIcon, Cloud, LogOut, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import { logOut } from '../services/firebase/auth'
+import { syncService, SyncProgress } from '../services/syncService'
 import type { BudgetType } from '../types'
 import ProfileManager from '../components/ProfileManager'
 
@@ -13,6 +15,7 @@ type Tab = 'profiles' | 'data' | 'preferences' | 'categories' | 'income' | 'proj
 export default function Settings() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
+  const { activeProfile } = useProfile()
   const {
     appData,
     updateSettings,
@@ -33,8 +36,30 @@ export default function Settings() {
   } = useBudget()
   const [activeTab, setActiveTab] = useState<Tab>('profiles')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress>({ status: 'idle', message: '' })
+
+  // Subscribe to sync progress
+  useEffect(() => {
+    const unsubscribe = syncService.onSyncProgress((progress) => {
+      setSyncProgress(progress)
+    })
+    return unsubscribe
+  }, [])
 
   // Cloud sync handlers
+  const handleSync = async () => {
+    if (!activeProfile) {
+      alert('No active profile selected')
+      return
+    }
+
+    try {
+      await syncService.syncProfile(activeProfile.id)
+    } catch (error) {
+      console.error('Sync error:', error)
+    }
+  }
+
   const handleSignOut = async () => {
     if (confirm('Are you sure you want to sign out of cloud sync?')) {
       try {
@@ -680,14 +705,75 @@ export default function Settings() {
                   </div>
                 </div>
 
+                {/* Sync Controls */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Manual Sync</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Sync your local data with the cloud. This will push your changes and pull any updates from other devices.
+                  </p>
+
+                  <button
+                    onClick={handleSync}
+                    disabled={syncProgress.status === 'syncing'}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncProgress.status === 'syncing' ? 'animate-spin' : ''}`} />
+                    {syncProgress.status === 'syncing' ? 'Syncing...' : 'Sync Now'}
+                  </button>
+
+                  {/* Sync Progress */}
+                  {syncProgress.status !== 'idle' && (
+                    <div className="mt-4">
+                      {syncProgress.status === 'syncing' && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-blue-700">
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">{syncProgress.message}</span>
+                          </div>
+                          {syncProgress.current && syncProgress.total && (
+                            <div className="mt-2">
+                              <div className="w-full bg-blue-200 rounded-full h-2">
+                                <div
+                                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${(syncProgress.current / syncProgress.total) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <p className="text-xs text-blue-600 mt-1">
+                                {syncProgress.current} of {syncProgress.total}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {syncProgress.status === 'success' && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span className="text-sm text-green-700">{syncProgress.message}</span>
+                        </div>
+                      )}
+
+                      {syncProgress.status === 'error' && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                          <XCircle className="w-4 h-4 text-red-600" />
+                          <span className="text-sm text-red-700">{syncProgress.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2">
-                    Sync Information
+                    How It Works
                   </h4>
                   <ul className="text-sm text-blue-700 space-y-1">
                     <li>• Your data is stored locally on this device</li>
-                    <li>• Cloud sync is currently in development</li>
-                    <li>• Auto-sync will be available soon</li>
+                    <li>• Click "Sync Now" to backup to cloud</li>
+                    <li>• Synced data is accessible from other devices</li>
+                    <li>• Conflicts are resolved using latest timestamp</li>
                   </ul>
                 </div>
 

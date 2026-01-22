@@ -149,6 +149,111 @@ ipcMain.handle('db:getProjectStatuses', async (_event, profileId: string) => {
   return databaseService.getProjectStatuses(profileId)
 })
 
+// Transaction CRUD operations
+ipcMain.handle('db:getTransaction', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getTransaction(id)
+})
+
+ipcMain.handle('db:createTransaction', async (_event, transaction: any) => {
+  await databaseServicePromise
+  return databaseService.createTransaction(transaction)
+})
+
+ipcMain.handle('db:updateTransaction', async (_event, id: string, updates: any) => {
+  await databaseServicePromise
+  return databaseService.updateTransaction(id, updates)
+})
+
+ipcMain.handle('db:deleteTransaction', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.deleteTransaction(id)
+})
+
+// Income Source CRUD operations
+ipcMain.handle('db:getIncomeSource', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getIncomeSource(id)
+})
+
+ipcMain.handle('db:createIncomeSource', async (_event, source: any) => {
+  await databaseServicePromise
+  return databaseService.createIncomeSource(source)
+})
+
+ipcMain.handle('db:updateIncomeSource', async (_event, id: string, updates: any) => {
+  await databaseServicePromise
+  return databaseService.updateIncomeSource(id, updates)
+})
+
+ipcMain.handle('db:deleteIncomeSource', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.deleteIncomeSource(id)
+})
+
+// Project CRUD operations
+ipcMain.handle('db:getProject', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProject(id)
+})
+
+ipcMain.handle('db:createProject', async (_event, project: any) => {
+  await databaseServicePromise
+  return databaseService.createProject(project)
+})
+
+ipcMain.handle('db:updateProject', async (_event, id: string, updates: any) => {
+  await databaseServicePromise
+  return databaseService.updateProject(id, updates)
+})
+
+ipcMain.handle('db:deleteProject', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.deleteProject(id)
+})
+
+// Project Type CRUD operations
+ipcMain.handle('db:getProjectType', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectType(id)
+})
+
+ipcMain.handle('db:createProjectType', async (_event, projectType: any) => {
+  await databaseServicePromise
+  return databaseService.createProjectType(projectType)
+})
+
+ipcMain.handle('db:updateProjectType', async (_event, id: string, updates: any) => {
+  await databaseServicePromise
+  return databaseService.updateProjectType(id, updates)
+})
+
+ipcMain.handle('db:deleteProjectType', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.deleteProjectType(id)
+})
+
+// Project Status CRUD operations
+ipcMain.handle('db:getProjectStatus', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectStatus(id)
+})
+
+ipcMain.handle('db:createProjectStatus', async (_event, status: any) => {
+  await databaseServicePromise
+  return databaseService.createProjectStatus(status)
+})
+
+ipcMain.handle('db:updateProjectStatus', async (_event, id: string, updates: any) => {
+  await databaseServicePromise
+  return databaseService.updateProjectStatus(id, updates)
+})
+
+ipcMain.handle('db:deleteProjectStatus', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.deleteProjectStatus(id)
+})
+
 // Initialize database when app is ready
 app.whenReady().then(async () => {
   try {

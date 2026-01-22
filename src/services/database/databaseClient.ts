@@ -200,6 +200,45 @@ class DatabaseClient {
   }
 
   /**
+   * Get a transaction by ID
+   */
+  getTransaction(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getTransaction(id)
+    }
+    return null
+  }
+
+  /**
+   * Create a new transaction
+   */
+  createTransaction(transaction: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createTransaction(transaction)
+    }
+    return null
+  }
+
+  /**
+   * Update a transaction
+   */
+  updateTransaction(id: string, updates: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateTransaction(id, updates)
+    }
+    return null
+  }
+
+  /**
+   * Delete a transaction
+   */
+  deleteTransaction(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.deleteTransaction(id)
+    }
+  }
+
+  /**
    * Get income sources for a profile
    */
   getIncomeSources(profileId: string, budgetType?: string) {
@@ -207,6 +246,45 @@ class DatabaseClient {
       return window.electronAPI.database.getIncomeSources(profileId, budgetType)
     }
     return []
+  }
+
+  /**
+   * Get an income source by ID
+   */
+  getIncomeSource(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getIncomeSource(id)
+    }
+    return null
+  }
+
+  /**
+   * Create a new income source
+   */
+  createIncomeSource(source: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createIncomeSource(source)
+    }
+    return null
+  }
+
+  /**
+   * Update an income source
+   */
+  updateIncomeSource(id: string, updates: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateIncomeSource(id, updates)
+    }
+    return null
+  }
+
+  /**
+   * Delete an income source
+   */
+  deleteIncomeSource(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.deleteIncomeSource(id)
+    }
   }
 
   /**
@@ -220,6 +298,45 @@ class DatabaseClient {
   }
 
   /**
+   * Get a project by ID
+   */
+  getProject(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProject(id)
+    }
+    return null
+  }
+
+  /**
+   * Create a new project
+   */
+  createProject(project: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createProject(project)
+    }
+    return null
+  }
+
+  /**
+   * Update a project
+   */
+  updateProject(id: string, updates: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateProject(id, updates)
+    }
+    return null
+  }
+
+  /**
+   * Delete a project
+   */
+  deleteProject(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.deleteProject(id)
+    }
+  }
+
+  /**
    * Get project types for a profile
    */
   getProjectTypes(profileId: string, budgetType?: string) {
@@ -230,6 +347,45 @@ class DatabaseClient {
   }
 
   /**
+   * Get a project type by ID
+   */
+  getProjectType(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectType(id)
+    }
+    return null
+  }
+
+  /**
+   * Create a new project type
+   */
+  createProjectType(projectType: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createProjectType(projectType)
+    }
+    return null
+  }
+
+  /**
+   * Update a project type
+   */
+  updateProjectType(id: string, updates: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateProjectType(id, updates)
+    }
+    return null
+  }
+
+  /**
+   * Delete a project type
+   */
+  deleteProjectType(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.deleteProjectType(id)
+    }
+  }
+
+  /**
    * Get project statuses for a profile
    */
   getProjectStatuses(profileId: string) {
@@ -237,6 +393,45 @@ class DatabaseClient {
       return window.electronAPI.database.getProjectStatuses(profileId)
     }
     return []
+  }
+
+  /**
+   * Get a project status by ID
+   */
+  getProjectStatus(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectStatus(id)
+    }
+    return null
+  }
+
+  /**
+   * Create a new project status
+   */
+  createProjectStatus(status: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createProjectStatus(status)
+    }
+    return null
+  }
+
+  /**
+   * Update a project status
+   */
+  updateProjectStatus(id: string, updates: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateProjectStatus(id, updates)
+    }
+    return null
+  }
+
+  /**
+   * Delete a project status
+   */
+  deleteProjectStatus(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.deleteProjectStatus(id)
+    }
   }
 }
 

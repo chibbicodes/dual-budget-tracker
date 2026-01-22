@@ -27,10 +27,30 @@ declare global {
         updateCategory: (id: string, updates: any) => Promise<any>
         deleteCategory: (id: string) => Promise<void>
         getTransactions: (profileId: string, options?: any) => Promise<any[]>
+        getTransaction: (id: string) => Promise<any>
+        createTransaction: (transaction: any) => Promise<any>
+        updateTransaction: (id: string, updates: any) => Promise<any>
+        deleteTransaction: (id: string) => Promise<void>
         getIncomeSources: (profileId: string, budgetType?: string) => Promise<any[]>
+        getIncomeSource: (id: string) => Promise<any>
+        createIncomeSource: (source: any) => Promise<any>
+        updateIncomeSource: (id: string, updates: any) => Promise<any>
+        deleteIncomeSource: (id: string) => Promise<void>
         getProjects: (profileId: string, budgetType?: string) => Promise<any[]>
+        getProject: (id: string) => Promise<any>
+        createProject: (project: any) => Promise<any>
+        updateProject: (id: string, updates: any) => Promise<any>
+        deleteProject: (id: string) => Promise<void>
         getProjectTypes: (profileId: string, budgetType?: string) => Promise<any[]>
+        getProjectType: (id: string) => Promise<any>
+        createProjectType: (projectType: any) => Promise<any>
+        updateProjectType: (id: string, updates: any) => Promise<any>
+        deleteProjectType: (id: string) => Promise<void>
         getProjectStatuses: (profileId: string) => Promise<any[]>
+        getProjectStatus: (id: string) => Promise<any>
+        createProjectStatus: (status: any) => Promise<any>
+        updateProjectStatus: (id: string, updates: any) => Promise<any>
+        deleteProjectStatus: (id: string) => Promise<void>
       }
     }
   }

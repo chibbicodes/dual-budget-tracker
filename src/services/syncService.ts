@@ -2,9 +2,7 @@ import { databaseService } from './database/databaseClient'
 import {
   syncRecordToCloud,
   getRecordsFromCloud,
-  deleteRecordFromCloud,
   subscribeToCollection,
-  SyncableRecord,
 } from './firebase/firestore'
 import { getCurrentUser } from './firebase/auth'
 
@@ -320,9 +318,21 @@ class SyncService {
    */
   private async pullAccounts(profileId: string): Promise<void> {
     try {
+      // Verify profile exists locally before pulling accounts
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping account pull`)
+        return
+      }
+
       const cloudAccounts = await getRecordsFromCloud('accounts', profileId)
 
       for (const cloudAccount of cloudAccounts) {
+        // Only sync accounts that belong to this profile
+        if (cloudAccount.profileId !== profileId) {
+          continue
+        }
+
         const localAccount = await databaseService.getAccount(cloudAccount.id)
 
         // Compare timestamps - update if cloud is newer
@@ -347,7 +357,7 @@ class SyncService {
               notes: cloudAccount.notes,
             })
           } else {
-            // Create new
+            // Create new only if profile exists
             await databaseService.createAccount({
               id: cloudAccount.id,
               profile_id: profileId,
@@ -376,9 +386,21 @@ class SyncService {
    */
   private async pullCategories(profileId: string): Promise<void> {
     try {
+      // Verify profile exists locally before pulling categories
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping category pull`)
+        return
+      }
+
       const cloudCategories = await getRecordsFromCloud('categories', profileId)
 
       for (const cloudCategory of cloudCategories) {
+        // Only sync categories that belong to this profile
+        if (cloudCategory.profileId !== profileId) {
+          continue
+        }
+
         const localCategory = await databaseService.getCategory(cloudCategory.id)
 
         // Compare timestamps - update if cloud is newer
@@ -430,6 +452,402 @@ class SyncService {
   }
 
   /**
+   * Pull transactions from cloud and update local database
+   */
+  private async pullTransactions(profileId: string): Promise<void> {
+    try {
+      // Verify profile exists locally before pulling transactions
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping transaction pull`)
+        return
+      }
+
+      const cloudTransactions = await getRecordsFromCloud('transactions', profileId)
+
+      for (const cloudTransaction of cloudTransactions) {
+        // Only sync transactions that belong to this profile
+        if (cloudTransaction.profileId !== profileId) {
+          continue
+        }
+
+        const localTransaction = await databaseService.getTransaction(cloudTransaction.id)
+
+        // Compare timestamps - update if cloud is newer
+        if (
+          !localTransaction ||
+          !localTransaction.updated_at ||
+          !cloudTransaction.updatedAt ||
+          new Date(cloudTransaction.updatedAt) > new Date(localTransaction.updated_at)
+        ) {
+          if (localTransaction) {
+            // Update existing
+            await databaseService.updateTransaction(cloudTransaction.id, {
+              date: cloudTransaction.date,
+              description: cloudTransaction.description,
+              amount: cloudTransaction.amount,
+              category_id: cloudTransaction.categoryId,
+              bucket_id: cloudTransaction.bucketId,
+              budget_type: cloudTransaction.budgetType,
+              account_id: cloudTransaction.accountId,
+              to_account_id: cloudTransaction.toAccountId,
+              linked_transaction_id: cloudTransaction.linkedTransactionId,
+              project_id: cloudTransaction.projectId,
+              income_source_id: cloudTransaction.incomeSourceId,
+              tax_deductible: cloudTransaction.taxDeductible,
+              reconciled: cloudTransaction.reconciled,
+              notes: cloudTransaction.notes,
+            })
+          } else {
+            // Create new
+            await databaseService.createTransaction({
+              id: cloudTransaction.id,
+              profile_id: profileId,
+              date: cloudTransaction.date,
+              description: cloudTransaction.description,
+              amount: cloudTransaction.amount,
+              category_id: cloudTransaction.categoryId,
+              bucket_id: cloudTransaction.bucketId,
+              budget_type: cloudTransaction.budgetType,
+              account_id: cloudTransaction.accountId,
+              to_account_id: cloudTransaction.toAccountId,
+              linked_transaction_id: cloudTransaction.linkedTransactionId,
+              project_id: cloudTransaction.projectId,
+              income_source_id: cloudTransaction.incomeSourceId,
+              tax_deductible: cloudTransaction.taxDeductible,
+              reconciled: cloudTransaction.reconciled,
+              notes: cloudTransaction.notes,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull transactions:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull income sources from cloud and update local database
+   */
+  private async pullIncomeSources(profileId: string): Promise<void> {
+    try {
+      // Verify profile exists locally before pulling income sources
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping income source pull`)
+        return
+      }
+
+      const cloudIncomeSources = await getRecordsFromCloud('incomeSources', profileId)
+
+      for (const cloudIncomeSource of cloudIncomeSources) {
+        // Only sync income sources that belong to this profile
+        if (cloudIncomeSource.profileId !== profileId) {
+          continue
+        }
+
+        const localIncomeSource = await databaseService.getIncomeSource(cloudIncomeSource.id)
+
+        // Compare timestamps - update if cloud is newer
+        if (
+          !localIncomeSource ||
+          !localIncomeSource.updated_at ||
+          !cloudIncomeSource.updatedAt ||
+          new Date(cloudIncomeSource.updatedAt) > new Date(localIncomeSource.updated_at)
+        ) {
+          if (localIncomeSource) {
+            // Update existing
+            await databaseService.updateIncomeSource(cloudIncomeSource.id, {
+              name: cloudIncomeSource.name,
+              budget_type: cloudIncomeSource.budgetType,
+              income_type: cloudIncomeSource.incomeType,
+              category_id: cloudIncomeSource.categoryId,
+              expected_amount: cloudIncomeSource.expectedAmount,
+              frequency: cloudIncomeSource.frequency,
+              next_expected_date: cloudIncomeSource.nextExpectedDate,
+              client_source: cloudIncomeSource.clientSource,
+              is_active: cloudIncomeSource.isActive,
+            })
+          } else {
+            // Create new
+            await databaseService.createIncomeSource({
+              id: cloudIncomeSource.id,
+              profile_id: profileId,
+              name: cloudIncomeSource.name,
+              budget_type: cloudIncomeSource.budgetType,
+              income_type: cloudIncomeSource.incomeType,
+              category_id: cloudIncomeSource.categoryId,
+              expected_amount: cloudIncomeSource.expectedAmount,
+              frequency: cloudIncomeSource.frequency,
+              next_expected_date: cloudIncomeSource.nextExpectedDate,
+              client_source: cloudIncomeSource.clientSource,
+              is_active: cloudIncomeSource.isActive,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull income sources:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull projects from cloud and update local database
+   */
+  private async pullProjects(profileId: string): Promise<void> {
+    try {
+      // Verify profile exists locally before pulling projects
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping project pull`)
+        return
+      }
+
+      const cloudProjects = await getRecordsFromCloud('projects', profileId)
+
+      for (const cloudProject of cloudProjects) {
+        // Only sync projects that belong to this profile
+        if (cloudProject.profileId !== profileId) {
+          continue
+        }
+
+        const localProject = await databaseService.getProject(cloudProject.id)
+
+        // Compare timestamps - update if cloud is newer
+        if (
+          !localProject ||
+          !localProject.updated_at ||
+          !cloudProject.updatedAt ||
+          new Date(cloudProject.updatedAt) > new Date(localProject.updated_at)
+        ) {
+          if (localProject) {
+            // Update existing
+            await databaseService.updateProject(cloudProject.id, {
+              name: cloudProject.name,
+              budget_type: cloudProject.budgetType,
+              project_type_id: cloudProject.projectTypeId,
+              status_id: cloudProject.statusId,
+              income_source_id: cloudProject.incomeSourceId,
+              budget: cloudProject.budget,
+              date_created: cloudProject.dateCreated,
+              date_completed: cloudProject.dateCompleted,
+              commission_paid: cloudProject.commissionPaid,
+              notes: cloudProject.notes,
+            })
+          } else {
+            // Create new
+            await databaseService.createProject({
+              id: cloudProject.id,
+              profile_id: profileId,
+              name: cloudProject.name,
+              budget_type: cloudProject.budgetType,
+              project_type_id: cloudProject.projectTypeId,
+              status_id: cloudProject.statusId,
+              income_source_id: cloudProject.incomeSourceId,
+              budget: cloudProject.budget,
+              date_created: cloudProject.dateCreated,
+              date_completed: cloudProject.dateCompleted,
+              commission_paid: cloudProject.commissionPaid,
+              notes: cloudProject.notes,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull projects:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull project types from cloud and update local database
+   */
+  private async pullProjectTypes(profileId: string): Promise<void> {
+    try {
+      // Verify profile exists locally before pulling project types
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping project type pull`)
+        return
+      }
+
+      const cloudProjectTypes = await getRecordsFromCloud('projectTypes', profileId)
+
+      for (const cloudProjectType of cloudProjectTypes) {
+        // Only sync project types that belong to this profile
+        if (cloudProjectType.profileId !== profileId) {
+          continue
+        }
+
+        const localProjectType = await databaseService.getProjectType(cloudProjectType.id)
+
+        // Compare timestamps - update if cloud is newer
+        if (
+          !localProjectType ||
+          !localProjectType.updated_at ||
+          !cloudProjectType.updatedAt ||
+          new Date(cloudProjectType.updatedAt) > new Date(localProjectType.updated_at)
+        ) {
+          if (localProjectType) {
+            // Update existing
+            await databaseService.updateProjectType(cloudProjectType.id, {
+              name: cloudProjectType.name,
+              budget_type: cloudProjectType.budgetType,
+              allowed_statuses: cloudProjectType.allowedStatuses,
+            })
+          } else {
+            // Create new
+            await databaseService.createProjectType({
+              id: cloudProjectType.id,
+              profile_id: profileId,
+              name: cloudProjectType.name,
+              budget_type: cloudProjectType.budgetType,
+              allowed_statuses: cloudProjectType.allowedStatuses,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull project types:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull project statuses from cloud and update local database
+   */
+  private async pullProjectStatuses(profileId: string): Promise<void> {
+    try {
+      // Verify profile exists locally before pulling project statuses
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping project status pull`)
+        return
+      }
+
+      const cloudProjectStatuses = await getRecordsFromCloud('projectStatuses', profileId)
+
+      for (const cloudProjectStatus of cloudProjectStatuses) {
+        // Only sync project statuses that belong to this profile
+        if (cloudProjectStatus.profileId !== profileId) {
+          continue
+        }
+
+        const localProjectStatus = await databaseService.getProjectStatus(cloudProjectStatus.id)
+
+        // Compare timestamps - update if cloud is newer
+        if (
+          !localProjectStatus ||
+          !localProjectStatus.updated_at ||
+          !cloudProjectStatus.updatedAt ||
+          new Date(cloudProjectStatus.updatedAt) > new Date(localProjectStatus.updated_at)
+        ) {
+          if (localProjectStatus) {
+            // Update existing
+            await databaseService.updateProjectStatus(cloudProjectStatus.id, {
+              name: cloudProjectStatus.name,
+              description: cloudProjectStatus.description,
+            })
+          } else {
+            // Create new
+            await databaseService.createProjectStatus({
+              id: cloudProjectStatus.id,
+              profile_id: profileId,
+              name: cloudProjectStatus.name,
+              description: cloudProjectStatus.description,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull project statuses:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Clean up orphaned data from deleted profiles
+   * This removes any accounts, categories, transactions, etc. that belong to profiles that no longer exist
+   */
+  private async cleanupOrphanedData(): Promise<void> {
+    try {
+      // Get all existing profiles
+      const profiles = await databaseService.getAllProfiles()
+      const validProfileIds = new Set(profiles.map((p: any) => p.id))
+
+      // Get all accounts and delete those with invalid profile_id
+      const allAccounts = await databaseService.getAccounts('')
+      for (const account of allAccounts as any[]) {
+        if (!validProfileIds.has(account.profile_id)) {
+          console.log(`Deleting orphaned account: ${account.id} (profile: ${account.profile_id})`)
+          await databaseService.deleteAccount(account.id)
+        }
+      }
+
+      // Get all categories and delete those with invalid profile_id
+      const allCategories = await databaseService.getCategories('')
+      for (const category of allCategories as any[]) {
+        if (!validProfileIds.has(category.profile_id)) {
+          console.log(`Deleting orphaned category: ${category.id} (profile: ${category.profile_id})`)
+          await databaseService.deleteCategory(category.id)
+        }
+      }
+
+      // Get all transactions and delete those with invalid profile_id
+      const allTransactions = await databaseService.getTransactions('')
+      for (const transaction of allTransactions as any[]) {
+        if (!validProfileIds.has(transaction.profile_id)) {
+          console.log(`Deleting orphaned transaction: ${transaction.id} (profile: ${transaction.profile_id})`)
+          await databaseService.deleteTransaction(transaction.id)
+        }
+      }
+
+      // Get all income sources and delete those with invalid profile_id
+      const allIncomeSources = await databaseService.getIncomeSources('')
+      for (const source of allIncomeSources as any[]) {
+        if (!validProfileIds.has(source.profile_id)) {
+          console.log(`Deleting orphaned income source: ${source.id} (profile: ${source.profile_id})`)
+          await databaseService.deleteIncomeSource(source.id)
+        }
+      }
+
+      // Get all projects and delete those with invalid profile_id
+      const allProjects = await databaseService.getProjects('')
+      for (const project of allProjects as any[]) {
+        if (!validProfileIds.has(project.profile_id)) {
+          console.log(`Deleting orphaned project: ${project.id} (profile: ${project.profile_id})`)
+          await databaseService.deleteProject(project.id)
+        }
+      }
+
+      // Get all project types and delete those with invalid profile_id
+      const allProjectTypes = await databaseService.getProjectTypes('')
+      for (const type of allProjectTypes as any[]) {
+        if (!validProfileIds.has(type.profile_id)) {
+          console.log(`Deleting orphaned project type: ${type.id} (profile: ${type.profile_id})`)
+          await databaseService.deleteProjectType(type.id)
+        }
+      }
+
+      // Get all project statuses and delete those with invalid profile_id
+      const allProjectStatuses = await databaseService.getProjectStatuses('')
+      for (const status of allProjectStatuses as any[]) {
+        if (!validProfileIds.has(status.profile_id)) {
+          console.log(`Deleting orphaned project status: ${status.id} (profile: ${status.profile_id})`)
+          await databaseService.deleteProjectStatus(status.id)
+        }
+      }
+
+      console.log('Cleanup of orphaned data completed')
+    } catch (error) {
+      console.error('Failed to cleanup orphaned data:', error)
+      // Don't throw - allow sync to continue
+    }
+  }
+
+  /**
    * Perform full sync for a profile
    */
   async syncProfile(profileId: string): Promise<void> {
@@ -446,6 +864,10 @@ class SyncService {
 
     try {
       this.notifyProgress({ status: 'syncing', message: 'Starting sync...' })
+
+      // Clean up any orphaned data from deleted profiles
+      this.notifyProgress({ status: 'syncing', message: 'Cleaning up orphaned data...' })
+      await this.cleanupOrphanedData()
 
       const totalSteps = 16 // 8 push + 8 pull
 
@@ -538,6 +960,46 @@ class SyncService {
         total: totalSteps,
       })
       await this.pullCategories(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling transactions...',
+        current: 12,
+        total: totalSteps,
+      })
+      await this.pullTransactions(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling income sources...',
+        current: 13,
+        total: totalSteps,
+      })
+      await this.pullIncomeSources(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling projects...',
+        current: 14,
+        total: totalSteps,
+      })
+      await this.pullProjects(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling project types...',
+        current: 15,
+        total: totalSteps,
+      })
+      await this.pullProjectTypes(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling project statuses...',
+        current: 16,
+        total: totalSteps,
+      })
+      await this.pullProjectStatuses(profileId)
 
       // Store last synced timestamp
       localStorage.setItem('lastSyncedAt', new Date().toISOString())

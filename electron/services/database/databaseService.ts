@@ -694,6 +694,15 @@ class DatabaseService {
   }
 
   /**
+   * Get all transactions for a profile including soft-deleted (for sync)
+   */
+  getTransactionsForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM transactions WHERE profile_id = ?')
+    return stmt.all(profileId)
+  }
+
+  /**
    * Get a transaction by ID (excluding soft-deleted)
    */
   getTransaction(id: string) {
@@ -820,6 +829,15 @@ class DatabaseService {
   }
 
   /**
+   * Get all income sources for a profile including soft-deleted (for sync)
+   */
+  getIncomeSourcesForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM income_sources WHERE profile_id = ?')
+    return stmt.all(profileId)
+  }
+
+  /**
    * Create an income source
    */
   createIncomeSource(source: any) {
@@ -920,6 +938,15 @@ class DatabaseService {
 
     const stmt = db.prepare(query)
     return stmt.all(...params)
+  }
+
+  /**
+   * Get all projects for a profile including soft-deleted (for sync)
+   */
+  getProjectsForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM projects WHERE profile_id = ?')
+    return stmt.all(profileId)
   }
 
   /**
@@ -1033,6 +1060,23 @@ class DatabaseService {
   }
 
   /**
+   * Get all project types for a profile including soft-deleted (for sync)
+   */
+  getProjectTypesForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM project_types WHERE profile_id = ?')
+    const results: any[] = stmt.all(profileId)
+
+    // Parse allowed_statuses JSON for each result
+    return results.map(result => {
+      if (result.allowed_statuses) {
+        result.allowed_statuses = JSON.parse(result.allowed_statuses)
+      }
+      return result
+    })
+  }
+
+  /**
    * Create a project type
    */
   createProjectType(projectType: any) {
@@ -1124,6 +1168,15 @@ class DatabaseService {
   getProjectStatuses(profileId: string) {
     const db = this.getDb()
     const stmt = db.prepare('SELECT * FROM project_statuses WHERE profile_id = ? AND deleted_at IS NULL')
+    return stmt.all(profileId)
+  }
+
+  /**
+   * Get all project statuses for a profile including soft-deleted (for sync)
+   */
+  getProjectStatusesForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM project_statuses WHERE profile_id = ?')
     return stmt.all(profileId)
   }
 

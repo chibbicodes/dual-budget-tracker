@@ -169,9 +169,19 @@ ipcMain.handle('db:getTransactions', async (_event, profileId: string, options?:
   return databaseService.getTransactions(profileId, options)
 })
 
+ipcMain.handle('db:getTransactionsForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getTransactionsForSync(profileId)
+})
+
 ipcMain.handle('db:getIncomeSources', async (_event, profileId: string, budgetType?: string) => {
   await databaseServicePromise
   return databaseService.getIncomeSources(profileId, budgetType)
+})
+
+ipcMain.handle('db:getIncomeSourcesForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getIncomeSourcesForSync(profileId)
 })
 
 ipcMain.handle('db:getProjects', async (_event, profileId: string, budgetType?: string) => {
@@ -179,14 +189,29 @@ ipcMain.handle('db:getProjects', async (_event, profileId: string, budgetType?: 
   return databaseService.getProjects(profileId, budgetType)
 })
 
+ipcMain.handle('db:getProjectsForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectsForSync(profileId)
+})
+
 ipcMain.handle('db:getProjectTypes', async (_event, profileId: string, budgetType?: string) => {
   await databaseServicePromise
   return databaseService.getProjectTypes(profileId, budgetType)
 })
 
+ipcMain.handle('db:getProjectTypesForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectTypesForSync(profileId)
+})
+
 ipcMain.handle('db:getProjectStatuses', async (_event, profileId: string) => {
   await databaseServicePromise
   return databaseService.getProjectStatuses(profileId)
+})
+
+ipcMain.handle('db:getProjectStatusesForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectStatusesForSync(profileId)
 })
 
 // Transaction CRUD operations

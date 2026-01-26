@@ -148,7 +148,7 @@ class SyncService {
    */
   private async syncTransactions(profileId: string): Promise<void> {
     try {
-      const transactions = await databaseService.getTransactions(profileId)
+      const transactions = await databaseService.getTransactionsForSync(profileId)
 
       for (const transaction of transactions) {
         await syncRecordToCloud('transactions', {
@@ -170,6 +170,7 @@ class SyncService {
           notes: transaction.notes,
           createdAt: transaction.created_at,
           updatedAt: transaction.updated_at,
+          deletedAt: transaction.deleted_at || null,
         })
       }
     } catch (error) {
@@ -183,7 +184,7 @@ class SyncService {
    */
   private async syncIncomeSources(profileId: string): Promise<void> {
     try {
-      const incomeSources = await databaseService.getIncomeSources(profileId)
+      const incomeSources = await databaseService.getIncomeSourcesForSync(profileId)
 
       for (const source of incomeSources) {
         await syncRecordToCloud('incomeSources', {
@@ -200,6 +201,7 @@ class SyncService {
           isActive: source.is_active,
           createdAt: source.created_at,
           updatedAt: source.updated_at,
+          deletedAt: source.deleted_at || null,
         })
       }
     } catch (error) {
@@ -213,7 +215,7 @@ class SyncService {
    */
   private async syncProjects(profileId: string): Promise<void> {
     try {
-      const projects = await databaseService.getProjects(profileId)
+      const projects = await databaseService.getProjectsForSync(profileId)
 
       for (const project of projects) {
         await syncRecordToCloud('projects', {
@@ -231,6 +233,7 @@ class SyncService {
           notes: project.notes,
           createdAt: project.created_at,
           updatedAt: project.updated_at,
+          deletedAt: project.deleted_at || null,
         })
       }
     } catch (error) {
@@ -244,7 +247,7 @@ class SyncService {
    */
   private async syncProjectTypes(profileId: string): Promise<void> {
     try {
-      const projectTypes = await databaseService.getProjectTypes(profileId)
+      const projectTypes = await databaseService.getProjectTypesForSync(profileId)
 
       for (const type of projectTypes) {
         await syncRecordToCloud('projectTypes', {
@@ -255,6 +258,7 @@ class SyncService {
           allowedStatuses: type.allowed_statuses,
           createdAt: type.created_at,
           updatedAt: type.updated_at,
+          deletedAt: type.deleted_at || null,
         })
       }
     } catch (error) {
@@ -268,7 +272,7 @@ class SyncService {
    */
   private async syncProjectStatuses(profileId: string): Promise<void> {
     try {
-      const projectStatuses = await databaseService.getProjectStatuses(profileId)
+      const projectStatuses = await databaseService.getProjectStatusesForSync(profileId)
 
       for (const status of projectStatuses) {
         await syncRecordToCloud('projectStatuses', {
@@ -278,6 +282,7 @@ class SyncService {
           description: status.description,
           createdAt: status.created_at,
           updatedAt: status.updated_at,
+          deletedAt: status.deleted_at || null,
         })
       }
     } catch (error) {

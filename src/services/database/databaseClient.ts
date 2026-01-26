@@ -276,6 +276,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get all transactions for a profile including soft-deleted (for sync)
+   */
+  getTransactionsForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getTransactionsForSync(profileId)
+    }
+    return []
+  }
+
+  /**
    * Get a transaction by ID
    */
   getTransaction(id: string) {
@@ -320,6 +330,16 @@ class DatabaseClient {
   getIncomeSources(profileId: string, budgetType?: string) {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.getIncomeSources(profileId, budgetType)
+    }
+    return []
+  }
+
+  /**
+   * Get all income sources for a profile including soft-deleted (for sync)
+   */
+  getIncomeSourcesForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getIncomeSourcesForSync(profileId)
     }
     return []
   }
@@ -374,6 +394,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get all projects for a profile including soft-deleted (for sync)
+   */
+  getProjectsForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectsForSync(profileId)
+    }
+    return []
+  }
+
+  /**
    * Get a project by ID
    */
   getProject(id: string) {
@@ -423,6 +453,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get all project types for a profile including soft-deleted (for sync)
+   */
+  getProjectTypesForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectTypesForSync(profileId)
+    }
+    return []
+  }
+
+  /**
    * Get a project type by ID
    */
   getProjectType(id: string) {
@@ -467,6 +507,16 @@ class DatabaseClient {
   getProjectStatuses(profileId: string) {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.getProjectStatuses(profileId)
+    }
+    return []
+  }
+
+  /**
+   * Get all project statuses for a profile including soft-deleted (for sync)
+   */
+  getProjectStatusesForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectStatusesForSync(profileId)
     }
     return []
   }

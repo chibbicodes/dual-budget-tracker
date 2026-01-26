@@ -264,6 +264,15 @@ class DatabaseService {
   }
 
   /**
+   * Get all accounts for a profile including soft-deleted (for sync)
+   */
+  getAccountsForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM accounts WHERE profile_id = ?')
+    return stmt.all(profileId)
+  }
+
+  /**
    * Get an account by ID (excluding soft-deleted)
    */
   getAccount(id: string) {
@@ -359,6 +368,77 @@ class DatabaseService {
     stmt.run(now, now, id)
   }
 
+  /**
+   * Get account by ID including soft-deleted (for sync)
+   */
+  getAccountForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM accounts WHERE id = ?')
+    return stmt.get(id)
+  }
+
+  /**
+   * Update account including deleted_at (for sync)
+   */
+  updateAccountForSync(id: string, data: any) {
+    const db = this.getDb()
+    const stmt = db.prepare(`
+      UPDATE accounts
+      SET name = ?, budget_type = ?, account_type = ?, balance = ?,
+          interest_rate = ?, credit_limit = ?, payment_due_date = ?,
+          minimum_payment = ?, website_url = ?, notes = ?,
+          deleted_at = ?, updated_at = ?
+      WHERE id = ?
+    `)
+    stmt.run(
+      data.name,
+      data.budgetType,
+      data.accountType,
+      data.balance,
+      data.interestRate,
+      data.creditLimit,
+      data.paymentDueDate,
+      data.minimumPayment,
+      data.websiteUrl,
+      data.notes,
+      data.deletedAt || null,
+      data.updatedAt,
+      id
+    )
+  }
+
+  /**
+   * Create account with deleted_at (for sync)
+   */
+  createAccountForSync(account: any) {
+    const db = this.getDb()
+    const stmt = db.prepare(`
+      INSERT INTO accounts (
+        id, profile_id, name, budget_type, account_type, balance,
+        interest_rate, credit_limit, payment_due_date, minimum_payment,
+        website_url, notes, deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const now = new Date().toISOString()
+    stmt.run(
+      account.id,
+      account.profileId,
+      account.name,
+      account.budgetType,
+      account.accountType,
+      account.balance,
+      account.interestRate,
+      account.creditLimit,
+      account.paymentDueDate,
+      account.minimumPayment,
+      account.websiteUrl,
+      account.notes,
+      account.deletedAt || null,
+      account.createdAt || now,
+      account.updatedAt || now
+    )
+  }
+
   // ==================== Category Operations ====================
 
   /**
@@ -378,6 +458,15 @@ class DatabaseService {
 
     const stmt = db.prepare(query)
     return stmt.all(...params)
+  }
+
+  /**
+   * Get all categories for a profile including soft-deleted (for sync)
+   */
+  getCategoriesForSync(profileId: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM categories WHERE profile_id = ?')
+    return stmt.all(profileId)
   }
 
   /**
@@ -476,6 +565,79 @@ class DatabaseService {
     const stmt = db.prepare('UPDATE categories SET deleted_at = ?, updated_at = ? WHERE id = ?')
     const now = new Date().toISOString()
     stmt.run(now, now, id)
+  }
+
+  /**
+   * Get category by ID including soft-deleted (for sync)
+   */
+  getCategoryForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM categories WHERE id = ?')
+    return stmt.get(id)
+  }
+
+  /**
+   * Update category including deleted_at (for sync)
+   */
+  updateCategoryForSync(id: string, data: any) {
+    const db = this.getDb()
+    const stmt = db.prepare(`
+      UPDATE categories
+      SET name = ?, budget_type = ?, bucket_id = ?, category_group = ?,
+          monthly_budget = ?, is_fixed_expense = ?, is_active = ?,
+          tax_deductible_by_default = ?, is_income_category = ?,
+          exclude_from_budget = ?, icon = ?, deleted_at = ?, updated_at = ?
+      WHERE id = ?
+    `)
+    stmt.run(
+      data.name,
+      data.budgetType,
+      data.bucketId,
+      data.categoryGroup,
+      data.monthlyBudget,
+      data.isFixedExpense,
+      data.isActive,
+      data.taxDeductibleByDefault,
+      data.isIncomeCategory,
+      data.excludeFromBudget,
+      data.icon,
+      data.deletedAt || null,
+      data.updatedAt,
+      id
+    )
+  }
+
+  /**
+   * Create category with deleted_at (for sync)
+   */
+  createCategoryForSync(category: any) {
+    const db = this.getDb()
+    const stmt = db.prepare(`
+      INSERT INTO categories (
+        id, profile_id, name, budget_type, bucket_id, category_group,
+        monthly_budget, is_fixed_expense, is_active, tax_deductible_by_default,
+        is_income_category, exclude_from_budget, icon, deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const now = new Date().toISOString()
+    stmt.run(
+      category.id,
+      category.profileId,
+      category.name,
+      category.budgetType,
+      category.bucketId,
+      category.categoryGroup,
+      category.monthlyBudget,
+      category.isFixedExpense,
+      category.isActive,
+      category.taxDeductibleByDefault,
+      category.isIncomeCategory,
+      category.excludeFromBudget,
+      category.icon,
+      category.deletedAt || null,
+      category.createdAt || now,
+      category.updatedAt || now
+    )
   }
 
   // ==================== Transaction Operations ====================

@@ -102,6 +102,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get all accounts for a profile including soft-deleted (for sync)
+   */
+  getAccountsForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getAccountsForSync(profileId)
+    }
+    return []
+  }
+
+  /**
    * Get an account by ID
    */
   getAccount(id: string) {
@@ -141,11 +151,49 @@ class DatabaseClient {
   }
 
   /**
+   * Get account by ID including soft-deleted (for sync)
+   */
+  getAccountForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getAccountForSync(id)
+    }
+    return null
+  }
+
+  /**
+   * Update account including deleted_at (for sync)
+   */
+  updateAccountForSync(id: string, data: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateAccountForSync(id, data)
+    }
+  }
+
+  /**
+   * Create account with deleted_at (for sync)
+   */
+  createAccountForSync(account: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createAccountForSync(account)
+    }
+  }
+
+  /**
    * Get all categories for a profile
    */
   getCategories(profileId: string, budgetType?: string) {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.getCategories(profileId, budgetType)
+    }
+    return []
+  }
+
+  /**
+   * Get all categories for a profile including soft-deleted (for sync)
+   */
+  getCategoriesForSync(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getCategoriesForSync(profileId)
     }
     return []
   }
@@ -186,6 +234,34 @@ class DatabaseClient {
   deleteCategory(id: string) {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.deleteCategory(id)
+    }
+  }
+
+  /**
+   * Get category by ID including soft-deleted (for sync)
+   */
+  getCategoryForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getCategoryForSync(id)
+    }
+    return null
+  }
+
+  /**
+   * Update category including deleted_at (for sync)
+   */
+  updateCategoryForSync(id: string, data: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.updateCategoryForSync(id, data)
+    }
+  }
+
+  /**
+   * Create category with deleted_at (for sync)
+   */
+  createCategoryForSync(category: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.createCategoryForSync(category)
     }
   }
 

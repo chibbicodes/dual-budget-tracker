@@ -82,14 +82,7 @@ class SyncService {
   private async syncAccounts(profileId: string): Promise<void> {
     try {
       // Get ALL accounts including soft-deleted ones for sync
-      const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
-      if (!db) {
-        console.error('Cannot access database for soft delete sync')
-        return
-      }
-
-      const stmt = db.prepare('SELECT * FROM accounts WHERE profile_id = ?')
-      const accounts = stmt.all(profileId)
+      const accounts = await databaseService.getAccountsForSync(profileId)
 
       for (const account of accounts) {
         await syncRecordToCloud('accounts', {
@@ -122,14 +115,7 @@ class SyncService {
   private async syncCategories(profileId: string): Promise<void> {
     try {
       // Get ALL categories including soft-deleted ones for sync
-      const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
-      if (!db) {
-        console.error('Cannot access database for soft delete sync')
-        return
-      }
-
-      const stmt = db.prepare('SELECT * FROM categories WHERE profile_id = ?')
-      const categories = stmt.all(profileId)
+      const categories = await databaseService.getCategoriesForSync(profileId)
 
       for (const category of categories) {
         await syncRecordToCloud('categories', {
@@ -360,62 +346,44 @@ class SyncService {
           !cloudAccount.updatedAt ||
           new Date(cloudAccount.updatedAt) > new Date(localAccount.updated_at)
         ) {
-          // Need to handle soft deletes - get the record even if soft-deleted locally
-          const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
-          const localAccountQuery = db?.prepare('SELECT * FROM accounts WHERE id = ?').get(cloudAccount.id)
+          // Check if account exists (including soft-deleted)
+          const existingAccount = await databaseService.getAccountForSync(cloudAccount.id)
 
-          if (localAccountQuery) {
-            // Update existing - use raw SQL to update deleted_at
-            const stmt = db.prepare(`
-              UPDATE accounts
-              SET name = ?, budget_type = ?, account_type = ?, balance = ?,
-                  interest_rate = ?, credit_limit = ?, payment_due_date = ?,
-                  minimum_payment = ?, website_url = ?, notes = ?,
-                  deleted_at = ?, updated_at = ?
-              WHERE id = ?
-            `)
-            stmt.run(
-              cloudAccount.name,
-              cloudAccount.budgetType,
-              cloudAccount.accountType,
-              cloudAccount.balance,
-              cloudAccount.interestRate,
-              cloudAccount.creditLimit,
-              cloudAccount.paymentDueDate,
-              cloudAccount.minimumPayment,
-              cloudAccount.websiteUrl,
-              cloudAccount.notes,
-              cloudAccount.deletedAt || null,
-              cloudAccount.updatedAt,
-              cloudAccount.id
-            )
+          if (existingAccount) {
+            // Update existing account including deleted_at field
+            await databaseService.updateAccountForSync(cloudAccount.id, {
+              name: cloudAccount.name,
+              budgetType: cloudAccount.budgetType,
+              accountType: cloudAccount.accountType,
+              balance: cloudAccount.balance,
+              interestRate: cloudAccount.interestRate,
+              creditLimit: cloudAccount.creditLimit,
+              paymentDueDate: cloudAccount.paymentDueDate,
+              minimumPayment: cloudAccount.minimumPayment,
+              websiteUrl: cloudAccount.websiteUrl,
+              notes: cloudAccount.notes,
+              deletedAt: cloudAccount.deletedAt || null,
+              updatedAt: cloudAccount.updatedAt,
+            })
           } else {
-            // Create new only if profile exists
-            const stmt = db.prepare(`
-              INSERT INTO accounts (
-                id, profile_id, name, budget_type, account_type, balance,
-                interest_rate, credit_limit, payment_due_date, minimum_payment,
-                website_url, notes, deleted_at, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `)
-            const now = new Date().toISOString()
-            stmt.run(
-              cloudAccount.id,
-              profileId,
-              cloudAccount.name,
-              cloudAccount.budgetType,
-              cloudAccount.accountType,
-              cloudAccount.balance,
-              cloudAccount.interestRate,
-              cloudAccount.creditLimit,
-              cloudAccount.paymentDueDate,
-              cloudAccount.minimumPayment,
-              cloudAccount.websiteUrl,
-              cloudAccount.notes,
-              cloudAccount.deletedAt || null,
-              cloudAccount.createdAt || now,
-              cloudAccount.updatedAt || now
-            )
+            // Create new account
+            await databaseService.createAccountForSync({
+              id: cloudAccount.id,
+              profileId: profileId,
+              name: cloudAccount.name,
+              budgetType: cloudAccount.budgetType,
+              accountType: cloudAccount.accountType,
+              balance: cloudAccount.balance,
+              interestRate: cloudAccount.interestRate,
+              creditLimit: cloudAccount.creditLimit,
+              paymentDueDate: cloudAccount.paymentDueDate,
+              minimumPayment: cloudAccount.minimumPayment,
+              websiteUrl: cloudAccount.websiteUrl,
+              notes: cloudAccount.notes,
+              deletedAt: cloudAccount.deletedAt || null,
+              createdAt: cloudAccount.createdAt,
+              updatedAt: cloudAccount.updatedAt,
+            })
           }
         }
       }

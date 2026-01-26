@@ -79,6 +79,11 @@ ipcMain.handle('db:getAccounts', async (_event, profileId: string, budgetType?: 
   return databaseService.getAccounts(profileId, budgetType)
 })
 
+ipcMain.handle('db:getAccountsForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getAccountsForSync(profileId)
+})
+
 ipcMain.handle('db:getAccount', async (_event, id: string) => {
   await databaseServicePromise
   return databaseService.getAccount(id)
@@ -99,9 +104,29 @@ ipcMain.handle('db:deleteAccount', async (_event, id: string) => {
   return databaseService.deleteAccount(id)
 })
 
+ipcMain.handle('db:getAccountForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getAccountForSync(id)
+})
+
+ipcMain.handle('db:updateAccountForSync', async (_event, id: string, data: any) => {
+  await databaseServicePromise
+  return databaseService.updateAccountForSync(id, data)
+})
+
+ipcMain.handle('db:createAccountForSync', async (_event, account: any) => {
+  await databaseServicePromise
+  return databaseService.createAccountForSync(account)
+})
+
 ipcMain.handle('db:getCategories', async (_event, profileId: string, budgetType?: string) => {
   await databaseServicePromise
   return databaseService.getCategories(profileId, budgetType)
+})
+
+ipcMain.handle('db:getCategoriesForSync', async (_event, profileId: string) => {
+  await databaseServicePromise
+  return databaseService.getCategoriesForSync(profileId)
 })
 
 ipcMain.handle('db:getCategory', async (_event, id: string) => {
@@ -122,6 +147,21 @@ ipcMain.handle('db:updateCategory', async (_event, id: string, updates: any) => 
 ipcMain.handle('db:deleteCategory', async (_event, id: string) => {
   await databaseServicePromise
   return databaseService.deleteCategory(id)
+})
+
+ipcMain.handle('db:getCategoryForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getCategoryForSync(id)
+})
+
+ipcMain.handle('db:updateCategoryForSync', async (_event, id: string, data: any) => {
+  await databaseServicePromise
+  return databaseService.updateCategoryForSync(id, data)
+})
+
+ipcMain.handle('db:createCategoryForSync', async (_event, category: any) => {
+  await databaseServicePromise
+  return databaseService.createCategoryForSync(category)
 })
 
 ipcMain.handle('db:getTransactions', async (_event, profileId: string, options?: any) => {

@@ -20,6 +20,17 @@ import StorageService from '../services/storage'
 import ProfileService from '../services/profileService'
 import { databaseService } from '../services/database/databaseClient'
 import { generateDefaultCategories } from '../data/defaultCategories'
+import { syncService } from '../services/syncService'
+import {
+  convertDbAccount,
+  convertDbTransaction,
+  convertDbCategory,
+  convertDbIncomeSource,
+  convertDbProject,
+  convertDbProjectType,
+  convertDbProjectStatus,
+  convertDbSettings,
+} from '../services/dataConverters'
 
 const BudgetContext = createContext<BudgetContextState | null>(null)
 
@@ -47,9 +58,47 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
         if (activeProfile) {
           setActiveProfileId(activeProfile.id)
-          const stored = await ProfileService.loadProfileData(activeProfile.id)
-          if (stored) {
-            setAppDataState(stored)
+
+          // First, try to sync from Firestore if authenticated
+          try {
+            await syncService.syncProfile(activeProfile.id)
+            console.log('Synced from Firestore on app load')
+          } catch (error) {
+            console.log('No cloud sync available or sync failed, loading from local database only')
+          }
+
+          // Load data from database with proper conversion
+          const settings = await databaseService.getSettings(activeProfile.id)
+          const accounts = await databaseService.getAccounts(activeProfile.id)
+          const categories = await databaseService.getCategories(activeProfile.id)
+          const transactions = await databaseService.getTransactions(activeProfile.id)
+          const incomeSources = await databaseService.getIncomeSources(activeProfile.id)
+          const projects = await databaseService.getProjects(activeProfile.id)
+          const projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+          const projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+
+          // Convert database records to AppData format
+          const appData: AppData = {
+            settings: settings ? convertDbSettings(settings) : StorageService.getDefaultData().settings,
+            accounts: (accounts || []).map(convertDbAccount),
+            transactions: (transactions || []).map(convertDbTransaction),
+            categories: (categories || []).map(convertDbCategory),
+            incomeSources: (incomeSources || []).map(convertDbIncomeSource),
+            income: [], // Legacy income array (not used)
+            autoCategorization: [], // TODO: Load from database if needed
+            monthlyBudgets: [], // TODO: Load from database if needed
+            projects: (projects || []).map(convertDbProject),
+            projectTypes: (projectTypes || []).map(convertDbProjectType),
+            projectStatuses: (projectStatuses || []).map(convertDbProjectStatus),
+            version: '1.0.0',
+          }
+
+          setAppDataState(appData)
+
+          // Start auto-sync if enabled
+          const autoSyncEnabled = syncService.getAutoSyncEnabled()
+          if (autoSyncEnabled && !syncService.isAutoSyncRunning()) {
+            syncService.startAutoSync(activeProfile.id, 5) // Sync every 5 minutes
           }
         }
       } catch (error) {
@@ -58,6 +107,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadProfileData()
+
+    // Cleanup on unmount
+    return () => {
+      syncService.stopAutoSync()
+    }
   }, [])
 
   // Note: Individual operations now write directly to SQLite database

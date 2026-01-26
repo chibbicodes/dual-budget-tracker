@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
@@ -531,7 +531,7 @@ export default function Income() {
                 </tr>
               ) : (
                 incomeByCategory.map((group) => (
-                  <>
+                  <React.Fragment key={group.category.id}>
                     {/* Category Header */}
                     <tr key={`header-${group.category.id}`} className="bg-indigo-50">
                       <td colSpan={6} className="px-6 py-3">
@@ -580,7 +580,7 @@ export default function Income() {
                         </td>
                       </tr>
                     ))}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </tbody>

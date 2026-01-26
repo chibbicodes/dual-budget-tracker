@@ -70,12 +70,97 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           // Load data from database with proper conversion
           const settings = await databaseService.getSettings(activeProfile.id)
           const accounts = await databaseService.getAccounts(activeProfile.id)
-          const categories = await databaseService.getCategories(activeProfile.id)
+          let categories = await databaseService.getCategories(activeProfile.id)
           const transactions = await databaseService.getTransactions(activeProfile.id)
           const incomeSources = await databaseService.getIncomeSources(activeProfile.id)
           const projects = await databaseService.getProjects(activeProfile.id)
-          const projectTypes = await databaseService.getProjectTypes(activeProfile.id)
-          const projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+          let projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+          let projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+
+          // Initialize default categories if none exist
+          if (!categories || categories.length === 0) {
+            console.log('No categories found, initializing default categories...')
+            const defaultCategories = generateDefaultCategories()
+
+            // Save each default category to database
+            for (const category of defaultCategories) {
+              try {
+                await databaseService.createCategory({
+                  id: category.id,
+                  profile_id: activeProfile.id,
+                  name: category.name,
+                  budget_type: category.budgetType,
+                  bucket_id: category.bucketId,
+                  category_group: category.categoryGroup,
+                  monthly_budget: category.monthlyBudget,
+                  is_fixed_expense: category.isFixedExpense ? 1 : 0,
+                  is_active: category.isActive !== false ? 1 : 0,
+                  tax_deductible_by_default: category.taxDeductibleByDefault ? 1 : 0,
+                  is_income_category: category.isIncomeCategory ? 1 : 0,
+                  exclude_from_budget: category.excludeFromBudget ? 1 : 0,
+                  icon: category.icon,
+                })
+              } catch (error) {
+                console.error('Failed to create default category:', category.name, error)
+              }
+            }
+
+            // Reload categories from database
+            categories = await databaseService.getCategories(activeProfile.id)
+            console.log(`Initialized ${categories?.length || 0} default categories`)
+          }
+
+          // Initialize default project types if none exist
+          if (!projectTypes || projectTypes.length === 0) {
+            console.log('No project types found, initializing defaults...')
+            const defaultProjectTypes = [
+              { id: 'speaking', name: 'Speaking Engagement', budgetType: 'business' },
+              { id: 'craft', name: 'Craft Project', budgetType: 'business' },
+              { id: 'household', name: 'Household Project', budgetType: 'household' },
+            ]
+
+            for (const type of defaultProjectTypes) {
+              try {
+                await databaseService.createProjectType({
+                  id: type.id,
+                  profile_id: activeProfile.id,
+                  name: type.name,
+                  budget_type: type.budgetType as any,
+                  allowed_statuses: JSON.stringify([]),
+                })
+              } catch (error) {
+                console.error('Failed to create default project type:', type.name, error)
+              }
+            }
+
+            projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+          }
+
+          // Initialize default project statuses if none exist
+          if (!projectStatuses || projectStatuses.length === 0) {
+            console.log('No project statuses found, initializing defaults...')
+            const defaultProjectStatuses = [
+              { id: 'planned', name: 'Planned', description: 'Project is planned but not started' },
+              { id: 'in-progress', name: 'In Progress', description: 'Project is currently being worked on' },
+              { id: 'completed', name: 'Completed', description: 'Project has been completed' },
+              { id: 'cancelled', name: 'Cancelled', description: 'Project was cancelled' },
+            ]
+
+            for (const status of defaultProjectStatuses) {
+              try {
+                await databaseService.createProjectStatus({
+                  id: status.id,
+                  profile_id: activeProfile.id,
+                  name: status.name,
+                  description: status.description,
+                })
+              } catch (error) {
+                console.error('Failed to create default project status:', status.name, error)
+              }
+            }
+
+            projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+          }
 
           // Convert database records to AppData format
           const appData: AppData = {
@@ -94,6 +179,16 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           }
 
           setAppDataState(appData)
+
+          // Sync default data to Firestore if we initialized new data
+          if ((categories?.length || 0) > 0 || (projectTypes?.length || 0) > 0 || (projectStatuses?.length || 0) > 0) {
+            try {
+              await syncService.syncProfile(activeProfile.id)
+              console.log('Synced initialized data to Firestore')
+            } catch (error) {
+              console.log('Could not sync initialized data to Firestore:', error)
+            }
+          }
 
           // Start auto-sync if enabled
           const autoSyncEnabled = syncService.getAutoSyncEnabled()

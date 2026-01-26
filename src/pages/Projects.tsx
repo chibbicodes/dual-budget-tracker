@@ -855,6 +855,41 @@ function ProjectForm({ project, budgetType, onSubmit, onCancel }: ProjectFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate required foreign keys exist
+    if (!formData.projectTypeId) {
+      alert('Please select a project type')
+      return
+    }
+
+    if (!formData.statusId) {
+      alert('Please select a status')
+      return
+    }
+
+    // Verify project type exists
+    const projectTypeExists = appData.projectTypes.some(t => t.id === formData.projectTypeId)
+    if (!projectTypeExists) {
+      alert('Selected project type is invalid. Please refresh the page and try again.')
+      return
+    }
+
+    // Verify status exists
+    const statusExists = appData.projectStatuses.some(s => s.id === formData.statusId)
+    if (!statusExists) {
+      alert('Selected status is invalid. Please refresh the page and try again.')
+      return
+    }
+
+    // Verify income source exists if provided
+    if (formData.incomeSourceId) {
+      const incomeSourceExists = appData.income.some(s => s.id === formData.incomeSourceId)
+      if (!incomeSourceExists) {
+        alert('Selected income source is invalid. Please select a different one or leave it empty.')
+        return
+      }
+    }
+
     const budgetValue = formData.budget ? parseFloat(formData.budget) : undefined
     onSubmit({
       ...formData,

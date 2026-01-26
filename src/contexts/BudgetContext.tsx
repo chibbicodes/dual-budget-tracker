@@ -54,20 +54,37 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadProfileData = async () => {
       try {
+        console.log('Loading profile data...')
         const activeProfile = await ProfileService.getActiveProfile()
 
-        if (activeProfile) {
-          setActiveProfileId(activeProfile.id)
+        if (!activeProfile) {
+          console.log('No active profile found')
+          return
+        }
 
-          // Load data from database with proper conversion (load local first)
-          const settings = await databaseService.getSettings(activeProfile.id)
-          const accounts = await databaseService.getAccounts(activeProfile.id)
-          let categories = await databaseService.getCategories(activeProfile.id)
-          const transactions = await databaseService.getTransactions(activeProfile.id)
-          const incomeSources = await databaseService.getIncomeSources(activeProfile.id)
-          const projects = await databaseService.getProjects(activeProfile.id)
-          let projectTypes = await databaseService.getProjectTypes(activeProfile.id)
-          let projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+        console.log('Active profile:', activeProfile.id, activeProfile.name)
+        setActiveProfileId(activeProfile.id)
+
+        // Load data from database with proper conversion (load local first)
+        console.log('Loading database records...')
+        const settings = await databaseService.getSettings(activeProfile.id)
+        const accounts = await databaseService.getAccounts(activeProfile.id)
+        let categories = await databaseService.getCategories(activeProfile.id)
+        const transactions = await databaseService.getTransactions(activeProfile.id)
+        const incomeSources = await databaseService.getIncomeSources(activeProfile.id)
+        const projects = await databaseService.getProjects(activeProfile.id)
+        let projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+        let projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
+
+        console.log('Loaded records:', {
+          accounts: accounts?.length || 0,
+          categories: categories?.length || 0,
+          transactions: transactions?.length || 0,
+          incomeSources: incomeSources?.length || 0,
+          projects: projects?.length || 0,
+          projectTypes: projectTypes?.length || 0,
+          projectStatuses: projectStatuses?.length || 0,
+        })
 
           // Initialize default categories if none exist
           if (!categories || categories.length === 0) {
@@ -105,36 +122,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             console.log(`Initialized ${categories?.length || 0} default categories`)
           }
 
-          // Initialize default project types if none exist
-          if (!projectTypes || projectTypes.length === 0) {
-            console.log('No project types found, initializing defaults...')
-            const defaultProjectTypes = [
-              { id: 'speaking', name: 'Speaking Engagement', budgetType: 'business' },
-              { id: 'craft', name: 'Craft Project', budgetType: 'business' },
-              { id: 'household', name: 'Household Project', budgetType: 'household' },
-            ]
-
-            for (const type of defaultProjectTypes) {
-              try {
-                await databaseService.createProjectType({
-                  id: type.id,
-                  profile_id: activeProfile.id,
-                  name: type.name,
-                  budget_type: type.budgetType as any,
-                  allowed_statuses: JSON.stringify([]),
-                })
-              } catch (error: any) {
-                // Ignore UNIQUE constraint errors - means it already exists
-                if (!error.message?.includes('UNIQUE constraint')) {
-                  console.error('Failed to create default project type:', type.name, error)
-                }
-              }
-            }
-
-            projectTypes = await databaseService.getProjectTypes(activeProfile.id)
-          }
-
-          // Initialize default project statuses if none exist
+          // Initialize default project statuses first (needed for project types)
           if (!projectStatuses || projectStatuses.length === 0) {
             console.log('No project statuses found, initializing defaults...')
             const defaultProjectStatuses = [
@@ -163,7 +151,58 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
           }
 
+          // Initialize default project types with valid status IDs
+          if (!projectTypes || projectTypes.length === 0) {
+            console.log('No project types found, initializing defaults...')
+
+            // Get all available status IDs
+            const allStatusIds = (projectStatuses || []).map(s => s.id)
+
+            const defaultProjectTypes = [
+              { id: 'speaking', name: 'Speaking Engagement', budgetType: 'business', allowedStatuses: allStatusIds },
+              { id: 'craft', name: 'Craft Project', budgetType: 'business', allowedStatuses: allStatusIds },
+              { id: 'household', name: 'Household Project', budgetType: 'household', allowedStatuses: allStatusIds },
+            ]
+
+            for (const type of defaultProjectTypes) {
+              try {
+                await databaseService.createProjectType({
+                  id: type.id,
+                  profile_id: activeProfile.id,
+                  name: type.name,
+                  budget_type: type.budgetType as any,
+                  allowed_statuses: type.allowedStatuses,
+                })
+              } catch (error: any) {
+                // Ignore UNIQUE constraint errors - means it already exists
+                if (!error.message?.includes('UNIQUE constraint')) {
+                  console.error('Failed to create default project type:', type.name, error)
+                }
+              }
+            }
+
+            projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+          } else {
+            // Update existing project types if they have empty allowed_statuses
+            const allStatusIds = (projectStatuses || []).map(s => s.id)
+            for (const type of projectTypes) {
+              if (!type.allowed_statuses || type.allowed_statuses === '[]' ||
+                  (Array.isArray(type.allowed_statuses) && type.allowed_statuses.length === 0)) {
+                try {
+                  await databaseService.updateProjectType(type.id, {
+                    allowed_statuses: allStatusIds,
+                  })
+                } catch (error: any) {
+                  console.error('Failed to update project type allowed statuses:', type.name, error)
+                }
+              }
+            }
+            // Reload project types after updates
+            projectTypes = await databaseService.getProjectTypes(activeProfile.id)
+          }
+
           // Convert database records to AppData format
+          console.log('Converting database records to AppData format...')
           const appData: AppData = {
             settings: settings ? convertDbSettings(settings) : StorageService.getDefaultData().settings,
             accounts: (accounts || []).map(convertDbAccount),
@@ -179,7 +218,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             version: '1.0.0',
           }
 
+          console.log('Setting app data state with converted records...')
           setAppDataState(appData)
+          console.log('Profile data loaded successfully!')
 
           // NOTE: We don't automatically sync on app load to give users control over
           // when cloud sync happens. Users should explicitly click the sync button
@@ -193,7 +234,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error('Failed to load profile data:', error)
+        console.error('CRITICAL ERROR: Failed to load profile data:', error)
+        // Show error to user
+        alert('Failed to load profile data. Please check the console for details and restart the app.')
       }
     }
 
@@ -357,6 +400,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       const transactionWithoutLinking = { ...transaction }
       delete (transactionWithoutLinking as any).linkingOption
 
+      // Validate account exists
+      const account = appData.accounts.find(a => a.id === transactionWithoutLinking.accountId)
+      if (!account) {
+        console.error('Account not found:', transactionWithoutLinking.accountId)
+        alert('The selected account does not exist. Please refresh the page and try again.')
+        return
+      }
+
       // Auto-categorize if category not provided or is "uncategorized"
       let categoryId = transactionWithoutLinking.categoryId
       if (!categoryId || categoryId === 'uncategorized') {
@@ -366,9 +417,44 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         )
       }
 
-      // Get bucket from category
+      // Get bucket from category and validate category exists
       const category = appData.categories.find((c) => c.id === categoryId)
+      if (!category) {
+        console.error('Category not found:', categoryId)
+        alert('The selected category does not exist. Please refresh the page and try again.')
+        return
+      }
       const bucketId = category?.bucketId
+
+      // Validate project exists if provided
+      if (transactionWithoutLinking.projectId) {
+        const project = appData.projects.find(p => p.id === transactionWithoutLinking.projectId)
+        if (!project) {
+          console.error('Project not found:', transactionWithoutLinking.projectId)
+          alert('The selected project does not exist. Please refresh the page and try again.')
+          return
+        }
+      }
+
+      // Validate income source exists if provided
+      if (transactionWithoutLinking.incomeSourceId) {
+        const incomeSource = appData.incomeSources.find(s => s.id === transactionWithoutLinking.incomeSourceId)
+        if (!incomeSource) {
+          console.error('Income source not found:', transactionWithoutLinking.incomeSourceId)
+          alert('The selected income source does not exist. Please refresh the page and try again.')
+          return
+        }
+      }
+
+      // Validate destination account exists if provided (for transfers)
+      if (transactionWithoutLinking.toAccountId) {
+        const toAccount = appData.accounts.find(a => a.id === transactionWithoutLinking.toAccountId)
+        if (!toAccount) {
+          console.error('Destination account not found:', transactionWithoutLinking.toAccountId)
+          alert('The destination account does not exist. Please refresh the page and try again.')
+          return
+        }
+      }
 
       // Generate IDs upfront for linking
       const mainTransactionId = generateId()

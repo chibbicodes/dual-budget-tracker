@@ -254,3 +254,83 @@ export const createSchema = (db: Database.Database): void => {
   versionStmt.run('version', '1.0.0')
   versionStmt.run('created_at', new Date().toISOString())
 }
+
+/**
+ * Apply database migrations
+ * This function checks the current database version and applies any necessary migrations
+ */
+export const applyMigrations = (db: Database.Database): void => {
+  // Get current version
+  const versionRow = db.prepare('SELECT value FROM db_metadata WHERE key = ?').get('db_version') as { value: string } | undefined
+  const currentVersion = versionRow ? parseInt(versionRow.value) : 0
+
+  console.log(`Current database version: ${currentVersion}`)
+
+  // Migration 1: Add deleted_at columns for soft deletes
+  if (currentVersion < 1) {
+    console.log('Applying migration 1: Adding deleted_at columns...')
+
+    // Add deleted_at to accounts
+    try {
+      db.exec('ALTER TABLE accounts ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to accounts')
+    } catch (e) {
+      // Column might already exist
+      console.log('deleted_at column already exists in accounts or error:', e)
+    }
+
+    // Add deleted_at to categories
+    try {
+      db.exec('ALTER TABLE categories ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to categories')
+    } catch (e) {
+      console.log('deleted_at column already exists in categories or error:', e)
+    }
+
+    // Add deleted_at to transactions
+    try {
+      db.exec('ALTER TABLE transactions ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to transactions')
+    } catch (e) {
+      console.log('deleted_at column already exists in transactions or error:', e)
+    }
+
+    // Add deleted_at to income_sources
+    try {
+      db.exec('ALTER TABLE income_sources ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to income_sources')
+    } catch (e) {
+      console.log('deleted_at column already exists in income_sources or error:', e)
+    }
+
+    // Add deleted_at to projects
+    try {
+      db.exec('ALTER TABLE projects ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to projects')
+    } catch (e) {
+      console.log('deleted_at column already exists in projects or error:', e)
+    }
+
+    // Add deleted_at to project_types
+    try {
+      db.exec('ALTER TABLE project_types ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to project_types')
+    } catch (e) {
+      console.log('deleted_at column already exists in project_types or error:', e)
+    }
+
+    // Add deleted_at to project_statuses
+    try {
+      db.exec('ALTER TABLE project_statuses ADD COLUMN deleted_at TEXT')
+      console.log('Added deleted_at to project_statuses')
+    } catch (e) {
+      console.log('deleted_at column already exists in project_statuses or error:', e)
+    }
+
+    // Update version
+    db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '1')
+    console.log('Migration 1 completed')
+  }
+
+  console.log('All migrations applied')
+}

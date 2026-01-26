@@ -81,7 +81,15 @@ class SyncService {
    */
   private async syncAccounts(profileId: string): Promise<void> {
     try {
-      const accounts = await databaseService.getAccounts(profileId)
+      // Get ALL accounts including soft-deleted ones for sync
+      const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
+      if (!db) {
+        console.error('Cannot access database for soft delete sync')
+        return
+      }
+
+      const stmt = db.prepare('SELECT * FROM accounts WHERE profile_id = ?')
+      const accounts = stmt.all(profileId)
 
       for (const account of accounts) {
         await syncRecordToCloud('accounts', {
@@ -99,6 +107,7 @@ class SyncService {
           notes: account.notes,
           createdAt: account.created_at,
           updatedAt: account.updated_at,
+          deletedAt: account.deleted_at || null,
         })
       }
     } catch (error) {
@@ -112,7 +121,15 @@ class SyncService {
    */
   private async syncCategories(profileId: string): Promise<void> {
     try {
-      const categories = await databaseService.getCategories(profileId)
+      // Get ALL categories including soft-deleted ones for sync
+      const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
+      if (!db) {
+        console.error('Cannot access database for soft delete sync')
+        return
+      }
+
+      const stmt = db.prepare('SELECT * FROM categories WHERE profile_id = ?')
+      const categories = stmt.all(profileId)
 
       for (const category of categories) {
         await syncRecordToCloud('categories', {
@@ -131,6 +148,7 @@ class SyncService {
           icon: category.icon,
           createdAt: category.created_at,
           updatedAt: category.updated_at,
+          deletedAt: category.deleted_at || null,
         })
       }
     } catch (error) {
@@ -342,36 +360,62 @@ class SyncService {
           !cloudAccount.updatedAt ||
           new Date(cloudAccount.updatedAt) > new Date(localAccount.updated_at)
         ) {
-          if (localAccount) {
-            // Update existing
-            await databaseService.updateAccount(cloudAccount.id, {
-              name: cloudAccount.name,
-              budget_type: cloudAccount.budgetType,
-              account_type: cloudAccount.accountType,
-              balance: cloudAccount.balance,
-              interest_rate: cloudAccount.interestRate,
-              credit_limit: cloudAccount.creditLimit,
-              payment_due_date: cloudAccount.paymentDueDate,
-              minimum_payment: cloudAccount.minimumPayment,
-              website_url: cloudAccount.websiteUrl,
-              notes: cloudAccount.notes,
-            })
+          // Need to handle soft deletes - get the record even if soft-deleted locally
+          const db = (databaseService as any).getDb ? (databaseService as any).getDb() : null
+          const localAccountQuery = db?.prepare('SELECT * FROM accounts WHERE id = ?').get(cloudAccount.id)
+
+          if (localAccountQuery) {
+            // Update existing - use raw SQL to update deleted_at
+            const stmt = db.prepare(`
+              UPDATE accounts
+              SET name = ?, budget_type = ?, account_type = ?, balance = ?,
+                  interest_rate = ?, credit_limit = ?, payment_due_date = ?,
+                  minimum_payment = ?, website_url = ?, notes = ?,
+                  deleted_at = ?, updated_at = ?
+              WHERE id = ?
+            `)
+            stmt.run(
+              cloudAccount.name,
+              cloudAccount.budgetType,
+              cloudAccount.accountType,
+              cloudAccount.balance,
+              cloudAccount.interestRate,
+              cloudAccount.creditLimit,
+              cloudAccount.paymentDueDate,
+              cloudAccount.minimumPayment,
+              cloudAccount.websiteUrl,
+              cloudAccount.notes,
+              cloudAccount.deletedAt || null,
+              cloudAccount.updatedAt,
+              cloudAccount.id
+            )
           } else {
             // Create new only if profile exists
-            await databaseService.createAccount({
-              id: cloudAccount.id,
-              profile_id: profileId,
-              name: cloudAccount.name,
-              budget_type: cloudAccount.budgetType,
-              account_type: cloudAccount.accountType,
-              balance: cloudAccount.balance,
-              interest_rate: cloudAccount.interestRate,
-              credit_limit: cloudAccount.creditLimit,
-              payment_due_date: cloudAccount.paymentDueDate,
-              minimum_payment: cloudAccount.minimumPayment,
-              website_url: cloudAccount.websiteUrl,
-              notes: cloudAccount.notes,
-            })
+            const stmt = db.prepare(`
+              INSERT INTO accounts (
+                id, profile_id, name, budget_type, account_type, balance,
+                interest_rate, credit_limit, payment_due_date, minimum_payment,
+                website_url, notes, deleted_at, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            const now = new Date().toISOString()
+            stmt.run(
+              cloudAccount.id,
+              profileId,
+              cloudAccount.name,
+              cloudAccount.budgetType,
+              cloudAccount.accountType,
+              cloudAccount.balance,
+              cloudAccount.interestRate,
+              cloudAccount.creditLimit,
+              cloudAccount.paymentDueDate,
+              cloudAccount.minimumPayment,
+              cloudAccount.websiteUrl,
+              cloudAccount.notes,
+              cloudAccount.deletedAt || null,
+              cloudAccount.createdAt || now,
+              cloudAccount.updatedAt || now
+            )
           }
         }
       }

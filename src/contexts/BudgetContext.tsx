@@ -181,10 +181,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
           setAppDataState(appData)
 
-          // NOTE: We don't automatically sync on app load to prevent deleted items from
-          // coming back from Firestore. Users should explicitly click the sync button
+          // NOTE: We don't automatically sync on app load to give users control over
+          // when cloud sync happens. Users should explicitly click the sync button
           // when they want to sync with the cloud.
-          // TODO: Implement proper soft deletes with deleted_at timestamps
+          // Soft deletes are now implemented so deletions will sync properly across devices.
 
           // Start auto-sync if enabled
           const autoSyncEnabled = syncService.getAutoSyncEnabled()

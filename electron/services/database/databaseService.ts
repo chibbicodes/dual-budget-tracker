@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { createSchema } from './schema'
+import { createSchema, applyMigrations } from './schema'
 
 /**
  * Local SQLite database service for Dual Budget Tracker
@@ -34,6 +34,9 @@ class DatabaseService {
 
       // Create schema if needed
       createSchema(this.db)
+
+      // Apply any pending migrations
+      applyMigrations(this.db)
 
       console.log(`Database initialized at: ${this.dbPath}`)
     } catch (error) {
@@ -242,11 +245,11 @@ class DatabaseService {
   // ==================== Account Operations ====================
 
   /**
-   * Get all accounts for a profile
+   * Get all accounts for a profile (excluding soft-deleted)
    */
   getAccounts(profileId: string, budgetType?: string) {
     const db = this.getDb()
-    let query = 'SELECT * FROM accounts WHERE profile_id = ?'
+    let query = 'SELECT * FROM accounts WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (budgetType) {
@@ -261,11 +264,11 @@ class DatabaseService {
   }
 
   /**
-   * Get an account by ID
+   * Get an account by ID (excluding soft-deleted)
    */
   getAccount(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM accounts WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -347,22 +350,23 @@ class DatabaseService {
   }
 
   /**
-   * Delete an account
+   * Delete an account (soft delete)
    */
   deleteAccount(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM accounts WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE accounts SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Category Operations ====================
 
   /**
-   * Get all categories for a profile
+   * Get all categories for a profile (excluding soft-deleted)
    */
   getCategories(profileId: string, budgetType?: string) {
     const db = this.getDb()
-    let query = 'SELECT * FROM categories WHERE profile_id = ?'
+    let query = 'SELECT * FROM categories WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (budgetType) {
@@ -377,11 +381,11 @@ class DatabaseService {
   }
 
   /**
-   * Get a category by ID
+   * Get a category by ID (excluding soft-deleted)
    */
   getCategory(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM categories WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM categories WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -465,18 +469,19 @@ class DatabaseService {
   }
 
   /**
-   * Delete a category
+   * Delete a category (soft delete)
    */
   deleteCategory(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM categories WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE categories SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Transaction Operations ====================
 
   /**
-   * Get transactions for a profile
+   * Get transactions for a profile (excluding soft-deleted)
    */
   getTransactions(profileId: string, options?: {
     budgetType?: string
@@ -487,7 +492,7 @@ class DatabaseService {
     limit?: number
   }) {
     const db = this.getDb()
-    let query = 'SELECT * FROM transactions WHERE profile_id = ?'
+    let query = 'SELECT * FROM transactions WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (options?.budgetType) {
@@ -527,11 +532,11 @@ class DatabaseService {
   }
 
   /**
-   * Get a transaction by ID
+   * Get a transaction by ID (excluding soft-deleted)
    */
   getTransaction(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM transactions WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM transactions WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -622,22 +627,23 @@ class DatabaseService {
   }
 
   /**
-   * Delete a transaction
+   * Delete a transaction (soft delete)
    */
   deleteTransaction(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM transactions WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Income Source Operations ====================
 
   /**
-   * Get income sources for a profile
+   * Get income sources for a profile (excluding soft-deleted)
    */
   getIncomeSources(profileId: string, budgetType?: string) {
     const db = this.getDb()
-    let query = 'SELECT * FROM income_sources WHERE profile_id = ?'
+    let query = 'SELECT * FROM income_sources WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (budgetType) {
@@ -686,11 +692,11 @@ class DatabaseService {
   }
 
   /**
-   * Get an income source by ID
+   * Get an income source by ID (excluding soft-deleted)
    */
   getIncomeSource(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM income_sources WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM income_sources WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -724,22 +730,23 @@ class DatabaseService {
   }
 
   /**
-   * Delete an income source
+   * Delete an income source (soft delete)
    */
   deleteIncomeSource(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM income_sources WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE income_sources SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Project Operations ====================
 
   /**
-   * Get projects for a profile
+   * Get projects for a profile (excluding soft-deleted)
    */
   getProjects(profileId: string, budgetType?: string) {
     const db = this.getDb()
-    let query = 'SELECT * FROM projects WHERE profile_id = ?'
+    let query = 'SELECT * FROM projects WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (budgetType) {
@@ -789,11 +796,11 @@ class DatabaseService {
   }
 
   /**
-   * Get a project by ID
+   * Get a project by ID (excluding soft-deleted)
    */
   getProject(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM projects WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -827,22 +834,23 @@ class DatabaseService {
   }
 
   /**
-   * Delete a project
+   * Delete a project (soft delete)
    */
   deleteProject(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM projects WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Project Type Operations ====================
 
   /**
-   * Get project types for a profile
+   * Get project types for a profile (excluding soft-deleted)
    */
   getProjectTypes(profileId: string, budgetType?: string) {
     const db = this.getDb()
-    let query = 'SELECT * FROM project_types WHERE profile_id = ?'
+    let query = 'SELECT * FROM project_types WHERE profile_id = ? AND deleted_at IS NULL'
     const params: any[] = [profileId]
 
     if (budgetType) {
@@ -882,11 +890,11 @@ class DatabaseService {
   }
 
   /**
-   * Get a project type by ID
+   * Get a project type by ID (excluding soft-deleted)
    */
   getProjectType(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM project_types WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM project_types WHERE id = ? AND deleted_at IS NULL')
     const result: any = stmt.get(id)
     if (result && result.allowed_statuses) {
       result.allowed_statuses = JSON.parse(result.allowed_statuses)
@@ -929,22 +937,23 @@ class DatabaseService {
   }
 
   /**
-   * Delete a project type
+   * Delete a project type (soft delete)
    */
   deleteProjectType(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM project_types WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE project_types SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Project Status Operations ====================
 
   /**
-   * Get project statuses for a profile
+   * Get project statuses for a profile (excluding soft-deleted)
    */
   getProjectStatuses(profileId: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM project_statuses WHERE profile_id = ?')
+    const stmt = db.prepare('SELECT * FROM project_statuses WHERE profile_id = ? AND deleted_at IS NULL')
     return stmt.all(profileId)
   }
 
@@ -974,11 +983,11 @@ class DatabaseService {
   }
 
   /**
-   * Get a project status by ID
+   * Get a project status by ID (excluding soft-deleted)
    */
   getProjectStatus(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('SELECT * FROM project_statuses WHERE id = ?')
+    const stmt = db.prepare('SELECT * FROM project_statuses WHERE id = ? AND deleted_at IS NULL')
     return stmt.get(id)
   }
 
@@ -1012,12 +1021,13 @@ class DatabaseService {
   }
 
   /**
-   * Delete a project status
+   * Delete a project status (soft delete)
    */
   deleteProjectStatus(id: string) {
     const db = this.getDb()
-    const stmt = db.prepare('DELETE FROM project_statuses WHERE id = ?')
-    stmt.run(id)
+    const stmt = db.prepare('UPDATE project_statuses SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    const now = new Date().toISOString()
+    stmt.run(now, now, id)
   }
 
   // ==================== Monthly Budget Operations ====================

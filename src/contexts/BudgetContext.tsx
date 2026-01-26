@@ -59,15 +59,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (activeProfile) {
           setActiveProfileId(activeProfile.id)
 
-          // First, try to sync from Firestore if authenticated
-          try {
-            await syncService.syncProfile(activeProfile.id)
-            console.log('Synced from Firestore on app load')
-          } catch (error) {
-            console.log('No cloud sync available or sync failed, loading from local database only')
-          }
-
-          // Load data from database with proper conversion
+          // Load data from database with proper conversion (load local first)
           const settings = await databaseService.getSettings(activeProfile.id)
           const accounts = await databaseService.getAccounts(activeProfile.id)
           let categories = await databaseService.getCategories(activeProfile.id)
@@ -100,8 +92,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
                   exclude_from_budget: category.excludeFromBudget ? 1 : 0,
                   icon: category.icon,
                 })
-              } catch (error) {
-                console.error('Failed to create default category:', category.name, error)
+              } catch (error: any) {
+                // Ignore UNIQUE constraint errors - means it already exists
+                if (!error.message?.includes('UNIQUE constraint')) {
+                  console.error('Failed to create default category:', category.name, error)
+                }
               }
             }
 
@@ -128,8 +123,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
                   budget_type: type.budgetType as any,
                   allowed_statuses: JSON.stringify([]),
                 })
-              } catch (error) {
-                console.error('Failed to create default project type:', type.name, error)
+              } catch (error: any) {
+                // Ignore UNIQUE constraint errors - means it already exists
+                if (!error.message?.includes('UNIQUE constraint')) {
+                  console.error('Failed to create default project type:', type.name, error)
+                }
               }
             }
 
@@ -154,8 +152,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
                   name: status.name,
                   description: status.description,
                 })
-              } catch (error) {
-                console.error('Failed to create default project status:', status.name, error)
+              } catch (error: any) {
+                // Ignore UNIQUE constraint errors - means it already exists
+                if (!error.message?.includes('UNIQUE constraint')) {
+                  console.error('Failed to create default project status:', status.name, error)
+                }
               }
             }
 
@@ -180,15 +181,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
           setAppDataState(appData)
 
-          // Sync default data to Firestore if we initialized new data
-          if ((categories?.length || 0) > 0 || (projectTypes?.length || 0) > 0 || (projectStatuses?.length || 0) > 0) {
-            try {
-              await syncService.syncProfile(activeProfile.id)
-              console.log('Synced initialized data to Firestore')
-            } catch (error) {
-              console.log('Could not sync initialized data to Firestore:', error)
-            }
-          }
+          // NOTE: We don't automatically sync on app load to prevent deleted items from
+          // coming back from Firestore. Users should explicitly click the sync button
+          // when they want to sync with the cloud.
+          // TODO: Implement proper soft deletes with deleted_at timestamps
 
           // Start auto-sync if enabled
           const autoSyncEnabled = syncService.getAutoSyncEnabled()

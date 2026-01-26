@@ -136,13 +136,26 @@ export function convertDbProject(dbProject: any): Project {
  * Convert database project type to ProjectTypeConfig type
  */
 export function convertDbProjectType(dbProjectType: any): ProjectTypeConfig {
+  // Parse allowedStatuses if it's a JSON string
+  let allowedStatuses: string[] = []
+  if (dbProjectType.allowed_statuses) {
+    if (typeof dbProjectType.allowed_statuses === 'string') {
+      try {
+        allowedStatuses = JSON.parse(dbProjectType.allowed_statuses)
+      } catch (e) {
+        console.error('Failed to parse allowedStatuses:', e)
+        allowedStatuses = []
+      }
+    } else if (Array.isArray(dbProjectType.allowed_statuses)) {
+      allowedStatuses = dbProjectType.allowed_statuses
+    }
+  }
+
   return {
     id: dbProjectType.id,
     name: dbProjectType.name,
     budgetType: dbProjectType.budget_type,
-    allowedStatuses: dbProjectType.allowed_statuses
-      ? JSON.parse(dbProjectType.allowed_statuses)
-      : [],
+    allowedStatuses,
     createdAt: dbProjectType.created_at,
     updatedAt: dbProjectType.updated_at,
   }

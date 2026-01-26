@@ -1021,7 +1021,15 @@ class DatabaseService {
     }
 
     const stmt = db.prepare(query)
-    return stmt.all(...params)
+    const results: any[] = stmt.all(...params)
+
+    // Parse allowed_statuses JSON for each result
+    return results.map(result => {
+      if (result.allowed_statuses) {
+        result.allowed_statuses = JSON.parse(result.allowed_statuses)
+      }
+      return result
+    })
   }
 
   /**

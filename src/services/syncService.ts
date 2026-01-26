@@ -422,37 +422,45 @@ class SyncService {
           !cloudCategory.updatedAt ||
           new Date(cloudCategory.updatedAt) > new Date(localCategory.updated_at)
         ) {
-          if (localCategory) {
-            // Update existing
-            await databaseService.updateCategory(cloudCategory.id, {
+          // Check if category exists (including soft-deleted)
+          const existingCategory = await databaseService.getCategoryForSync(cloudCategory.id)
+
+          if (existingCategory) {
+            // Update existing category including deleted_at field
+            await databaseService.updateCategoryForSync(cloudCategory.id, {
               name: cloudCategory.name,
-              budget_type: cloudCategory.budgetType,
-              bucket_id: cloudCategory.bucketId,
-              category_group: cloudCategory.categoryGroup,
-              monthly_budget: cloudCategory.monthlyBudget,
-              is_fixed_expense: cloudCategory.isFixedExpense,
-              is_active: cloudCategory.isActive,
-              tax_deductible_by_default: cloudCategory.taxDeductibleByDefault,
-              is_income_category: cloudCategory.isIncomeCategory,
-              exclude_from_budget: cloudCategory.excludeFromBudget,
+              budgetType: cloudCategory.budgetType,
+              bucketId: cloudCategory.bucketId,
+              categoryGroup: cloudCategory.categoryGroup,
+              monthlyBudget: cloudCategory.monthlyBudget,
+              isFixedExpense: cloudCategory.isFixedExpense,
+              isActive: cloudCategory.isActive,
+              taxDeductibleByDefault: cloudCategory.taxDeductibleByDefault,
+              isIncomeCategory: cloudCategory.isIncomeCategory,
+              excludeFromBudget: cloudCategory.excludeFromBudget,
               icon: cloudCategory.icon,
+              deletedAt: cloudCategory.deletedAt || null,
+              updatedAt: cloudCategory.updatedAt,
             })
           } else {
-            // Create new
-            await databaseService.createCategory({
+            // Create new category
+            await databaseService.createCategoryForSync({
               id: cloudCategory.id,
-              profile_id: profileId,
+              profileId: profileId,
               name: cloudCategory.name,
-              budget_type: cloudCategory.budgetType,
-              bucket_id: cloudCategory.bucketId,
-              category_group: cloudCategory.categoryGroup,
-              monthly_budget: cloudCategory.monthlyBudget,
-              is_fixed_expense: cloudCategory.isFixedExpense,
-              is_active: cloudCategory.isActive,
-              tax_deductible_by_default: cloudCategory.taxDeductibleByDefault,
-              is_income_category: cloudCategory.isIncomeCategory,
-              exclude_from_budget: cloudCategory.excludeFromBudget,
+              budgetType: cloudCategory.budgetType,
+              bucketId: cloudCategory.bucketId,
+              categoryGroup: cloudCategory.categoryGroup,
+              monthlyBudget: cloudCategory.monthlyBudget,
+              isFixedExpense: cloudCategory.isFixedExpense,
+              isActive: cloudCategory.isActive,
+              taxDeductibleByDefault: cloudCategory.taxDeductibleByDefault,
+              isIncomeCategory: cloudCategory.isIncomeCategory,
+              excludeFromBudget: cloudCategory.excludeFromBudget,
               icon: cloudCategory.icon,
+              deletedAt: cloudCategory.deletedAt || null,
+              createdAt: cloudCategory.createdAt,
+              updatedAt: cloudCategory.updatedAt,
             })
           }
         }
@@ -949,6 +957,7 @@ class SyncService {
       await this.syncProjectStatuses(profileId)
 
       // Step 2: Pull remote changes from cloud
+      // Important: Pull in dependency order (parent tables before child tables)
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling profiles...',
@@ -959,8 +968,24 @@ class SyncService {
 
       this.notifyProgress({
         status: 'syncing',
-        message: 'Pulling accounts...',
+        message: 'Pulling project statuses...',
         current: 10,
+        total: totalSteps,
+      })
+      await this.pullProjectStatuses(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling project types...',
+        current: 11,
+        total: totalSteps,
+      })
+      await this.pullProjectTypes(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling accounts...',
+        current: 12,
         total: totalSteps,
       })
       await this.pullAccounts(profileId)
@@ -968,23 +993,15 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling categories...',
-        current: 11,
+        current: 13,
         total: totalSteps,
       })
       await this.pullCategories(profileId)
 
       this.notifyProgress({
         status: 'syncing',
-        message: 'Pulling transactions...',
-        current: 12,
-        total: totalSteps,
-      })
-      await this.pullTransactions(profileId)
-
-      this.notifyProgress({
-        status: 'syncing',
         message: 'Pulling income sources...',
-        current: 13,
+        current: 14,
         total: totalSteps,
       })
       await this.pullIncomeSources(profileId)
@@ -992,26 +1009,18 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling projects...',
-        current: 14,
+        current: 15,
         total: totalSteps,
       })
       await this.pullProjects(profileId)
 
       this.notifyProgress({
         status: 'syncing',
-        message: 'Pulling project types...',
-        current: 15,
-        total: totalSteps,
-      })
-      await this.pullProjectTypes(profileId)
-
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling project statuses...',
+        message: 'Pulling transactions...',
         current: 16,
         total: totalSteps,
       })
-      await this.pullProjectStatuses(profileId)
+      await this.pullTransactions(profileId)
 
       // Store last synced timestamp
       localStorage.setItem('lastSyncedAt', new Date().toISOString())

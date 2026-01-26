@@ -232,7 +232,6 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           if (autoSyncEnabled && !syncService.isAutoSyncRunning()) {
             syncService.startAutoSync(activeProfile.id, 5) // Sync every 5 minutes
           }
-        }
       } catch (error) {
         console.error('CRITICAL ERROR: Failed to load profile data:', error)
         // Show error to user

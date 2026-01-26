@@ -199,6 +199,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addTransaction = useCallback(
     (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> & { linkingOption?: string }) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
 
       // Extract linking option
@@ -231,6 +237,30 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         reconciled: transactionWithoutLinking.reconciled ?? false,
         createdAt: now,
         updatedAt: now,
+      }
+
+      // Save main transaction to database
+      try {
+        databaseService.createTransaction({
+          id: newTransaction.id,
+          profile_id: profileId,
+          date: newTransaction.date,
+          description: newTransaction.description,
+          amount: newTransaction.amount,
+          category_id: newTransaction.categoryId,
+          bucket_id: newTransaction.bucketId,
+          budget_type: newTransaction.budgetType,
+          account_id: newTransaction.accountId,
+          to_account_id: newTransaction.toAccountId,
+          linked_transaction_id: newTransaction.linkedTransactionId,
+          project_id: newTransaction.projectId,
+          income_source_id: newTransaction.incomeSourceId,
+          tax_deductible: newTransaction.taxDeductible ? 1 : 0,
+          reconciled: newTransaction.reconciled ? 1 : 0,
+          notes: newTransaction.notes,
+        })
+      } catch (error) {
+        console.error('Failed to create transaction in database:', error)
       }
 
       setAppDataState((prev) => {
@@ -287,12 +317,44 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
               }
               transactions.push(depositTransaction)
 
+              // Save paired transaction to database
+              try {
+                databaseService.createTransaction({
+                  id: depositTransaction.id,
+                  profile_id: profileId,
+                  date: depositTransaction.date,
+                  description: depositTransaction.description,
+                  amount: depositTransaction.amount,
+                  category_id: depositTransaction.categoryId,
+                  bucket_id: depositTransaction.bucketId,
+                  budget_type: depositTransaction.budgetType,
+                  account_id: depositTransaction.accountId,
+                  to_account_id: depositTransaction.toAccountId,
+                  linked_transaction_id: depositTransaction.linkedTransactionId,
+                  project_id: depositTransaction.projectId,
+                  income_source_id: depositTransaction.incomeSourceId,
+                  tax_deductible: depositTransaction.taxDeductible ? 1 : 0,
+                  reconciled: depositTransaction.reconciled ? 1 : 0,
+                  notes: depositTransaction.notes,
+                })
+              } catch (error) {
+                console.error('Failed to create paired transaction in database:', error)
+              }
+
               // Update main transaction to link to paired transaction
               const mainTxIndex = transactions.findIndex(t => t.id === mainTransactionId)
               if (mainTxIndex >= 0) {
                 transactions[mainTxIndex] = {
                   ...transactions[mainTxIndex],
                   linkedTransactionId: pairedTransactionId,
+                }
+                // Update main transaction in database with link
+                try {
+                  databaseService.updateTransaction(mainTransactionId, {
+                    linked_transaction_id: pairedTransactionId,
+                  })
+                } catch (error) {
+                  console.error('Failed to update main transaction link in database:', error)
                 }
               }
 
@@ -314,6 +376,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
                     linkedTransactionId: mainTransactionId,
                     updatedAt: now,
                   }
+                  // Update in database
+                  try {
+                    databaseService.updateTransaction(existingTx.id, {
+                      linked_transaction_id: mainTransactionId,
+                    })
+                  } catch (error) {
+                    console.error('Failed to update existing transaction link in database:', error)
+                  }
                 }
               }
             }
@@ -328,7 +398,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }
       })
     },
-    [appData.categories, appData.accounts]
+    [appData.categories, appData.accounts, getProfileId]
   )
 
   const autoCategorizeTransaction = (description: string, budgetType: string): string => {
@@ -368,6 +438,29 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const updateTransaction = useCallback(
     (id: string, updates: Partial<Transaction>) => {
+      // Update in database
+      try {
+        const dbUpdates: any = {}
+        if (updates.date !== undefined) dbUpdates.date = updates.date
+        if (updates.description !== undefined) dbUpdates.description = updates.description
+        if (updates.amount !== undefined) dbUpdates.amount = updates.amount
+        if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId
+        if (updates.bucketId !== undefined) dbUpdates.bucket_id = updates.bucketId
+        if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+        if (updates.accountId !== undefined) dbUpdates.account_id = updates.accountId
+        if (updates.toAccountId !== undefined) dbUpdates.to_account_id = updates.toAccountId
+        if (updates.linkedTransactionId !== undefined) dbUpdates.linked_transaction_id = updates.linkedTransactionId
+        if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId
+        if (updates.incomeSourceId !== undefined) dbUpdates.income_source_id = updates.incomeSourceId
+        if (updates.taxDeductible !== undefined) dbUpdates.tax_deductible = updates.taxDeductible ? 1 : 0
+        if (updates.reconciled !== undefined) dbUpdates.reconciled = updates.reconciled ? 1 : 0
+        if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+        databaseService.updateTransaction(id, dbUpdates)
+      } catch (error) {
+        console.error('Failed to update transaction in database:', error)
+      }
+
       setAppDataState((prev) => {
         const transaction = prev.transactions.find((t) => t.id === id)
         if (!transaction) return prev
@@ -409,6 +502,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   )
 
   const deleteTransaction = useCallback((id: string) => {
+    // Delete from database
+    try {
+      databaseService.deleteTransaction(id)
+    } catch (error) {
+      console.error('Failed to delete transaction from database:', error)
+    }
+
     setAppDataState((prev) => {
       const transaction = prev.transactions.find((t) => t.id === id)
       if (!transaction) return prev
@@ -553,6 +653,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addIncomeSource = useCallback(
     (income: Omit<IncomeSource, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
       const newIncome: IncomeSource = {
         ...income,
@@ -561,15 +667,52 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.createIncomeSource({
+          id: newIncome.id,
+          profile_id: profileId,
+          name: newIncome.name,
+          budget_type: newIncome.budgetType,
+          income_type: newIncome.incomeType,
+          category_id: newIncome.categoryId,
+          expected_amount: newIncome.expectedAmount,
+          frequency: newIncome.frequency,
+          next_expected_date: newIncome.nextExpectedDate,
+          client_source: newIncome.clientSource,
+          is_active: newIncome.isActive !== false ? 1 : 0,
+        })
+      } catch (error) {
+        console.error('Failed to create income source in database:', error)
+      }
+
       setAppDataState((prev) => ({
         ...prev,
         incomeSources: [...prev.incomeSources, newIncome],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateIncomeSource = useCallback((id: string, updates: Partial<IncomeSource>) => {
+    // Update in database
+    try {
+      const dbUpdates: any = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+      if (updates.incomeType !== undefined) dbUpdates.income_type = updates.incomeType
+      if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId
+      if (updates.expectedAmount !== undefined) dbUpdates.expected_amount = updates.expectedAmount
+      if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency
+      if (updates.nextExpectedDate !== undefined) dbUpdates.next_expected_date = updates.nextExpectedDate
+      if (updates.clientSource !== undefined) dbUpdates.client_source = updates.clientSource
+      if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive ? 1 : 0
+
+      databaseService.updateIncomeSource(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update income source in database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       incomeSources: prev.incomeSources.map((income) =>
@@ -585,6 +728,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteIncomeSource = useCallback((id: string) => {
+    // Delete from database
+    try {
+      databaseService.deleteIncomeSource(id)
+    } catch (error) {
+      console.error('Failed to delete income source from database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       incomeSources: prev.incomeSources.filter((i) => i.id !== id),
@@ -641,6 +791,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addProject = useCallback(
     (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
       const newProject: Project = {
         ...project,
@@ -649,15 +805,54 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.createProject({
+          id: newProject.id,
+          profile_id: profileId,
+          name: newProject.name,
+          budget_type: newProject.budgetType,
+          project_type_id: newProject.projectTypeId,
+          status_id: newProject.statusId,
+          income_source_id: newProject.incomeSourceId,
+          budget: newProject.budget,
+          date_created: newProject.dateCreated,
+          date_completed: newProject.dateCompleted,
+          commission_paid: newProject.commissionPaid,
+          notes: newProject.notes,
+        })
+      } catch (error) {
+        console.error('Failed to create project in database:', error)
+      }
+
       setAppDataState((prev) => ({
         ...prev,
         projects: [...prev.projects, newProject],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateProject = useCallback((id: string, updates: Partial<Project>) => {
+    // Update in database
+    try {
+      const dbUpdates: any = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+      if (updates.projectTypeId !== undefined) dbUpdates.project_type_id = updates.projectTypeId
+      if (updates.statusId !== undefined) dbUpdates.status_id = updates.statusId
+      if (updates.incomeSourceId !== undefined) dbUpdates.income_source_id = updates.incomeSourceId
+      if (updates.budget !== undefined) dbUpdates.budget = updates.budget
+      if (updates.dateCreated !== undefined) dbUpdates.date_created = updates.dateCreated
+      if (updates.dateCompleted !== undefined) dbUpdates.date_completed = updates.dateCompleted
+      if (updates.commissionPaid !== undefined) dbUpdates.commission_paid = updates.commissionPaid
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+      databaseService.updateProject(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update project in database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projects: prev.projects.map((project) =>
@@ -673,6 +868,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteProject = useCallback((id: string) => {
+    // Delete from database
+    try {
+      databaseService.deleteProject(id)
+    } catch (error) {
+      console.error('Failed to delete project from database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projects: prev.projects.filter((p) => p.id !== id),

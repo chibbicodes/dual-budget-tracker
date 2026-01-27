@@ -1121,6 +1121,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addProjectType = useCallback(
     (projectType: Omit<ProjectTypeConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
       const newProjectType: ProjectTypeConfig = {
         ...projectType,
@@ -1129,15 +1135,40 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.createProjectType({
+          id: newProjectType.id,
+          profile_id: profileId,
+          name: newProjectType.name,
+          budget_type: newProjectType.budgetType,
+          allowed_statuses: newProjectType.allowedStatuses,
+        })
+      } catch (error) {
+        console.error('Failed to create project type in database:', error)
+      }
+
       setAppDataState((prev) => ({
         ...prev,
         projectTypes: [...prev.projectTypes, newProjectType],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateProjectType = useCallback((id: string, updates: Partial<ProjectTypeConfig>) => {
+    // Update in database
+    try {
+      const dbUpdates: any = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
+      if (updates.allowedStatuses !== undefined) dbUpdates.allowed_statuses = updates.allowedStatuses
+
+      databaseService.updateProjectType(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update project type in database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projectTypes: prev.projectTypes.map((type) =>
@@ -1153,6 +1184,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteProjectType = useCallback((id: string) => {
+    // Delete from database (soft delete)
+    try {
+      databaseService.deleteProjectType(id)
+    } catch (error) {
+      console.error('Failed to delete project type from database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projectTypes: prev.projectTypes.filter((t) => t.id !== id),
@@ -1166,6 +1204,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addProjectStatus = useCallback(
     (status: Omit<ProjectStatusConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
       const newStatus: ProjectStatusConfig = {
         ...status,
@@ -1174,15 +1218,38 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.createProjectStatus({
+          id: newStatus.id,
+          profile_id: profileId,
+          name: newStatus.name,
+          description: newStatus.description,
+        })
+      } catch (error) {
+        console.error('Failed to create project status in database:', error)
+      }
+
       setAppDataState((prev) => ({
         ...prev,
         projectStatuses: [...prev.projectStatuses, newStatus],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateProjectStatus = useCallback((id: string, updates: Partial<ProjectStatusConfig>) => {
+    // Update in database
+    try {
+      const dbUpdates: any = {}
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.description !== undefined) dbUpdates.description = updates.description
+
+      databaseService.updateProjectStatus(id, dbUpdates)
+    } catch (error) {
+      console.error('Failed to update project status in database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projectStatuses: prev.projectStatuses.map((status) =>
@@ -1198,6 +1265,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteProjectStatus = useCallback((id: string) => {
+    // Delete from database (soft delete)
+    try {
+      databaseService.deleteProjectStatus(id)
+    } catch (error) {
+      console.error('Failed to delete project status from database:', error)
+    }
+
     setAppDataState((prev) => ({
       ...prev,
       projectStatuses: prev.projectStatuses.filter((s) => s.id !== id),

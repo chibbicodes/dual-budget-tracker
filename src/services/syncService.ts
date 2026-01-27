@@ -1120,7 +1120,8 @@ class SyncService {
     }
 
     if (!this.isAuthenticated()) {
-      console.warn('User not authenticated, cannot start auto-sync')
+      // User not authenticated yet - this is expected on app load before Firebase auth initializes
+      // Silently skip starting auto-sync
       return
     }
 

@@ -642,7 +642,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }
       })
     },
-    [appData.categories, appData.accounts, getProfileId]
+    [appData.categories, appData.accounts, appData.incomeSources, appData.projects, getProfileId]
   )
 
   const autoCategorizeTransaction = (description: string, budgetType: string): string => {

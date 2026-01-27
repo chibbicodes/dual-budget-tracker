@@ -435,10 +435,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Validate income source exists if provided
+      // Validate income source exists if provided (check both new incomeSources and legacy income)
       if (transactionWithoutLinking.incomeSourceId) {
         const incomeSource = appData.incomeSources.find(s => s.id === transactionWithoutLinking.incomeSourceId)
-        if (!incomeSource) {
+        const legacyIncome = appData.income.find(i => i.id === transactionWithoutLinking.incomeSourceId)
+        if (!incomeSource && !legacyIncome) {
           console.error('Income source not found:', transactionWithoutLinking.incomeSourceId)
           alert('The selected income source does not exist. Please refresh the page and try again.')
           return

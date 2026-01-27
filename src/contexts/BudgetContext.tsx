@@ -440,9 +440,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         const incomeSource = appData.incomeSources.find(s => s.id === transactionWithoutLinking.incomeSourceId)
         const legacyIncome = appData.income.find(i => i.id === transactionWithoutLinking.incomeSourceId)
         if (!incomeSource && !legacyIncome) {
-          console.error('Income source not found:', transactionWithoutLinking.incomeSourceId)
-          alert('The selected income source does not exist. Please refresh the page and try again.')
-          return
+          console.warn('Income source not found:', transactionWithoutLinking.incomeSourceId, '- removing invalid reference')
+          // Remove the invalid income source reference instead of blocking the transaction
+          delete transactionWithoutLinking.incomeSourceId
         }
       }
 

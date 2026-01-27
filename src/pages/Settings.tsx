@@ -27,6 +27,9 @@ export default function Settings() {
     addIncome,
     updateIncome,
     deleteIncome,
+    addIncomeSource,
+    updateIncomeSource,
+    deleteIncomeSource,
     addProjectType,
     updateProjectType,
     deleteProjectType,
@@ -688,10 +691,10 @@ export default function Settings() {
       {/* Income Sources Tab */}
       {activeTab === 'income' && (
         <IncomeSourceManager
-          incomeSources={appData.income}
-          onAddIncome={addIncome}
-          onUpdateIncome={updateIncome}
-          onDeleteIncome={deleteIncome}
+          incomeSources={appData.incomeSources}
+          onAddIncome={addIncomeSource}
+          onUpdateIncome={updateIncomeSource}
+          onDeleteIncome={deleteIncomeSource}
         />
       )}
 
@@ -1338,62 +1341,74 @@ function IncomeSourceManager({
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    source: '',
+    name: '',
     budgetType: 'household' as 'household' | 'business',
-    client: '',
+    incomeType: 'salary' as string,
+    clientSource: '',
     expectedAmount: '',
-    isRecurring: false,
+    frequency: 'monthly' as string,
+    isActive: true,
   })
 
   const handleAdd = () => {
-    if (!formData.source.trim()) {
+    if (!formData.name.trim()) {
       alert('Please enter an income source name')
       return
     }
-    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : undefined
+    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : 0
     onAddIncome({
-      ...formData,
+      name: formData.name,
+      budgetType: formData.budgetType,
+      incomeType: formData.incomeType,
+      clientSource: formData.clientSource || undefined,
       expectedAmount,
-      client: formData.client || undefined,
+      frequency: formData.frequency,
+      isActive: formData.isActive,
     })
-    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+    setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
     setIsAdding(false)
   }
 
   const handleEdit = (income: any) => {
     setEditingId(income.id)
     setFormData({
-      source: income.source,
+      name: income.name,
       budgetType: income.budgetType,
-      client: income.client || '',
+      incomeType: income.incomeType || 'salary',
+      clientSource: income.clientSource || '',
       expectedAmount: income.expectedAmount?.toString() || '',
-      isRecurring: income.isRecurring || false,
+      frequency: income.frequency || 'monthly',
+      isActive: income.isActive !== false,
     })
   }
 
   const handleUpdate = () => {
-    if (!formData.source.trim()) {
+    if (!formData.name.trim()) {
       alert('Please enter an income source name')
       return
     }
-    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : undefined
+    const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : 0
     onUpdateIncome(editingId!, {
-      ...formData,
+      name: formData.name,
+      budgetType: formData.budgetType,
+      incomeType: formData.incomeType,
+      clientSource: formData.clientSource || undefined,
       expectedAmount,
-      client: formData.client || undefined,
+      frequency: formData.frequency,
+      isActive: formData.isActive,
     })
     setEditingId(null)
-    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+    setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
   }
 
   const handleCancel = () => {
     setIsAdding(false)
     setEditingId(null)
-    setFormData({ source: '', budgetType: 'household', client: '', expectedAmount: '', isRecurring: false })
+    setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
   }
 
-  const handleDelete = (id: string, source: string) => {
-    if (confirm(`Are you sure you want to delete the income source "${source}"?`)) {
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete the income source "${name}"?`)) {
       onDeleteIncome(id)
     }
   }
@@ -1415,24 +1430,55 @@ function IncomeSourceManager({
                 <div className="space-y-3">
                   <input
                     type="text"
-                    value={formData.source}
-                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="Income Source Name"
                   />
                   <select
                     value={formData.budgetType}
-                    onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                    onChange={(e) => {
+                      const newBudgetType = e.target.value as 'household' | 'business'
+                      setFormData({
+                        ...formData,
+                        budgetType: newBudgetType,
+                        incomeType: newBudgetType === 'household' ? 'salary' : 'project-income'
+                      })
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   >
                     <option value="household">Household</option>
                     <option value="business">Business</option>
                   </select>
+                  <select
+                    value={formData.incomeType}
+                    onChange={(e) => setFormData({ ...formData, incomeType: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    {formData.budgetType === 'household' ? (
+                      <>
+                        <option value="salary">Salary</option>
+                        <option value="freelance">Freelance</option>
+                        <option value="investment">Investment</option>
+                        <option value="rental">Rental</option>
+                        <option value="gift">Gift</option>
+                        <option value="other">Other</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="project-income">Project Income</option>
+                        <option value="service-income">Service Income</option>
+                        <option value="product-sales">Product Sales</option>
+                        <option value="commission">Commission</option>
+                        <option value="other-income">Other Income</option>
+                      </>
+                    )}
+                  </select>
                   {formData.budgetType === 'business' && (
                     <input
                       type="text"
-                      value={formData.client}
-                      onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                      value={formData.clientSource}
+                      onChange={(e) => setFormData({ ...formData, clientSource: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="Client Name (optional)"
                     />
@@ -1443,16 +1489,28 @@ function IncomeSourceManager({
                     value={formData.expectedAmount}
                     onChange={(e) => setFormData({ ...formData, expectedAmount: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Expected Amount (optional)"
+                    placeholder="Expected Amount"
                   />
+                  <select
+                    value={formData.frequency}
+                    onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Bi-weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="annual">Annual</option>
+                    <option value="irregular">Irregular</option>
+                  </select>
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.isRecurring}
-                      onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                       className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                     />
-                    <span className="ml-2 text-sm text-gray-700">Recurring Monthly</span>
+                    <span className="ml-2 text-sm text-gray-700">Active</span>
                   </label>
                   <div className="flex gap-2">
                     <button
@@ -1473,12 +1531,16 @@ function IncomeSourceManager({
             ) : (
               <div key={income.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
                 <div>
-                  <div className="font-medium text-gray-900">{income.source}</div>
+                  <div className="font-medium text-gray-900">
+                    {income.name}
+                    {!income.isActive && <span className="ml-2 text-xs text-gray-500">(Inactive)</span>}
+                  </div>
                   <div className="text-sm text-gray-500">
                     {income.budgetType === 'household' ? 'Household' : 'Business'}
-                    {income.client && ` • Client: ${income.client}`}
+                    {income.incomeType && ` • ${income.incomeType}`}
+                    {income.clientSource && ` • Client: ${income.clientSource}`}
                     {income.expectedAmount && ` • Expected: $${income.expectedAmount.toFixed(2)}`}
-                    {income.isRecurring && ' • Recurring'}
+                    {income.frequency && ` • ${income.frequency}`}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1489,7 +1551,7 @@ function IncomeSourceManager({
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(income.id, income.source)}
+                    onClick={() => handleDelete(income.id, income.name)}
                     className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
                   >
                     Delete
@@ -1507,24 +1569,55 @@ function IncomeSourceManager({
             <div className="space-y-3">
               <input
                 type="text"
-                value={formData.source}
-                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="Income Source Name (e.g., Salary, Freelance)"
               />
               <select
                 value={formData.budgetType}
-                onChange={(e) => setFormData({ ...formData, budgetType: e.target.value as any })}
+                onChange={(e) => {
+                  const newBudgetType = e.target.value as 'household' | 'business'
+                  setFormData({
+                    ...formData,
+                    budgetType: newBudgetType,
+                    incomeType: newBudgetType === 'household' ? 'salary' : 'project-income'
+                  })
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="household">Household</option>
                 <option value="business">Business</option>
               </select>
+              <select
+                value={formData.incomeType}
+                onChange={(e) => setFormData({ ...formData, incomeType: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                {formData.budgetType === 'household' ? (
+                  <>
+                    <option value="salary">Salary</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="investment">Investment</option>
+                    <option value="rental">Rental</option>
+                    <option value="gift">Gift</option>
+                    <option value="other">Other</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="project-income">Project Income</option>
+                    <option value="service-income">Service Income</option>
+                    <option value="product-sales">Product Sales</option>
+                    <option value="commission">Commission</option>
+                    <option value="other-income">Other Income</option>
+                  </>
+                )}
+              </select>
               {formData.budgetType === 'business' && (
                 <input
                   type="text"
-                  value={formData.client}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                  value={formData.clientSource}
+                  onChange={(e) => setFormData({ ...formData, clientSource: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Client Name (optional)"
                 />
@@ -1535,16 +1628,28 @@ function IncomeSourceManager({
                 value={formData.expectedAmount}
                 onChange={(e) => setFormData({ ...formData, expectedAmount: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="Expected Amount (optional)"
+                placeholder="Expected Amount"
               />
+              <select
+                value={formData.frequency}
+                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Bi-weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annual">Annual</option>
+                <option value="irregular">Irregular</option>
+              </select>
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={formData.isRecurring}
-                  onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                 />
-                <span className="ml-2 text-sm text-gray-700">Recurring Monthly</span>
+                <span className="ml-2 text-sm text-gray-700">Active</span>
               </label>
               <div className="flex gap-2">
                 <button

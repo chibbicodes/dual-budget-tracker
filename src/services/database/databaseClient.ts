@@ -325,6 +325,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get transaction by ID including soft-deleted (for sync)
+   */
+  getTransactionForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getTransactionForSync(id)
+    }
+    return null
+  }
+
+  /**
    * Get income sources for a profile
    */
   getIncomeSources(profileId: string, budgetType?: string) {
@@ -384,6 +394,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get income source by ID including soft-deleted (for sync)
+   */
+  getIncomeSourceForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getIncomeSourceForSync(id)
+    }
+    return null
+  }
+
+  /**
    * Get projects for a profile
    */
   getProjects(profileId: string, budgetType?: string) {
@@ -440,6 +460,16 @@ class DatabaseClient {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.deleteProject(id)
     }
+  }
+
+  /**
+   * Get project by ID including soft-deleted (for sync)
+   */
+  getProjectForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectForSync(id)
+    }
+    return null
   }
 
   /**

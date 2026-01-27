@@ -500,11 +500,18 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         // Update source account balance
         const sourceAccount = accounts.find((a) => a.id === transactionWithoutLinking.accountId)
         if (sourceAccount) {
+          const newBalance = sourceAccount.balance + transactionWithoutLinking.amount
           accounts = accounts.map((a) =>
             a.id === sourceAccount.id
-              ? { ...a, balance: a.balance + transactionWithoutLinking.amount, updatedAt: now }
+              ? { ...a, balance: newBalance, updatedAt: now }
               : a
           )
+          // Persist balance to database
+          try {
+            databaseService.updateAccount(sourceAccount.id, { balance: newBalance })
+          } catch (error) {
+            console.error('Failed to update account balance in database:', error)
+          }
         }
 
         // Handle transfer linking
@@ -589,11 +596,18 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
               }
 
               // Update destination account balance
+              const destNewBalance = destAccount.balance + Math.abs(transactionWithoutLinking.amount)
               accounts = accounts.map((a) =>
                 a.id === destAccount.id
-                  ? { ...a, balance: a.balance + Math.abs(transactionWithoutLinking.amount), updatedAt: now }
+                  ? { ...a, balance: destNewBalance, updatedAt: now }
                   : a
               )
+              // Persist destination account balance to database
+              try {
+                databaseService.updateAccount(destAccount.id, { balance: destNewBalance })
+              } catch (error) {
+                console.error('Failed to update destination account balance in database:', error)
+              }
             } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
               // Link to existing transaction - update both
               const existingTx = prev.transactions.find(t => t.id === transactionWithoutLinking.linkedTransactionId)
@@ -1473,7 +1487,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     console.log('Load sample data - to be implemented')
   }, [])
 
-  const addMissingDefaultCategories = useCallback(() => {
+  const addMissingDefaultCategories = useCallback(async () => {
     const defaultCategories = generateDefaultCategories()
     const existingCategoryKeys = new Set(
       appData.categories.map((c) => `${c.name}|${c.budgetType}`)
@@ -1487,36 +1501,65 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     let addedCount = 0
     let reactivatedCount = 0
 
-    setAppDataState((prev) => {
-      const updatedCategories = prev.categories.map((category) => {
-        // Reactivate any deactivated income categories or transfer categories
-        if ((category.isIncomeCategory || category.excludeFromBudget) && !category.isActive) {
+    const profileId = getProfileId()
+    if (!profileId) {
+      console.error('No active profile')
+      return 0
+    }
+
+    // Reactivate any deactivated income categories or transfer categories
+    for (const category of appData.categories) {
+      if ((category.isIncomeCategory || category.excludeFromBudget) && !category.isActive) {
+        try {
+          await databaseService.updateCategory(category.id, {
+            is_active: 1,
+          })
           reactivatedCount++
-          return { ...category, isActive: true }
-        }
-        return category
-      })
-
-      if (missingCategories.length > 0) {
-        addedCount = missingCategories.length
-        return {
-          ...prev,
-          categories: [...updatedCategories, ...missingCategories],
+        } catch (error) {
+          console.error('Failed to reactivate category in database:', error)
         }
       }
+    }
 
-      if (reactivatedCount > 0) {
-        return {
-          ...prev,
-          categories: updatedCategories,
-        }
+    // Add missing categories to database
+    for (const category of missingCategories) {
+      try {
+        await databaseService.createCategory({
+          id: category.id,
+          profile_id: profileId,
+          name: category.name,
+          budget_type: category.budgetType,
+          bucket_id: category.bucketId,
+          category_group: category.categoryGroup,
+          monthly_budget: category.monthlyBudget || 0,
+          is_fixed_expense: category.isFixedExpense ? 1 : 0,
+          is_active: 1,
+          tax_deductible_by_default: category.taxDeductibleByDefault ? 1 : 0,
+          is_income_category: category.isIncomeCategory ? 1 : 0,
+          exclude_from_budget: category.excludeFromBudget ? 1 : 0,
+          icon: category.icon,
+        })
+        addedCount++
+      } catch (error) {
+        console.error('Failed to create category in database:', error)
       }
+    }
 
-      return prev
-    })
+    // Reload categories from database if any changes were made
+    if (addedCount > 0 || reactivatedCount > 0) {
+      try {
+        const categories = await databaseService.getCategories(profileId)
+        setAppDataState((prev) => ({
+          ...prev,
+          categories: categories.map(convertDbCategory),
+        }))
+      } catch (error) {
+        console.error('Failed to reload categories from database:', error)
+      }
+    }
 
     return addedCount + reactivatedCount
-  }, [appData.categories])
+  }, [appData.categories, getProfileId])
 
   const cleanupOldBusinessExpenseCategories = useCallback(() => {
     // List of the 34 tailored category names that should remain active

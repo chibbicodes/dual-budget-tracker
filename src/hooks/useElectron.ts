@@ -20,20 +20,27 @@ export function useElectron() {
     }
 
     // Handle navigation from menu shortcuts
-    window.electronAPI.onNavigate((path: string) => {
+    const unsubscribeNavigate = window.electronAPI.onNavigate((path: string) => {
       navigate(path)
     })
 
     // Handle budget view switching from menu shortcuts
-    window.electronAPI.onSwitchView((view: string) => {
+    const unsubscribeView = window.electronAPI.onSwitchView((view: string) => {
       setCurrentView(view as BudgetViewType)
     })
 
     // Handle logout from menu
-    window.electronAPI.onLogout(() => {
+    const unsubscribeLogout = window.electronAPI.onLogout(() => {
       if (confirm('Are you sure you want to logout? You will be returned to the profile selection screen.')) {
         logout()
       }
     })
+
+    // Cleanup listeners on unmount
+    return () => {
+      unsubscribeNavigate()
+      unsubscribeView()
+      unsubscribeLogout()
+    }
   }, [navigate, setCurrentView, logout])
 }

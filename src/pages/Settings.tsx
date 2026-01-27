@@ -183,8 +183,8 @@ export default function Settings() {
     updateSettings({ currencySymbol: symbol })
   }
 
-  const handleSyncCategories = () => {
-    const count = addMissingDefaultCategories()
+  const handleSyncCategories = async () => {
+    const count = await addMissingDefaultCategories()
     if (count > 0) {
       alert(`Successfully synced ${count} categories! This includes any missing default categories and reactivated income/transfer categories.`)
     } else {

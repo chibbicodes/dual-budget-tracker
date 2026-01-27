@@ -8,17 +8,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Listen for navigation commands from menu
   onNavigate: (callback) => {
-    ipcRenderer.on('navigate', (_event, path) => callback(path))
+    const handler = (_event, path) => callback(path)
+    ipcRenderer.on('navigate', handler)
+    return () => ipcRenderer.removeListener('navigate', handler)
   },
 
   // Listen for view switching commands from menu
   onSwitchView: (callback) => {
-    ipcRenderer.on('switch-view', (_event, view) => callback(view))
+    const handler = (_event, view) => callback(view)
+    ipcRenderer.on('switch-view', handler)
+    return () => ipcRenderer.removeListener('switch-view', handler)
   },
 
   // Listen for logout command from menu
   onLogout: (callback) => {
-    ipcRenderer.on('logout', () => callback())
+    const handler = () => callback()
+    ipcRenderer.on('logout', handler)
+    return () => ipcRenderer.removeListener('logout', handler)
   },
 
   // Database operations

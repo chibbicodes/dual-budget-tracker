@@ -332,5 +332,91 @@ export const applyMigrations = (db: Database.Database): void => {
     console.log('Migration 1 completed')
   }
 
+  // Migration 2: Fix FOREIGN KEY constraint for category_id
+  if (currentVersion < 2) {
+    console.log('Applying migration 2: Fixing FOREIGN KEY constraint for category_id...')
+
+    try {
+      // SQLite requires rebuilding the table to modify foreign key constraints
+      // Temporarily disable foreign key constraints
+      db.pragma('foreign_keys = OFF')
+
+      // Start a transaction
+      db.exec('BEGIN TRANSACTION')
+
+      // Create a new transactions table with the correct foreign key constraint
+      // Note: category_id is now nullable to allow ON DELETE SET NULL
+      db.exec(`
+        CREATE TABLE transactions_new (
+          id TEXT PRIMARY KEY,
+          profile_id TEXT NOT NULL,
+          date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount REAL NOT NULL,
+          category_id TEXT,
+          bucket_id TEXT,
+          budget_type TEXT NOT NULL CHECK (budget_type IN ('household', 'business')),
+          account_id TEXT NOT NULL,
+          to_account_id TEXT,
+          linked_transaction_id TEXT,
+          project_id TEXT,
+          income_source_id TEXT,
+          tax_deductible INTEGER NOT NULL DEFAULT 0,
+          reconciled INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT,
+          FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+          FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+          FOREIGN KEY (account_id) REFERENCES accounts(id),
+          FOREIGN KEY (to_account_id) REFERENCES accounts(id),
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+        )
+      `)
+
+      // Copy data from old table to new table
+      db.exec(`
+        INSERT INTO transactions_new
+        SELECT * FROM transactions
+      `)
+
+      // Drop old table
+      db.exec('DROP TABLE transactions')
+
+      // Rename new table to transactions
+      db.exec('ALTER TABLE transactions_new RENAME TO transactions')
+
+      // Recreate indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_transactions_profile ON transactions(profile_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(profile_id, date);
+        CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(account_id);
+      `)
+
+      // Commit transaction
+      db.exec('COMMIT')
+
+      // Re-enable foreign key constraints
+      db.pragma('foreign_keys = ON')
+
+      console.log('Migration 2 completed successfully')
+    } catch (error) {
+      console.error('Migration 2 failed:', error)
+      // Rollback on error
+      try {
+        db.exec('ROLLBACK')
+        db.pragma('foreign_keys = ON')
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError)
+      }
+      throw error
+    }
+
+    // Update version
+    db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '2')
+  }
+
   console.log('All migrations applied')
 }

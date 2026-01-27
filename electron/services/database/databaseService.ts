@@ -712,6 +712,15 @@ class DatabaseService {
   }
 
   /**
+   * Get a transaction by ID for sync (including soft-deleted)
+   */
+  getTransactionForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM transactions WHERE id = ?')
+    return stmt.get(id)
+  }
+
+  /**
    * Create a new transaction
    */
   createTransaction(transaction: {
@@ -881,6 +890,15 @@ class DatabaseService {
   }
 
   /**
+   * Get an income source by ID for sync (including soft-deleted)
+   */
+  getIncomeSourceForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM income_sources WHERE id = ?')
+    return stmt.get(id)
+  }
+
+  /**
    * Update an income source
    */
   updateIncomeSource(id: string, updates: Record<string, any>) {
@@ -990,6 +1008,15 @@ class DatabaseService {
   getProject(id: string) {
     const db = this.getDb()
     const stmt = db.prepare('SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL')
+    return stmt.get(id)
+  }
+
+  /**
+   * Get a project by ID for sync (including soft-deleted)
+   */
+  getProjectForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM projects WHERE id = ?')
     return stmt.get(id)
   }
 

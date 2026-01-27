@@ -220,6 +220,11 @@ ipcMain.handle('db:getTransaction', async (_event, id: string) => {
   return databaseService.getTransaction(id)
 })
 
+ipcMain.handle('db:getTransactionForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getTransactionForSync(id)
+})
+
 ipcMain.handle('db:createTransaction', async (_event, transaction: any) => {
   await databaseServicePromise
   return databaseService.createTransaction(transaction)
@@ -241,6 +246,11 @@ ipcMain.handle('db:getIncomeSource', async (_event, id: string) => {
   return databaseService.getIncomeSource(id)
 })
 
+ipcMain.handle('db:getIncomeSourceForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getIncomeSourceForSync(id)
+})
+
 ipcMain.handle('db:createIncomeSource', async (_event, source: any) => {
   await databaseServicePromise
   return databaseService.createIncomeSource(source)
@@ -260,6 +270,11 @@ ipcMain.handle('db:deleteIncomeSource', async (_event, id: string) => {
 ipcMain.handle('db:getProject', async (_event, id: string) => {
   await databaseServicePromise
   return databaseService.getProject(id)
+})
+
+ipcMain.handle('db:getProjectForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectForSync(id)
 })
 
 ipcMain.handle('db:createProject', async (_event, project: any) => {

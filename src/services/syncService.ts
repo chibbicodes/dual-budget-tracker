@@ -496,7 +496,7 @@ class SyncService {
           continue
         }
 
-        const localTransaction = await databaseService.getTransaction(cloudTransaction.id)
+        const localTransaction = await databaseService.getTransactionForSync(cloudTransaction.id)
 
         // Compare timestamps - update if cloud is newer
         if (
@@ -506,7 +506,7 @@ class SyncService {
           new Date(cloudTransaction.updatedAt) > new Date(localTransaction.updated_at)
         ) {
           if (localTransaction) {
-            // Update existing
+            // Update existing (and resurrect if soft-deleted)
             await databaseService.updateTransaction(cloudTransaction.id, {
               date: cloudTransaction.date,
               description: cloudTransaction.description,
@@ -522,6 +522,7 @@ class SyncService {
               tax_deductible: cloudTransaction.taxDeductible,
               reconciled: cloudTransaction.reconciled,
               notes: cloudTransaction.notes,
+              deleted_at: null,
             })
           } else {
             // Create new
@@ -572,7 +573,7 @@ class SyncService {
           continue
         }
 
-        const localIncomeSource = await databaseService.getIncomeSource(cloudIncomeSource.id)
+        const localIncomeSource = await databaseService.getIncomeSourceForSync(cloudIncomeSource.id)
 
         // Compare timestamps - update if cloud is newer
         if (
@@ -582,7 +583,7 @@ class SyncService {
           new Date(cloudIncomeSource.updatedAt) > new Date(localIncomeSource.updated_at)
         ) {
           if (localIncomeSource) {
-            // Update existing
+            // Update existing (and resurrect if soft-deleted)
             await databaseService.updateIncomeSource(cloudIncomeSource.id, {
               name: cloudIncomeSource.name,
               budget_type: cloudIncomeSource.budgetType,
@@ -593,6 +594,7 @@ class SyncService {
               next_expected_date: cloudIncomeSource.nextExpectedDate,
               client_source: cloudIncomeSource.clientSource,
               is_active: cloudIncomeSource.isActive,
+              deleted_at: null,
             })
           } else {
             // Create new
@@ -638,7 +640,7 @@ class SyncService {
           continue
         }
 
-        const localProject = await databaseService.getProject(cloudProject.id)
+        const localProject = await databaseService.getProjectForSync(cloudProject.id)
 
         // Compare timestamps - update if cloud is newer
         if (
@@ -648,7 +650,7 @@ class SyncService {
           new Date(cloudProject.updatedAt) > new Date(localProject.updated_at)
         ) {
           if (localProject) {
-            // Update existing
+            // Update existing (and resurrect if soft-deleted)
             await databaseService.updateProject(cloudProject.id, {
               name: cloudProject.name,
               budget_type: cloudProject.budgetType,
@@ -660,6 +662,7 @@ class SyncService {
               date_completed: cloudProject.dateCompleted,
               commission_paid: cloudProject.commissionPaid,
               notes: cloudProject.notes,
+              deleted_at: null,
             })
           } else {
             // Create new

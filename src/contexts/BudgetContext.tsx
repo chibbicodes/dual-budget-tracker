@@ -896,7 +896,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ============================================================================
 
   const addIncomeSource = useCallback(
-    (income: Omit<IncomeSource, 'id' | 'createdAt' | 'updatedAt'>) => {
+    async (income: Omit<IncomeSource, 'id' | 'createdAt' | 'updatedAt'>) => {
       const profileId = getProfileId()
       if (!profileId) {
         console.error('No active profile')
@@ -913,7 +913,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
       // Save to database
       try {
-        databaseService.createIncomeSource({
+        await databaseService.createIncomeSource({
           id: newIncome.id,
           profile_id: profileId,
           name: newIncome.name,
@@ -926,19 +926,21 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           client_source: newIncome.clientSource,
           is_active: newIncome.isActive !== false ? 1 : 0,
         })
+
+        // Only update state after successful database write
+        setAppDataState((prev) => ({
+          ...prev,
+          incomeSources: [...prev.incomeSources, newIncome],
+        }))
       } catch (error) {
         console.error('Failed to create income source in database:', error)
+        throw error
       }
-
-      setAppDataState((prev) => ({
-        ...prev,
-        incomeSources: [...prev.incomeSources, newIncome],
-      }))
     },
     [getProfileId]
   )
 
-  const updateIncomeSource = useCallback((id: string, updates: Partial<IncomeSource>) => {
+  const updateIncomeSource = useCallback(async (id: string, updates: Partial<IncomeSource>) => {
     // Update in database
     try {
       const dbUpdates: any = {}
@@ -952,37 +954,41 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       if (updates.clientSource !== undefined) dbUpdates.client_source = updates.clientSource
       if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive ? 1 : 0
 
-      databaseService.updateIncomeSource(id, dbUpdates)
+      await databaseService.updateIncomeSource(id, dbUpdates)
+
+      // Only update state after successful database write
+      setAppDataState((prev) => ({
+        ...prev,
+        incomeSources: prev.incomeSources.map((income) =>
+          income.id === id
+            ? {
+                ...income,
+                ...updates,
+                updatedAt: new Date().toISOString(),
+              }
+            : income
+        ),
+      }))
     } catch (error) {
       console.error('Failed to update income source in database:', error)
+      throw error
     }
-
-    setAppDataState((prev) => ({
-      ...prev,
-      incomeSources: prev.incomeSources.map((income) =>
-        income.id === id
-          ? {
-              ...income,
-              ...updates,
-              updatedAt: new Date().toISOString(),
-            }
-          : income
-      ),
-    }))
   }, [])
 
-  const deleteIncomeSource = useCallback((id: string) => {
+  const deleteIncomeSource = useCallback(async (id: string) => {
     // Delete from database
     try {
-      databaseService.deleteIncomeSource(id)
+      await databaseService.deleteIncomeSource(id)
+
+      // Only update state after successful database write
+      setAppDataState((prev) => ({
+        ...prev,
+        incomeSources: prev.incomeSources.filter((i) => i.id !== id),
+      }))
     } catch (error) {
       console.error('Failed to delete income source from database:', error)
+      throw error
     }
-
-    setAppDataState((prev) => ({
-      ...prev,
-      incomeSources: prev.incomeSources.filter((i) => i.id !== id),
-    }))
   }, [])
 
   // ============================================================================

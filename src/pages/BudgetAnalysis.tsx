@@ -3,7 +3,7 @@ import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency, calculateBudgetSummary } from '../utils/calculations'
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lightbulb } from 'lucide-react'
 import ExportButtons from '../components/ExportButtons'
-import { exportToCSV, exportToPDF } from '../utils/export'
+import { exportToCSV, exportAnalysisToPDF } from '../utils/export'
 import type { BudgetType, Category } from '../types'
 import { subMonths, format, startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns'
 
@@ -323,7 +323,74 @@ export default function BudgetAnalysis() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = appData.categories
+    const savingsRate = analysis.avgIncome > 0 ? (analysis.avgNet / analysis.avgIncome) * 100 : 0
+
+    // Create comprehensive CSV with multiple sections
+    const csvData = [
+      // Summary metrics
+      { Label: 'SUMMARY METRICS', Value: '' },
+      { Label: 'Time Range', Value: timeRange.replace('_', ' ').toUpperCase() },
+      { Label: 'Average Monthly Income', Value: `$${analysis.avgIncome.toFixed(2)}` },
+      { Label: 'Income Trend', Value: `${analysis.incomeTrend > 0 ? '+' : ''}${analysis.incomeTrend.toFixed(1)}%` },
+      { Label: 'Average Monthly Expenses', Value: `$${analysis.avgExpenses.toFixed(2)}` },
+      { Label: 'Expense Trend', Value: `${analysis.expenseTrend > 0 ? '+' : ''}${analysis.expenseTrend.toFixed(1)}%` },
+      { Label: 'Average Net', Value: `$${analysis.avgNet.toFixed(2)}` },
+      { Label: 'Average Savings Rate', Value: `${savingsRate.toFixed(1)}%` },
+      { Label: '', Value: '' },
+    ]
+
+    // Add 50/30/20 compliance if applicable
+    if (budgetCompliance) {
+      csvData.push(
+        { Label: '50/30/20 BUDGET RULE COMPLIANCE', Value: '' },
+        { Label: 'Needs (Target: 50%)', Value: `${budgetCompliance.needs.actual.toFixed(1)}% (${budgetCompliance.needs.diff > 0 ? '+' : ''}${budgetCompliance.needs.diff.toFixed(1)}% from target)` },
+        { Label: 'Wants (Target: 30%)', Value: `${budgetCompliance.wants.actual.toFixed(1)}% (${budgetCompliance.wants.diff > 0 ? '+' : ''}${budgetCompliance.wants.diff.toFixed(1)}% from target)` },
+        { Label: 'Savings (Target: 20%)', Value: `${budgetCompliance.savings.actual.toFixed(1)}% (${budgetCompliance.savings.diff > 0 ? '+' : ''}${budgetCompliance.savings.diff.toFixed(1)}% from target)` },
+        { Label: '', Value: '' }
+      )
+    }
+
+    // Add smart suggestions
+    if (suggestions.length > 0) {
+      csvData.push(
+        { Label: 'SMART BUDGET SUGGESTIONS', Value: '' },
+        { Label: 'Category', Value: 'Suggestion | Current Budget | Suggested Budget | Reason' },
+        ...suggestions.map(s => ({
+          Label: s.category.name,
+          Value: `${s.type.toUpperCase()} | $${s.category.monthlyBudget.toFixed(2)} | $${(analysis.categoryAverages.get(s.category.id) || 0).toFixed(2)} | ${s.reason}`
+        })),
+        { Label: '', Value: '' }
+      )
+    }
+
+    // Add vendor analysis
+    if (vendorAnalysis.length > 0) {
+      csvData.push(
+        { Label: 'VENDOR ANALYSIS (EXPENSES)', Value: '' },
+        { Label: 'Vendor', Value: 'Total Paid | Transactions' },
+        ...vendorAnalysis.map(v => ({
+          Label: v.vendor,
+          Value: `$${v.totalPaid.toFixed(2)} | ${v.count}`
+        })),
+        { Label: '', Value: '' }
+      )
+    }
+
+    // Add payee analysis
+    if (payeeAnalysis.length > 0) {
+      csvData.push(
+        { Label: 'PAYEE ANALYSIS (INCOME)', Value: '' },
+        { Label: 'Payee', Value: 'Total Received | Transactions' },
+        ...payeeAnalysis.map(p => ({
+          Label: p.payee,
+          Value: `$${p.totalReceived.toFixed(2)} | ${p.count}`
+        })),
+        { Label: '', Value: '' }
+      )
+    }
+
+    // Add category analysis
+    const categoriesWithSpending = appData.categories
       .filter((c) => c.budgetType === budgetType && !c.isIncomeCategory)
       .map(category => {
         const avg = analysis.categoryAverages.get(category.id) || 0
@@ -331,24 +398,46 @@ export default function BudgetAnalysis() {
         const latestMonth = historicalData.length > 0
           ? (historicalData[historicalData.length - 1].categorySpending[category.id] || 0)
           : 0
-
-        return {
-          Category: category.name,
-          'Average Spending': avg,
-          'Latest Month': latestMonth,
-          'Monthly Budget': category.monthlyBudget,
-          'Trend': trend > 0 ? 'Increasing' : trend < 0 ? 'Decreasing' : 'Stable',
-          'Percent Change': `${trend.toFixed(1)}%`
-        }
+        return { category, avg, trend, latestMonth }
       })
-      .filter(item => item['Average Spending'] > 0) // Only include categories with spending
+      .filter(item => item.avg > 0)
+
+    if (categoriesWithSpending.length > 0) {
+      csvData.push(
+        { Label: 'CATEGORY ANALYSIS', Value: '' },
+        { Label: 'Category', Value: 'Average | Latest Month | Budget | Trend | % Change' },
+        ...categoriesWithSpending.map(item => ({
+          Label: item.category.name,
+          Value: `$${item.avg.toFixed(2)} | $${item.latestMonth.toFixed(2)} | $${item.category.monthlyBudget.toFixed(2)} | ${item.trend > 0 ? 'Increasing' : item.trend < 0 ? 'Decreasing' : 'Stable'} | ${item.trend.toFixed(1)}%`
+        })),
+        { Label: '', Value: '' }
+      )
+    }
+
+    // Add historical monthly trends
+    if (historicalData.length > 0) {
+      csvData.push(
+        { Label: 'MONTHLY TRENDS', Value: '' },
+        { Label: 'Month', Value: 'Income | Expenses | Net | Savings Rate' },
+        ...historicalData.map(month => {
+          const monthSavingsRate = month.income > 0 ? (month.net / month.income) * 100 : 0
+          return {
+            Label: format(month.month, 'MMM yyyy'),
+            Value: `$${month.income.toFixed(2)} | $${month.expenses.toFixed(2)} | $${month.net.toFixed(2)} | ${monthSavingsRate.toFixed(1)}%`
+          }
+        })
+      )
+    }
 
     const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
-    exportToCSV(exportData, filename)
+    exportToCSV(csvData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = appData.categories
+    const savingsRate = analysis.avgIncome > 0 ? (analysis.avgNet / analysis.avgIncome) * 100 : 0
+
+    // Prepare category analysis data
+    const categoryAnalysisData = appData.categories
       .filter((c) => c.budgetType === budgetType && !c.isIncomeCategory)
       .map(category => {
         const avg = analysis.categoryAverages.get(category.id) || 0
@@ -359,24 +448,53 @@ export default function BudgetAnalysis() {
 
         return {
           category: category.name,
-          average: formatCurrency(avg),
-          latest: formatCurrency(latestMonth),
-          budget: formatCurrency(category.monthlyBudget),
+          average: avg,
+          latest: latestMonth,
+          budget: category.monthlyBudget,
           trend: trend > 0 ? 'Increasing' : trend < 0 ? 'Decreasing' : 'Stable',
-          percentChange: `${trend.toFixed(1)}%`
+          percentChange: trend
         }
       })
-      .filter(item => parseFloat(item.average.replace(/[$,]/g, '')) > 0) // Only include categories with spending
+      .filter(item => item.average > 0)
 
-    const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
-    const title = `${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget Analysis`
+    // Prepare suggestions data
+    const suggestionsData = suggestions.map(s => ({
+      categoryName: s.category.name,
+      type: s.type,
+      currentBudget: s.category.monthlyBudget,
+      suggestedBudget: analysis.categoryAverages.get(s.category.id) || 0,
+      reason: s.reason
+    }))
 
-    exportToPDF(
-      exportData,
-      filename,
-      title,
-      ['Category', 'Average', 'Latest', 'Budget', 'Trend', '% Change'],
-      ['category', 'average', 'latest', 'budget', 'trend', 'percentChange']
+    // Prepare historical data
+    const historicalDataForExport = historicalData.map(month => {
+      const monthSavingsRate = month.income > 0 ? (month.net / month.income) * 100 : 0
+      return {
+        month: format(month.month, 'MMM yyyy'),
+        income: month.income,
+        expenses: month.expenses,
+        net: month.net,
+        savingsRate: monthSavingsRate
+      }
+    })
+
+    exportAnalysisToPDF(
+      budgetType,
+      timeRange,
+      {
+        avgIncome: analysis.avgIncome,
+        avgExpenses: analysis.avgExpenses,
+        avgNet: analysis.avgNet,
+        incomeTrend: analysis.incomeTrend,
+        expenseTrend: analysis.expenseTrend,
+        savingsRate: savingsRate
+      },
+      budgetCompliance,
+      suggestionsData,
+      vendorAnalysis,
+      payeeAnalysis,
+      categoryAnalysisData,
+      historicalDataForExport
     )
   }
 

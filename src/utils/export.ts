@@ -380,6 +380,248 @@ export function exportDashboardToPDF(
 }
 
 /**
+ * Exports budget analysis data to PDF
+ */
+export function exportAnalysisToPDF(
+  budgetType: string,
+  timeRange: string,
+  metrics: {
+    avgIncome: number;
+    avgExpenses: number;
+    avgNet: number;
+    incomeTrend: number;
+    expenseTrend: number;
+    savingsRate: number;
+  },
+  budgetCompliance: {
+    needs: { actual: number; target: number; diff: number };
+    wants: { actual: number; target: number; diff: number };
+    savings: { actual: number; target: number; diff: number };
+  } | null,
+  suggestions: Array<{
+    categoryName: string;
+    type: string;
+    currentBudget: number;
+    suggestedBudget: number;
+    reason: string;
+  }>,
+  vendorAnalysis: Array<{
+    vendor: string;
+    totalPaid: number;
+    count: number;
+  }>,
+  payeeAnalysis: Array<{
+    payee: string;
+    totalReceived: number;
+    count: number;
+  }>,
+  categoryAnalysis: Array<{
+    category: string;
+    average: number;
+    latest: number;
+    budget: number;
+    trend: string;
+    percentChange: number;
+  }>,
+  historicalData: Array<{
+    month: string;
+    income: number;
+    expenses: number;
+    net: number;
+    savingsRate: number;
+  }>
+) {
+  const doc = new jsPDF();
+
+  // Title
+  doc.setFontSize(20);
+  doc.text(`${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget Analysis`, 14, 20);
+
+  // Date and time range
+  doc.setFontSize(10);
+  const date = new Date().toLocaleDateString();
+  doc.text(`Generated on: ${date}`, 14, 28);
+  doc.text(`Time Range: ${timeRange.replace('_', ' ').toUpperCase()}`, 14, 34);
+
+  let yPos = 45;
+
+  // Summary Metrics
+  doc.setFontSize(14);
+  doc.text('Summary Metrics', 14, yPos);
+  yPos += 8;
+
+  doc.setFontSize(10);
+  doc.text(`Average Monthly Income: $${metrics.avgIncome.toFixed(2)} (${metrics.incomeTrend > 0 ? '+' : ''}${metrics.incomeTrend.toFixed(1)}% trend)`, 20, yPos);
+  yPos += 6;
+  doc.text(`Average Monthly Expenses: $${metrics.avgExpenses.toFixed(2)} (${metrics.expenseTrend > 0 ? '+' : ''}${metrics.expenseTrend.toFixed(1)}% trend)`, 20, yPos);
+  yPos += 6;
+  doc.text(`Average Net: $${metrics.avgNet.toFixed(2)}`, 20, yPos);
+  yPos += 6;
+  doc.text(`Average Savings Rate: ${metrics.savingsRate.toFixed(1)}%`, 20, yPos);
+  yPos += 10;
+
+  // 50/30/20 Compliance (if applicable)
+  if (budgetCompliance) {
+    doc.setFontSize(14);
+    doc.text('50/30/20 Budget Rule Compliance', 14, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.text(`Needs: ${budgetCompliance.needs.actual.toFixed(1)}% (Target: ${budgetCompliance.needs.target}%, ${budgetCompliance.needs.diff > 0 ? '+' : ''}${budgetCompliance.needs.diff.toFixed(1)}% from target)`, 20, yPos);
+    yPos += 6;
+    doc.text(`Wants: ${budgetCompliance.wants.actual.toFixed(1)}% (Target: ${budgetCompliance.wants.target}%, ${budgetCompliance.wants.diff > 0 ? '+' : ''}${budgetCompliance.wants.diff.toFixed(1)}% from target)`, 20, yPos);
+    yPos += 6;
+    doc.text(`Savings: ${budgetCompliance.savings.actual.toFixed(1)}% (Target: ${budgetCompliance.savings.target}%, ${budgetCompliance.savings.diff > 0 ? '+' : ''}${budgetCompliance.savings.diff.toFixed(1)}% from target)`, 20, yPos);
+    yPos += 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Smart Budget Suggestions
+  if (suggestions.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Smart Budget Suggestions', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      head: [['Category', 'Type', 'Current', 'Suggested', 'Reason']],
+      body: suggestions.map(s => [
+        s.categoryName,
+        s.type.toUpperCase(),
+        `$${s.currentBudget.toFixed(2)}`,
+        `$${s.suggestedBudget.toFixed(2)}`,
+        s.reason.length > 40 ? s.reason.substring(0, 37) + '...' : s.reason
+      ]),
+      startY: yPos,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: {
+        4: { cellWidth: 60 }
+      }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Vendor Analysis
+  if (vendorAnalysis.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Vendor Analysis (Expenses)', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      head: [['Vendor', 'Total Paid', 'Transactions']],
+      body: vendorAnalysis.slice(0, 15).map(v => [
+        v.vendor.length > 40 ? v.vendor.substring(0, 37) + '...' : v.vendor,
+        `$${v.totalPaid.toFixed(2)}`,
+        v.count.toString()
+      ]),
+      startY: yPos,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [239, 68, 68] },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Payee Analysis
+  if (payeeAnalysis.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Payee Analysis (Income)', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      head: [['Payee', 'Total Received', 'Transactions']],
+      body: payeeAnalysis.slice(0, 15).map(p => [
+        p.payee.length > 40 ? p.payee.substring(0, 37) + '...' : p.payee,
+        `$${p.totalReceived.toFixed(2)}`,
+        p.count.toString()
+      ]),
+      startY: yPos,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [34, 197, 94] },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Category Analysis
+  if (categoryAnalysis.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Category Analysis', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      head: [['Category', 'Average', 'Latest', 'Budget', 'Trend', '% Change']],
+      body: categoryAnalysis.map(c => [
+        c.category,
+        `$${c.average.toFixed(2)}`,
+        `$${c.latest.toFixed(2)}`,
+        `$${c.budget.toFixed(2)}`,
+        c.trend,
+        `${c.percentChange.toFixed(1)}%`
+      ]),
+      startY: yPos,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Historical Monthly Trends
+  if (historicalData.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Monthly Trends', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      head: [['Month', 'Income', 'Expenses', 'Net', 'Savings Rate']],
+      body: historicalData.map(m => [
+        m.month,
+        `$${m.income.toFixed(2)}`,
+        `$${m.expenses.toFixed(2)}`,
+        `$${m.net.toFixed(2)}`,
+        `${m.savingsRate.toFixed(1)}%`
+      ]),
+      startY: yPos,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+  }
+
+  doc.save(`${budgetType}-analysis-${timeRange}-${date}.pdf`);
+}
+
+/**
  * Format currency for export
  */
 export function formatCurrency(amount: number): string {

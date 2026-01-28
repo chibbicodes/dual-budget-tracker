@@ -1193,6 +1193,223 @@ interface ProjectDetailViewProps {
 function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
   const { appData } = useBudget()
 
+  // Export handlers for project detail
+  const handleExportCSV = () => {
+    const projectType = appData.projectTypes.find((t) => t.id === project.projectTypeId)
+    const status = appData.projectStatuses.find((s) => s.id === project.statusId)
+    const incomeSource = project.incomeSourceId
+      ? appData.income.find((s) => s.id === project.incomeSourceId)
+      : null
+
+    // Project header info
+    const headerData = {
+      'Project Name': project.name,
+      'Budget Type': project.budgetType === 'household' ? 'Household' : 'Business',
+      'Project Type': projectType?.name || 'Unknown',
+      'Status': status?.name || 'Unknown',
+      'Date Created': format(parseISO(project.dateCreated + 'T12:00:00'), 'MM/dd/yyyy'),
+      'Date Completed': project.dateCompleted ? format(parseISO(project.dateCompleted + 'T12:00:00'), 'MM/dd/yyyy') : '',
+      'Income Source': incomeSource?.source || '',
+      'Notes': project.notes || ''
+    }
+
+    // Categories summary
+    const categoriesData = categoryBreakdown.map((item) => ({
+      Category: item.category,
+      Type: item.isIncome ? 'Income' : 'Expense',
+      Amount: item.amount,
+      'Percentage of Total': `${item.percentage.toFixed(1)}%`
+    }))
+
+    // Transactions detail
+    const transactionsData = transactions
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((transaction) => {
+        const category = appData.categories.find((c) => c.id === transaction.categoryId)
+        return {
+          Date: format(parseISO(transaction.date + 'T12:00:00'), 'MM/dd/yyyy'),
+          Description: transaction.description,
+          Category: category?.name || 'Uncategorized',
+          Amount: transaction.amount,
+          Type: transaction.amount >= 0 ? 'Income' : 'Expense'
+        }
+      })
+
+    // Combine all sections with headers
+    const exportData = [
+      { Section: '=== PROJECT DETAILS ===' },
+      headerData,
+      { Section: '' },
+      { Section: '=== SUMMARY ===' },
+      project.budgetType === 'household'
+        ? {
+            'Total Budget': budgetMetrics.budget,
+            'Amount Spent': budgetMetrics.spent,
+            'Remaining': budgetMetrics.remaining,
+            'Percent Used': `${budgetMetrics.percentUsed.toFixed(1)}%`,
+            'Over Budget': budgetMetrics.isOverBudget ? 'Yes' : 'No'
+          }
+        : {
+            Revenue: totals.revenue,
+            Expenses: totals.expenses,
+            Profit: totals.profit,
+            'Profit Margin': `${totals.margin.toFixed(1)}%`
+          },
+      { Section: '' },
+      { Section: '=== CATEGORIES ===' },
+      ...categoriesData,
+      { Section: '' },
+      { Section: '=== TRANSACTIONS ===' },
+      ...transactionsData
+    ]
+
+    const filename = `project-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    // Import jsPDF and autoTable dynamically
+    import('jspdf').then((jsPDFModule) => {
+      import('jspdf-autotable').then((autoTableModule) => {
+        const jsPDF = jsPDFModule.default
+        const autoTable = autoTableModule.default
+
+        const doc = new jsPDF()
+        const projectType = appData.projectTypes.find((t) => t.id === project.projectTypeId)
+        const status = appData.projectStatuses.find((s) => s.id === project.statusId)
+        const incomeSource = project.incomeSourceId
+          ? appData.income.find((s) => s.id === project.incomeSourceId)
+          : null
+
+        let yPos = 20
+
+        // Title
+        doc.setFontSize(18)
+        doc.text(`Project: ${project.name}`, 14, yPos)
+        yPos += 10
+
+        // Date
+        doc.setFontSize(9)
+        doc.text(`Generated on: ${format(new Date(), 'MM/dd/yyyy')}`, 14, yPos)
+        yPos += 10
+
+        // Project Details Section
+        doc.setFontSize(12)
+        doc.text('Project Details', 14, yPos)
+        yPos += 6
+
+        doc.setFontSize(9)
+        doc.text(`Type: ${projectType?.name || 'Unknown'}`, 20, yPos)
+        yPos += 5
+        doc.text(`Status: ${status?.name || 'Unknown'}`, 20, yPos)
+        yPos += 5
+        doc.text(`Budget Type: ${project.budgetType === 'household' ? 'Household' : 'Business'}`, 20, yPos)
+        yPos += 5
+        doc.text(`Created: ${format(parseISO(project.dateCreated + 'T12:00:00'), 'MM/dd/yyyy')}`, 20, yPos)
+        yPos += 5
+        if (project.dateCompleted) {
+          doc.text(`Completed: ${format(parseISO(project.dateCompleted + 'T12:00:00'), 'MM/dd/yyyy')}`, 20, yPos)
+          yPos += 5
+        }
+        if (incomeSource) {
+          doc.text(`Income Source: ${incomeSource.source}`, 20, yPos)
+          yPos += 5
+        }
+        yPos += 5
+
+        // Summary Section
+        doc.setFontSize(12)
+        doc.text(project.budgetType === 'household' ? 'Budget Summary' : 'P&L Summary', 14, yPos)
+        yPos += 6
+
+        doc.setFontSize(9)
+        if (project.budgetType === 'household') {
+          doc.text(`Budget: ${formatCurrency(budgetMetrics.budget)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Spent: ${formatCurrency(budgetMetrics.spent)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Remaining: ${formatCurrency(budgetMetrics.remaining)}`, 20, yPos)
+          yPos += 5
+          doc.text(`% Used: ${budgetMetrics.percentUsed.toFixed(1)}%`, 20, yPos)
+          yPos += 5
+          if (budgetMetrics.isOverBudget) {
+            doc.text(`Over Budget: Yes`, 20, yPos)
+            yPos += 5
+          }
+        } else {
+          doc.text(`Revenue: ${formatCurrency(totals.revenue)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Expenses: ${formatCurrency(totals.expenses)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Profit: ${formatCurrency(totals.profit)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Margin: ${totals.margin.toFixed(1)}%`, 20, yPos)
+          yPos += 5
+        }
+        yPos += 5
+
+        // Categories Section
+        doc.setFontSize(12)
+        doc.text('Categories', 14, yPos)
+        yPos += 3
+
+        const categoriesData = categoryBreakdown.map((item) => [
+          item.category,
+          item.isIncome ? 'Income' : 'Expense',
+          formatCurrency(item.amount),
+          `${item.percentage.toFixed(1)}%`
+        ])
+
+        autoTable(doc, {
+          head: [['Category', 'Type', 'Amount', '% of Total']],
+          body: categoriesData,
+          startY: yPos,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [59, 130, 246] },
+        })
+
+        yPos = (doc as any).lastAutoTable.finalY + 10
+
+        // Check if we need a new page
+        if (yPos > 240) {
+          doc.addPage()
+          yPos = 20
+        }
+
+        // Transactions Section
+        doc.setFontSize(12)
+        const transactionCount = transactions.length
+        const displayCount = Math.min(50, transactionCount)
+        doc.text(`Transactions (${displayCount}${transactionCount > 50 ? ` of ${transactionCount}` : ''})`, 14, yPos)
+        yPos += 3
+
+        const transactionsData = transactions
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 50)
+          .map((transaction) => {
+            const category = appData.categories.find((c) => c.id === transaction.categoryId)
+            return [
+              format(parseISO(transaction.date + 'T12:00:00'), 'MM/dd/yy'),
+              transaction.description.substring(0, 35),
+              (category?.name || 'Uncategorized').substring(0, 15),
+              formatCurrency(transaction.amount)
+            ]
+          })
+
+        autoTable(doc, {
+          head: [['Date', 'Description', 'Category', 'Amount']],
+          body: transactionsData,
+          startY: yPos,
+          styles: { fontSize: 7 },
+          headStyles: { fillColor: [59, 130, 246] },
+        })
+
+        const filename = `project-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}`
+        doc.save(`${filename}.pdf`)
+      })
+    })
+  }
+
   // Get project metadata
   const projectType = appData.projectTypes.find((t) => t.id === project.projectTypeId)
   const status = appData.projectStatuses.find((s) => s.id === project.statusId)
@@ -1339,6 +1556,15 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
     return (
       <Modal isOpen={true} onClose={onClose} title={project.name} size="xl">
         <div className="space-y-6">
+          {/* Export Buttons */}
+          <div className="flex justify-end">
+            <ExportButtons
+              onExportCSV={handleExportCSV}
+              onExportPDF={handleExportPDF}
+              disabled={transactions.length === 0}
+            />
+          </div>
+
           {/* Project Info with Status Badge */}
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-start justify-between mb-4">
@@ -1579,6 +1805,15 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
   return (
     <Modal isOpen={true} onClose={onClose} title={project.name} size="xl">
       <div className="space-y-6">
+        {/* Export Buttons */}
+        <div className="flex justify-end">
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={transactions.length === 0}
+          />
+        </div>
+
         {/* Project Info */}
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

@@ -82,31 +82,28 @@ export default function Dashboard() {
     // Create comprehensive CSV with multiple sections
     const csvData = [
       // Summary section
-      { Section: 'COMBINED OVERVIEW' },
-      { Section: 'Total Assets', Value: combinedSummary.totalAssets.toFixed(2) },
-      { Section: 'Total Liabilities', Value: combinedSummary.totalLiabilities.toFixed(2) },
-      { Section: 'Net Worth', Value: combinedSummary.netWorth.toFixed(2) },
-      { Section: '' },
-      { Section: 'HOUSEHOLD' },
-      { Section: 'Net Worth', Value: householdSummary.netWorth.toFixed(2) },
-      { Section: 'This Month Income', Value: householdBudget.totalIncome.toFixed(2) },
-      { Section: 'This Month Expenses', Value: householdBudget.totalExpenses.toFixed(2) },
-      { Section: 'Remaining', Value: householdBudget.remainingBudget.toFixed(2) },
-      { Section: '' },
-      { Section: 'BUSINESS' },
-      { Section: 'Net Worth', Value: businessSummary.netWorth.toFixed(2) },
-      { Section: 'This Month Revenue', Value: businessBudget.totalIncome.toFixed(2) },
-      { Section: 'This Month Expenses', Value: businessBudget.totalExpenses.toFixed(2) },
-      { Section: 'Net Profit', Value: businessBudget.remainingBudget.toFixed(2) },
-      { Section: '' },
-      { Section: 'ACCOUNTS' },
-      { Account: 'Name', Type: 'Type', Budget: 'Budget', Balance: 'Balance', Utilization: 'Utilization' },
+      { Label: 'COMBINED OVERVIEW', Value: '' },
+      { Label: 'Total Assets', Value: `$${combinedSummary.totalAssets.toFixed(2)}` },
+      { Label: 'Total Liabilities', Value: `$${combinedSummary.totalLiabilities.toFixed(2)}` },
+      { Label: 'Net Worth', Value: `$${combinedSummary.netWorth.toFixed(2)}` },
+      { Label: '', Value: '' },
+      { Label: 'HOUSEHOLD', Value: '' },
+      { Label: 'Net Worth', Value: `$${householdSummary.netWorth.toFixed(2)}` },
+      { Label: 'This Month Income', Value: `$${householdBudget.totalIncome.toFixed(2)}` },
+      { Label: 'This Month Expenses', Value: `$${householdBudget.totalExpenses.toFixed(2)}` },
+      { Label: 'Remaining', Value: `$${householdBudget.remainingBudget.toFixed(2)}` },
+      { Label: '', Value: '' },
+      { Label: 'BUSINESS', Value: '' },
+      { Label: 'Net Worth', Value: `$${businessSummary.netWorth.toFixed(2)}` },
+      { Label: 'This Month Revenue', Value: `$${businessBudget.totalIncome.toFixed(2)}` },
+      { Label: 'This Month Expenses', Value: `$${businessBudget.totalExpenses.toFixed(2)}` },
+      { Label: 'Net Profit', Value: `$${businessBudget.remainingBudget.toFixed(2)}` },
+      { Label: '', Value: '' },
+      { Label: 'ACCOUNTS', Value: '' },
+      { Label: 'Name', Value: 'Type | Budget | Balance | Utilization' },
       ...appData.accounts.map(acc => ({
-        Account: acc.name,
-        Type: acc.type,
-        Budget: acc.budgetType === 'household' ? 'Household' : 'Business',
-        Balance: acc.balance.toFixed(2),
-        Utilization: acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'
+        Label: acc.name,
+        Value: `${acc.accountType} | ${acc.budgetType === 'household' ? 'Household' : 'Business'} | $${acc.balance.toFixed(2)} | ${acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'}`
       }))
     ]
 
@@ -135,7 +132,7 @@ export default function Dashboard() {
       },
       appData.accounts.map(acc => ({
         name: acc.name,
-        type: acc.type,
+        type: acc.accountType,
         balance: acc.balance,
         budgetType: acc.budgetType,
         creditUtilization: acc.creditUtilization
@@ -157,43 +154,37 @@ export default function Dashboard() {
     // Create comprehensive CSV with multiple sections
     const csvData = [
       // Summary metrics
-      { Section: 'SUMMARY METRICS' },
-      { Section: 'Total Assets', Value: summary.totalAssets.toFixed(2) },
-      { Section: 'Total Liabilities', Value: summary.totalLiabilities.toFixed(2) },
-      { Section: 'Net Worth', Value: summary.netWorth.toFixed(2) },
-      { Section: '' },
-      { Section: 'MONTHLY STATS' },
-      { Section: incomeLabel, Value: budget.totalIncome.toFixed(2) },
-      { Section: 'This Month Expenses', Value: budget.totalExpenses.toFixed(2) },
-      { Section: remainingLabel, Value: budget.remainingBudget.toFixed(2) },
-      { Section: '' },
-      { Section: 'ACCOUNTS' },
-      { Account: 'Name', Type: 'Type', Balance: 'Balance', Utilization: 'Utilization' },
+      { Label: 'SUMMARY METRICS', Value: '' },
+      { Label: 'Total Assets', Value: `$${summary.totalAssets.toFixed(2)}` },
+      { Label: 'Total Liabilities', Value: `$${summary.totalLiabilities.toFixed(2)}` },
+      { Label: 'Net Worth', Value: `$${summary.netWorth.toFixed(2)}` },
+      { Label: '', Value: '' },
+      { Label: 'MONTHLY STATS', Value: '' },
+      { Label: incomeLabel, Value: `$${budget.totalIncome.toFixed(2)}` },
+      { Label: 'This Month Expenses', Value: `$${budget.totalExpenses.toFixed(2)}` },
+      { Label: remainingLabel, Value: `$${budget.remainingBudget.toFixed(2)}` },
+      { Label: '', Value: '' },
+      { Label: 'ACCOUNTS', Value: '' },
+      { Label: 'Name', Value: 'Type | Balance | Utilization' },
       ...appData.accounts
         .filter(acc => acc.budgetType === budgetType)
         .map(acc => ({
-          Account: acc.name,
-          Type: acc.type,
-          Balance: acc.balance.toFixed(2),
-          Utilization: acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'
+          Label: acc.name,
+          Value: `${acc.accountType} | $${acc.balance.toFixed(2)} | ${acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'}`
         })),
-      { Section: '' },
-      { Section: 'TOP SPENDING THIS MONTH' },
-      { Category: 'Category', Amount: 'Amount', Transactions: 'Transactions' },
+      { Label: '', Value: '' },
+      { Label: 'TOP SPENDING THIS MONTH', Value: '' },
+      { Label: 'Category', Value: 'Amount | Transactions' },
       ...topSpending.map(item => ({
-        Category: item.category.name,
-        Amount: item.amount.toFixed(2),
-        Transactions: item.transactionCount.toString()
+        Label: item.category.name,
+        Value: `$${item.amount.toFixed(2)} | ${item.transactionCount}`
       })),
-      { Section: '' },
-      { Section: 'SPENDING BY CATEGORY BUCKET' },
-      { Bucket: 'Bucket', Target: 'Target', Actual: 'Actual', Difference: 'Difference', PercentOfIncome: '% of Income' },
+      { Label: '', Value: '' },
+      { Label: 'SPENDING BY CATEGORY BUCKET', Value: '' },
+      { Label: 'Bucket', Value: 'Target | Actual | Difference | % of Income' },
       ...budget.bucketBreakdown.map(bucket => ({
-        Bucket: bucket.bucketName,
-        Target: bucket.targetAmount.toFixed(2),
-        Actual: bucket.actualAmount.toFixed(2),
-        Difference: bucket.overUnder.toFixed(2),
-        PercentOfIncome: `${bucket.percentOfIncome.toFixed(1)}%`
+        Label: bucket.bucketName,
+        Value: `$${bucket.targetAmount.toFixed(2)} | $${bucket.actualAmount.toFixed(2)} | $${bucket.overUnder.toFixed(2)} | ${bucket.percentOfIncome.toFixed(1)}%`
       }))
     ]
 
@@ -211,7 +202,7 @@ export default function Dashboard() {
       .filter(acc => acc.budgetType === budgetType)
       .map(acc => ({
         name: acc.name,
-        type: acc.type,
+        type: acc.accountType,
         balance: acc.balance,
         creditUtilization: acc.creditUtilization
       }))

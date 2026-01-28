@@ -322,6 +322,7 @@ export interface BucketBreakdown {
   bucketName: string
   targetAmount: number
   actualAmount: number
+  totalBudgeted: number
   overUnder: number
   percentOfIncome: number
   categories: CategoryBreakdown[]

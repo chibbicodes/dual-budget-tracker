@@ -162,7 +162,13 @@ export function calculateBudgetSummary(
       }
     )
 
-    const overUnder = targetAmount - actualAmount
+    // Calculate total budgeted amount for this bucket
+    const totalBudgeted = categoryBreakdown.reduce(
+      (sum, category) => sum + category.budgeted,
+      0
+    )
+
+    const overUnder = totalBudgeted - actualAmount
     const percentOfIncome = totalIncome > 0 ? (actualAmount / totalIncome) * 100 : 0
 
     return {
@@ -170,6 +176,7 @@ export function calculateBudgetSummary(
       bucketName: bucket.name,
       targetAmount,
       actualAmount,
+      totalBudgeted,
       overUnder,
       percentOfIncome,
       categories: categoryBreakdown,

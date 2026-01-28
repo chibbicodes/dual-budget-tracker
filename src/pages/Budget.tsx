@@ -405,7 +405,6 @@ export default function Budget() {
       {budgetSummary.bucketBreakdown
         .filter((bucket) => visibleBucketIds.includes(bucket.bucketId))
         .map((bucket) => {
-        const bucketInfo = buckets.find((b) => b.id === bucket.bucketId)
         const categoriesInBucket = appData.categories.filter(
           (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && !c.isIncomeCategory && !c.excludeFromBudget
         )
@@ -418,7 +417,7 @@ export default function Budget() {
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{bucket.bucketName}</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Target: {bucketInfo?.targetPercentage || 0}% of income ({formatCurrency(bucket.targetAmount)})
+                    Budgeted: {formatCurrency(bucket.totalBudgeted)} • {bucket.percentOfIncome.toFixed(1)}% of income
                   </p>
                 </div>
                 <div className="text-right">
@@ -440,16 +439,16 @@ export default function Budget() {
                 <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
                   <span>{bucket.percentOfIncome.toFixed(1)}% of income</span>
                   <span>
-                    {bucket.targetAmount > 0
-                      ? ((bucket.actualAmount / bucket.targetAmount) * 100).toFixed(1)
+                    {bucket.totalBudgeted > 0
+                      ? ((bucket.actualAmount / bucket.totalBudgeted) * 100).toFixed(1)
                       : 0}
-                    % of target
+                    % of budget
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className={`h-3 rounded-full transition-all ${
-                      bucket.actualAmount > bucket.targetAmount
+                      bucket.actualAmount > bucket.totalBudgeted
                         ? 'bg-red-500'
                         : budgetType === 'household'
                         ? 'bg-blue-500'
@@ -457,7 +456,7 @@ export default function Budget() {
                     }`}
                     style={{
                       width: `${Math.min(
-                        (bucket.actualAmount / bucket.targetAmount) * 100,
+                        (bucket.actualAmount / bucket.totalBudgeted) * 100,
                         100
                       )}%`,
                     }}

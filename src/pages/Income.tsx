@@ -73,11 +73,19 @@ export default function Income() {
       .sort((a, b) => a.source.localeCompare(b.source))
   }, [appData.incomeSources, currentView, budgetFilter])
 
-  // Group income sources by category
+  // Filter income sources for the selected month (only show sources expected in that month)
+  const filteredIncomeForMonth = useMemo(() => {
+    return filteredIncome.filter((income) => {
+      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
+      return occurrences > 0
+    })
+  }, [filteredIncome, selectedMonth])
+
+  // Group income sources by category (for selected month only)
   const incomeByCategory = useMemo(() => {
     const grouped = new Map<string, { category: any; sources: IncomeType[] }>()
 
-    filteredIncome.forEach(income => {
+    filteredIncomeForMonth.forEach(income => {
       const categoryId = income.categoryId || 'uncategorized'
       const category = categoryId === 'uncategorized'
         ? { id: 'uncategorized', name: 'Uncategorized' }
@@ -95,7 +103,7 @@ export default function Income() {
       if (b.category.id === 'uncategorized') return -1
       return a.category.name.localeCompare(b.category.name)
     })
-  }, [filteredIncome, appData.categories])
+  }, [filteredIncomeForMonth, appData.categories])
 
   // Helper function to calculate recurring income occurrences in a month
   const calculateRecurringOccurrences = (income: IncomeType, monthDate: Date): number => {
@@ -149,9 +157,20 @@ export default function Income() {
         return count
       }
       case 'monthly':
-      case 'same-day-each-month':
+      case 'same-day-each-month': {
+        // Check if this income source has started by the selected month
+        if (income.expectedDate) {
+          const startDate = parseISO(income.expectedDate + 'T12:00:00')
+          const monthStart = startOfMonth(monthDate)
+
+          // If the start date is after this month, return 0
+          if (startDate > endOfMonth(monthDate)) {
+            return 0
+          }
+        }
         // Once per month
         return 1
+      }
       default:
         // Default to once per month if frequency is unknown
         return 1
@@ -330,7 +349,7 @@ export default function Income() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = filteredIncome.map(income => {
+    const exportData = filteredIncomeForMonth.map(income => {
       const category = appData.categories.find(c => c.id === income.categoryId)
       const occurrences = calculateRecurringOccurrences(income, selectedMonth)
       const expectedThisMonth = income.expectedAmount * occurrences
@@ -347,12 +366,12 @@ export default function Income() {
       }
     })
 
-    const filename = `income-sources-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    const filename = `income-sources-${currentView}-${selectedMonthString}`
     exportToCSV(exportData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = filteredIncome.map(income => {
+    const exportData = filteredIncomeForMonth.map(income => {
       const category = appData.categories.find(c => c.id === income.categoryId)
       const occurrences = calculateRecurringOccurrences(income, selectedMonth)
       const expectedThisMonth = income.expectedAmount * occurrences
@@ -367,8 +386,8 @@ export default function Income() {
       }
     })
 
-    const filename = `income-sources-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
-    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Income Sources`
+    const filename = `income-sources-${currentView}-${selectedMonthString}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Income Sources - ${format(selectedMonth, 'MMMM yyyy')}`
 
     exportToPDF(
       exportData,
@@ -424,7 +443,7 @@ export default function Income() {
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={filteredIncome.length === 0}
+            disabled={filteredIncomeForMonth.length === 0}
           />
 
           <button
@@ -606,7 +625,7 @@ export default function Income() {
       {/* Income sources list */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Income Sources</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Income Sources ({format(selectedMonth, 'MMMM yyyy')})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -633,10 +652,10 @@ export default function Income() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredIncome.length === 0 ? (
+              {filteredIncomeForMonth.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No income sources found. Click "Add Income Source" to get started.
+                    No income sources expected for {format(selectedMonth, 'MMMM yyyy')}. Click "Add Income Source" to get started.
                   </td>
                 </tr>
               ) : (

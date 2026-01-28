@@ -266,6 +266,17 @@ ipcMain.handle('db:deleteIncomeSource', async (_event, id: string) => {
   return databaseService.deleteIncomeSource(id)
 })
 
+// Monthly Budget operations
+ipcMain.handle('db:getMonthlyBudgets', async (_event, profileId: string, month?: string, budgetType?: string) => {
+  await databaseServicePromise
+  return databaseService.getMonthlyBudgets(profileId, month, budgetType)
+})
+
+ipcMain.handle('db:upsertMonthlyBudget', async (_event, budget: any) => {
+  await databaseServicePromise
+  return databaseService.upsertMonthlyBudget(budget)
+})
+
 // Project CRUD operations
 ipcMain.handle('db:getProject', async (_event, id: string) => {
   await databaseServicePromise

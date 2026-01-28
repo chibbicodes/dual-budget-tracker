@@ -30,6 +30,7 @@ import {
   convertDbProjectType,
   convertDbProjectStatus,
   convertDbSettings,
+  convertDbMonthlyBudget,
 } from '../services/dataConverters'
 
 const BudgetContext = createContext<BudgetContextState | null>(null)
@@ -72,6 +73,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         let categories = await databaseService.getCategories(activeProfile.id)
         const transactions = await databaseService.getTransactions(activeProfile.id)
         const incomeSources = await databaseService.getIncomeSources(activeProfile.id)
+        const monthlyBudgets = await databaseService.getMonthlyBudgets(activeProfile.id)
         const projects = await databaseService.getProjects(activeProfile.id)
         let projectTypes = await databaseService.getProjectTypes(activeProfile.id)
         let projectStatuses = await databaseService.getProjectStatuses(activeProfile.id)
@@ -81,6 +83,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           categories: categories?.length || 0,
           transactions: transactions?.length || 0,
           incomeSources: incomeSources?.length || 0,
+          monthlyBudgets: monthlyBudgets?.length || 0,
           projects: projects?.length || 0,
           projectTypes: projectTypes?.length || 0,
           projectStatuses: projectStatuses?.length || 0,
@@ -211,7 +214,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             incomeSources: (incomeSources || []).map(convertDbIncomeSource),
             income: [], // Legacy income array (not used)
             autoCategorization: [], // TODO: Load from database if needed
-            monthlyBudgets: [], // TODO: Load from database if needed
+            monthlyBudgets: (monthlyBudgets || []).map(convertDbMonthlyBudget),
             projects: (projects || []).map(convertDbProject),
             projectTypes: (projectTypes || []).map(convertDbProjectType),
             projectStatuses: (projectStatuses || []).map(convertDbProjectStatus),
@@ -1350,6 +1353,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const addMonthlyBudget = useCallback(
     (budget: Omit<MonthlyBudget, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const profileId = getProfileId()
+      if (!profileId) {
+        console.error('Cannot add monthly budget: No active profile')
+        return
+      }
+
       const now = new Date().toISOString()
       const newBudget: MonthlyBudget = {
         ...budget,
@@ -1358,28 +1367,70 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Save to database
+      try {
+        databaseService.upsertMonthlyBudget({
+          profile_id: profileId,
+          month: budget.month,
+          budget_type: budget.budgetType,
+          category_id: budget.categoryId,
+          amount: budget.amount,
+        })
+      } catch (error) {
+        console.error('Failed to save monthly budget to database:', error)
+      }
+
+      // Update local state
       setAppDataState((prev) => ({
         ...prev,
         monthlyBudgets: [...prev.monthlyBudgets, newBudget],
       }))
     },
-    []
+    [getProfileId]
   )
 
   const updateMonthlyBudget = useCallback((id: string, updates: Partial<MonthlyBudget>) => {
-    setAppDataState((prev) => ({
-      ...prev,
-      monthlyBudgets: prev.monthlyBudgets.map((budget) =>
-        budget.id === id
-          ? {
-              ...budget,
-              ...updates,
-              updatedAt: new Date().toISOString(),
-            }
-          : budget
-      ),
-    }))
-  }, [])
+    const profileId = getProfileId()
+    if (!profileId) {
+      console.error('Cannot update monthly budget: No active profile')
+      return
+    }
+
+    // Update local state and get updated budget
+    let updatedBudget: MonthlyBudget | null = null
+    setAppDataState((prev) => {
+      const newBudgets = prev.monthlyBudgets.map((budget) => {
+        if (budget.id === id) {
+          updatedBudget = {
+            ...budget,
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          }
+          return updatedBudget
+        }
+        return budget
+      })
+      return {
+        ...prev,
+        monthlyBudgets: newBudgets,
+      }
+    })
+
+    // Save to database
+    if (updatedBudget) {
+      try {
+        databaseService.upsertMonthlyBudget({
+          profile_id: profileId,
+          month: updatedBudget.month,
+          budget_type: updatedBudget.budgetType,
+          category_id: updatedBudget.categoryId,
+          amount: updatedBudget.amount,
+        })
+      } catch (error) {
+        console.error('Failed to update monthly budget in database:', error)
+      }
+    }
+  }, [getProfileId])
 
   const deleteMonthlyBudget = useCallback((id: string) => {
     setAppDataState((prev) => ({

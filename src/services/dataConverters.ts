@@ -12,6 +12,7 @@ import type {
   ProjectTypeConfig,
   ProjectStatusConfig,
   AppSettings,
+  MonthlyBudget,
 } from '../types'
 
 /**
@@ -199,5 +200,20 @@ export function convertDbSettings(dbSettings: any): AppSettings {
       businessSavingsPercentage: dbSettings.business_savings_percentage || 0,
       monthlyRevenueBaseline: dbSettings.business_monthly_revenue_baseline || 0,
     },
+  }
+}
+
+/**
+ * Convert database monthly budget to MonthlyBudget type
+ */
+export function convertDbMonthlyBudget(dbMonthlyBudget: any): MonthlyBudget {
+  return {
+    id: dbMonthlyBudget.id,
+    month: dbMonthlyBudget.month,
+    budgetType: dbMonthlyBudget.budget_type,
+    categoryId: dbMonthlyBudget.category_id,
+    amount: dbMonthlyBudget.amount || 0,
+    createdAt: dbMonthlyBudget.created_at,
+    updatedAt: dbMonthlyBudget.updated_at,
   }
 }

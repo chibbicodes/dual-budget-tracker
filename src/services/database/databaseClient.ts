@@ -589,6 +589,25 @@ class DatabaseClient {
       return window.electronAPI.database.deleteProjectStatus(id)
     }
   }
+
+  /**
+   * Get monthly budgets for a profile
+   */
+  getMonthlyBudgets(profileId: string, month?: string, budgetType?: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getMonthlyBudgets(profileId, month, budgetType)
+    }
+    return []
+  }
+
+  /**
+   * Upsert a monthly budget (insert or update)
+   */
+  upsertMonthlyBudget(budget: any) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.upsertMonthlyBudget(budget)
+    }
+  }
 }
 
 // Export singleton instance

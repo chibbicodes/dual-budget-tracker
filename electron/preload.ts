@@ -70,6 +70,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createIncomeSource: (source) => ipcRenderer.invoke('db:createIncomeSource', source),
     updateIncomeSource: (id, updates) => ipcRenderer.invoke('db:updateIncomeSource', id, updates),
     deleteIncomeSource: (id) => ipcRenderer.invoke('db:deleteIncomeSource', id),
+    getMonthlyBudgets: (profileId, month, budgetType) => ipcRenderer.invoke('db:getMonthlyBudgets', profileId, month, budgetType),
+    upsertMonthlyBudget: (budget) => ipcRenderer.invoke('db:upsertMonthlyBudget', budget),
     getProjects: (profileId, budgetType) => ipcRenderer.invoke('db:getProjects', profileId, budgetType),
     getProjectsForSync: (profileId) => ipcRenderer.invoke('db:getProjectsForSync', profileId),
     getProject: (id) => ipcRenderer.invoke('db:getProject', id),

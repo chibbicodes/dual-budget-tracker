@@ -349,52 +349,55 @@ export default function Income() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = filteredIncomeForMonth.map(income => {
-      const category = appData.categories.find(c => c.id === income.categoryId)
-      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
-      const expectedThisMonth = income.expectedAmount * occurrences
+    const exportData = incomeBySource.map(item => {
+      const category = appData.categories.find(c => c.id === item.source.categoryId)
+      const variance = item.actual - item.expected
+      const percentAchieved = item.expected > 0 ? (item.actual / item.expected) * 100 : 0
 
       return {
-        Source: income.source,
+        Source: item.source.source,
         Category: category?.name || 'Uncategorized',
-        Budget: income.budgetType === 'household' ? 'Household' : 'Business',
-        Client: income.client || '',
-        'Expected Amount': income.expectedAmount,
-        Frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
-        'Expected This Month': expectedThisMonth,
-        'Next Expected Date': income.expectedDate ? format(parseISO(income.expectedDate), 'MM/dd/yyyy') : ''
+        Budget: item.source.budgetType === 'household' ? 'Household' : 'Business',
+        Client: item.source.client || '',
+        'Expected Amount': item.expected,
+        'Actual Amount': item.actual,
+        'Variance': variance,
+        'Percent Achieved': `${percentAchieved.toFixed(1)}%`,
+        Frequency: item.source.isRecurring ? item.source.recurringFrequency : 'One-time',
+        'Next Expected Date': item.source.expectedDate ? format(parseISO(item.source.expectedDate), 'MM/dd/yyyy') : ''
       }
     })
 
-    const filename = `income-sources-${currentView}-${selectedMonthString}`
+    const filename = `income-${currentView}-${selectedMonthString}`
     exportToCSV(exportData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = filteredIncomeForMonth.map(income => {
-      const category = appData.categories.find(c => c.id === income.categoryId)
-      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
-      const expectedThisMonth = income.expectedAmount * occurrences
+    const exportData = incomeBySource.map(item => {
+      const category = appData.categories.find(c => c.id === item.source.categoryId)
+      const variance = item.actual - item.expected
+      const percentAchieved = item.expected > 0 ? (item.actual / item.expected) * 100 : 0
 
       return {
-        source: income.source,
+        source: item.source.source,
         category: category?.name || 'Uncategorized',
-        budget: income.budgetType === 'household' ? 'Household' : 'Business',
-        expected: formatCurrency(income.expectedAmount),
-        frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
-        expectedMonth: formatCurrency(expectedThisMonth)
+        budget: item.source.budgetType === 'household' ? 'Household' : 'Business',
+        expected: formatCurrency(item.expected),
+        actual: formatCurrency(item.actual),
+        variance: formatCurrency(variance),
+        percent: `${percentAchieved.toFixed(0)}%`
       }
     })
 
-    const filename = `income-sources-${currentView}-${selectedMonthString}`
-    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Income Sources - ${format(selectedMonth, 'MMMM yyyy')}`
+    const filename = `income-${currentView}-${selectedMonthString}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Income - ${format(selectedMonth, 'MMMM yyyy')}`
 
     exportToPDF(
       exportData,
       filename,
       title,
-      ['Source', 'Category', 'Budget', 'Expected', 'Frequency', 'Expected/Month'],
-      ['source', 'category', 'budget', 'expected', 'frequency', 'expectedMonth']
+      ['Source', 'Category', 'Budget', 'Expected', 'Actual', 'Variance', '%'],
+      ['source', 'category', 'budget', 'expected', 'actual', 'variance', 'percent']
     )
   }
 
@@ -443,7 +446,7 @@ export default function Income() {
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={filteredIncomeForMonth.length === 0}
+            disabled={incomeBySource.length === 0}
           />
 
           <button

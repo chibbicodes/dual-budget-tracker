@@ -13,25 +13,38 @@ export function exportToCSV(data: any[], filename: string, headers?: string[]) {
   // Get headers from first object if not provided
   const csvHeaders = headers || Object.keys(data[0]);
 
-  // Create CSV content
-  const csvContent = [
-    csvHeaders.join(','),
-    ...data.map(row =>
-      csvHeaders.map(header => {
-        const value = row[header];
-        // Handle values that contain commas, quotes, or newlines
-        if (value === null || value === undefined) return '';
-        const stringValue = String(value);
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-          return `"${stringValue.replace(/"/g, '""')}"`;
-        }
-        return stringValue;
-      }).join(',')
-    )
-  ].join('\n');
+  // Create CSV rows
+  const csvRows: string[] = [];
 
-  // Create and trigger download
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Add header row
+  csvRows.push(csvHeaders.join(','));
+
+  // Add data rows
+  for (const row of data) {
+    const values = csvHeaders.map(header => {
+      const value = row[header];
+      // Handle null/undefined
+      if (value === null || value === undefined) return '';
+
+      // Convert to string
+      const stringValue = String(value);
+
+      // Wrap in quotes if contains comma, quote, or newline
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+
+      return stringValue;
+    });
+    csvRows.push(values.join(','));
+  }
+
+  // Join rows with Windows-style line endings for better Excel compatibility
+  const csvContent = csvRows.join('\r\n');
+
+  // Create and trigger download with BOM for proper UTF-8 recognition
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
@@ -40,6 +53,7 @@ export function exportToCSV(data: any[], filename: string, headers?: string[]) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**

@@ -349,23 +349,135 @@ export default function Income() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = incomeBySource.map(item => {
-      const category = appData.categories.find(c => c.id === item.source.categoryId)
-      const variance = item.actual - item.expected
-      const percentAchieved = item.expected > 0 ? (item.actual / item.expected) * 100 : 0
+    // Create comprehensive export data with summary
+    const exportData: any[] = []
 
-      return {
-        Source: item.source.source,
-        Category: category?.name || 'Uncategorized',
-        Budget: item.source.budgetType === 'household' ? 'Household' : 'Business',
-        Client: item.source.client || '',
-        'Expected Amount': item.expected,
-        'Actual Amount': item.actual,
-        'Variance': variance,
-        'Percent Achieved': `${percentAchieved.toFixed(1)}%`,
-        Frequency: item.source.isRecurring ? item.source.recurringFrequency : 'One-time',
-        'Next Expected Date': item.source.expectedDate ? format(parseISO(item.source.expectedDate), 'MM/dd/yyyy') : ''
-      }
+    // Add summary section
+    exportData.push({
+      Source: 'INCOME SUMMARY',
+      Category: format(selectedMonth, 'MMMM yyyy'),
+      Budget: '',
+      Client: '',
+      Type: '',
+      'Expected Amount': '',
+      'Actual Amount': '',
+      'Variance': '',
+      'Percent Achieved': '',
+      Frequency: '',
+      'Next Expected Date': ''
+    })
+
+    exportData.push({
+      Source: 'Total Expected Income',
+      Category: '',
+      Budget: '',
+      Client: '',
+      Type: '',
+      'Expected Amount': expectedIncomeThisMonth,
+      'Actual Amount': '',
+      'Variance': '',
+      'Percent Achieved': '',
+      Frequency: '',
+      'Next Expected Date': ''
+    })
+
+    exportData.push({
+      Source: 'Total Actual Income',
+      Category: '',
+      Budget: '',
+      Client: '',
+      Type: '',
+      'Expected Amount': '',
+      'Actual Amount': actualIncomeThisMonth,
+      'Variance': '',
+      'Percent Achieved': '',
+      Frequency: '',
+      'Next Expected Date': ''
+    })
+
+    exportData.push({
+      Source: 'Total Variance',
+      Category: '',
+      Budget: '',
+      Client: '',
+      Type: '',
+      'Expected Amount': '',
+      'Actual Amount': '',
+      'Variance': variance,
+      'Percent Achieved': `${variancePercent.toFixed(1)}%`,
+      Frequency: '',
+      'Next Expected Date': ''
+    })
+
+    // Add blank row
+    exportData.push({
+      Source: '',
+      Category: '',
+      Budget: '',
+      Client: '',
+      Type: '',
+      'Expected Amount': '',
+      'Actual Amount': '',
+      'Variance': '',
+      'Percent Achieved': '',
+      Frequency: '',
+      'Next Expected Date': ''
+    })
+
+    // Add income by category with all sources
+    incomeByCategory.forEach(group => {
+      // Category header
+      exportData.push({
+        Source: `CATEGORY: ${group.category.name}`,
+        Category: '',
+        Budget: '',
+        Client: '',
+        Type: '',
+        'Expected Amount': '',
+        'Actual Amount': '',
+        'Variance': '',
+        'Percent Achieved': '',
+        Frequency: '',
+        'Next Expected Date': ''
+      })
+
+      // Income sources in this category
+      group.sources.forEach(income => {
+        const sourceData = incomeBySource.find(item => item.source.id === income.id)
+        const itemVariance = sourceData ? sourceData.actual - sourceData.expected : 0
+        const percentAchieved = sourceData && sourceData.expected > 0
+          ? (sourceData.actual / sourceData.expected) * 100
+          : 0
+
+        exportData.push({
+          Source: income.source,
+          Category: group.category.name,
+          Budget: income.budgetType === 'household' ? 'Household' : 'Business',
+          Client: income.client || '',
+          Type: income.isRecurring ? 'Recurring' : 'One-time',
+          'Expected Amount': sourceData?.expected || 0,
+          'Actual Amount': sourceData?.actual || 0,
+          'Variance': itemVariance,
+          'Percent Achieved': `${percentAchieved.toFixed(1)}%`,
+          Frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
+          'Next Expected Date': income.expectedDate ? format(parseISO(income.expectedDate), 'MM/dd/yyyy') : ''
+        })
+      })
+
+      // Add blank row after each category
+      exportData.push({
+        Source: '',
+        Category: '',
+        Budget: '',
+        Client: '',
+        Type: '',
+        'Expected Amount': '',
+        'Actual Amount': '',
+        'Variance': '',
+        'Percent Achieved': '',
+        Frequency: '',
+        'Next Expected Date': ''
+      })
     })
 
     const filename = `income-${currentView}-${selectedMonthString}`
@@ -373,20 +485,99 @@ export default function Income() {
   }
 
   const handleExportPDF = () => {
-    const exportData = incomeBySource.map(item => {
-      const category = appData.categories.find(c => c.id === item.source.categoryId)
-      const variance = item.actual - item.expected
-      const percentAchieved = item.expected > 0 ? (item.actual / item.expected) * 100 : 0
+    // Create comprehensive export data
+    const exportData: any[] = []
 
-      return {
-        source: item.source.source,
-        category: category?.name || 'Uncategorized',
-        budget: item.source.budgetType === 'household' ? 'Household' : 'Business',
-        expected: formatCurrency(item.expected),
-        actual: formatCurrency(item.actual),
-        variance: formatCurrency(variance),
-        percent: `${percentAchieved.toFixed(0)}%`
-      }
+    // Add summary rows
+    exportData.push({
+      source: 'SUMMARY',
+      category: '',
+      budget: '',
+      type: '',
+      expected: '',
+      actual: '',
+      variance: '',
+      percent: ''
+    })
+
+    exportData.push({
+      source: 'Total Expected',
+      category: '',
+      budget: '',
+      type: '',
+      expected: formatCurrency(expectedIncomeThisMonth),
+      actual: '',
+      variance: '',
+      percent: ''
+    })
+
+    exportData.push({
+      source: 'Total Actual',
+      category: '',
+      budget: '',
+      type: '',
+      expected: '',
+      actual: formatCurrency(actualIncomeThisMonth),
+      variance: '',
+      percent: ''
+    })
+
+    exportData.push({
+      source: 'Total Variance',
+      category: '',
+      budget: '',
+      type: '',
+      expected: '',
+      actual: '',
+      variance: formatCurrency(variance),
+      percent: `${variancePercent.toFixed(1)}%`
+    })
+
+    // Add blank row
+    exportData.push({
+      source: '',
+      category: '',
+      budget: '',
+      type: '',
+      expected: '',
+      actual: '',
+      variance: '',
+      percent: ''
+    })
+
+    // Add income by category
+    incomeByCategory.forEach(group => {
+      // Category header
+      exportData.push({
+        source: `${group.category.name.toUpperCase()}`,
+        category: '',
+        budget: '',
+        type: '',
+        expected: '',
+        actual: '',
+        variance: '',
+        percent: ''
+      })
+
+      // Income sources in this category
+      group.sources.forEach(income => {
+        const sourceData = incomeBySource.find(item => item.source.id === income.id)
+        const itemVariance = sourceData ? sourceData.actual - sourceData.expected : 0
+        const percentAchieved = sourceData && sourceData.expected > 0
+          ? (sourceData.actual / sourceData.expected) * 100
+          : 0
+
+        exportData.push({
+          source: income.source,
+          category: group.category.name,
+          budget: income.budgetType === 'household' ? 'HH' : 'BIZ',
+          type: income.isRecurring ? income.recurringFrequency?.replace('bi-weekly', 'Bi-wk')?.replace('same-day-each-month', 'Monthly') : 'Once',
+          expected: formatCurrency(sourceData?.expected || 0),
+          actual: formatCurrency(sourceData?.actual || 0),
+          variance: formatCurrency(itemVariance),
+          percent: `${percentAchieved.toFixed(0)}%`
+        })
+      })
     })
 
     const filename = `income-${currentView}-${selectedMonthString}`
@@ -396,8 +587,8 @@ export default function Income() {
       exportData,
       filename,
       title,
-      ['Source', 'Category', 'Budget', 'Expected', 'Actual', 'Variance', '%'],
-      ['source', 'category', 'budget', 'expected', 'actual', 'variance', 'percent']
+      ['Source', 'Category', 'Budget', 'Type', 'Expected', 'Actual', 'Variance', '%'],
+      ['source', 'category', 'budget', 'type', 'expected', 'actual', 'variance', 'percent']
     )
   }
 

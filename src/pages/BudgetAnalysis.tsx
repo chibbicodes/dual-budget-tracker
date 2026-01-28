@@ -323,28 +323,50 @@ export default function BudgetAnalysis() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = analysis.categoryComparison.map(item => ({
-      Category: item.category.name,
-      'Average Spending': item.average,
-      'Latest Month': item.latestMonth,
-      'Change vs Average': formatCurrency(item.changeVsAverage),
-      'Trend': item.trend,
-      'Percent Change': `${item.percentChange.toFixed(1)}%`
-    }))
+    const exportData = appData.categories
+      .filter((c) => c.budgetType === budgetType && !c.isIncomeCategory)
+      .map(category => {
+        const avg = analysis.categoryAverages.get(category.id) || 0
+        const trend = analysis.categoryTrends.get(category.id) || 0
+        const latestMonth = historicalData.length > 0
+          ? (historicalData[historicalData.length - 1].categorySpending[category.id] || 0)
+          : 0
+
+        return {
+          Category: category.name,
+          'Average Spending': avg,
+          'Latest Month': latestMonth,
+          'Monthly Budget': category.monthlyBudget,
+          'Trend': trend > 0 ? 'Increasing' : trend < 0 ? 'Decreasing' : 'Stable',
+          'Percent Change': `${trend.toFixed(1)}%`
+        }
+      })
+      .filter(item => item['Average Spending'] > 0) // Only include categories with spending
 
     const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
     exportToCSV(exportData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = analysis.categoryComparison.map(item => ({
-      category: item.category.name,
-      average: formatCurrency(item.average),
-      latest: formatCurrency(item.latestMonth),
-      change: formatCurrency(item.changeVsAverage),
-      trend: item.trend,
-      percentChange: `${item.percentChange.toFixed(1)}%`
-    }))
+    const exportData = appData.categories
+      .filter((c) => c.budgetType === budgetType && !c.isIncomeCategory)
+      .map(category => {
+        const avg = analysis.categoryAverages.get(category.id) || 0
+        const trend = analysis.categoryTrends.get(category.id) || 0
+        const latestMonth = historicalData.length > 0
+          ? (historicalData[historicalData.length - 1].categorySpending[category.id] || 0)
+          : 0
+
+        return {
+          category: category.name,
+          average: formatCurrency(avg),
+          latest: formatCurrency(latestMonth),
+          budget: formatCurrency(category.monthlyBudget),
+          trend: trend > 0 ? 'Increasing' : trend < 0 ? 'Decreasing' : 'Stable',
+          percentChange: `${trend.toFixed(1)}%`
+        }
+      })
+      .filter(item => parseFloat(item.average.replace(/[$,]/g, '')) > 0) // Only include categories with spending
 
     const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
     const title = `${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget Analysis`
@@ -353,8 +375,8 @@ export default function BudgetAnalysis() {
       exportData,
       filename,
       title,
-      ['Category', 'Average', 'Latest', 'Change', 'Trend', '% Change'],
-      ['category', 'average', 'latest', 'change', 'trend', 'percentChange']
+      ['Category', 'Average', 'Latest', 'Budget', 'Trend', '% Change'],
+      ['category', 'average', 'latest', 'budget', 'trend', 'percentChange']
     )
   }
 
@@ -420,7 +442,7 @@ export default function BudgetAnalysis() {
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={analysis.categoryComparison.length === 0}
+            disabled={historicalData.length === 0 || analysis.categoryAverages.size === 0}
           />
         </div>
       </div>

@@ -331,6 +331,7 @@ export function getUpcomingDueDates(
   daysAhead: number = 30
 ): Array<{
   account: Account
+  dueDate: Date
   daysUntilDue: number
   isOverdue: boolean
 }> {
@@ -357,6 +358,7 @@ export function getUpcomingDueDates(
 
       return {
         account,
+        dueDate,
         daysUntilDue,
         isOverdue,
       }

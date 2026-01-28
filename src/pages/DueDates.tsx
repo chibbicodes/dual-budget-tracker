@@ -86,7 +86,6 @@ export default function DueDates() {
       Budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
       'Due Date': format(item.dueDate, 'MM/dd/yyyy'),
       'Days Until Due': item.daysUntilDue,
-      'Statement Date': item.account.statementDate || 'N/A',
       Balance: item.account.balance,
       'Credit Limit': item.account.creditLimit || 'N/A',
       'Utilization': item.account.creditLimit

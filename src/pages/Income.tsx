@@ -4,13 +4,30 @@ import { formatCurrency } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
 import Modal from '../components/Modal'
 import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { BudgetType, Income as IncomeType } from '../types'
+import type { BudgetType, Income as IncomeType, IncomeSource } from '../types'
 import { startOfMonth, endOfMonth, format, parseISO, addMonths, subMonths, differenceInDays } from 'date-fns'
 
 type BudgetFilter = 'all' | BudgetType
 
+// Helper function to convert IncomeSource to legacy Income format for display
+function incomeSourceToLegacy(source: IncomeSource): IncomeType {
+  return {
+    id: source.id,
+    source: source.name,
+    budgetType: source.budgetType,
+    categoryId: source.categoryId,
+    client: source.clientSource,
+    expectedAmount: source.expectedAmount,
+    isRecurring: source.frequency !== 'irregular',
+    recurringFrequency: source.frequency === 'biweekly' ? 'bi-weekly' : source.frequency as any,
+    expectedDate: source.nextExpectedDate,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+  }
+}
+
 export default function Income() {
-  const { currentView, appData, addIncome, updateIncome, deleteIncome, addCategory } = useBudget()
+  const { currentView, appData, addIncomeSource, updateIncomeSource, deleteIncomeSource, addCategory } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
@@ -40,7 +57,7 @@ export default function Income() {
 
   // Filter income sources
   const filteredIncome = useMemo(() => {
-    let income = appData.income
+    let income = appData.incomeSources
 
     if (currentView !== 'combined') {
       income = income.filter((i) => i.budgetType === currentView)
@@ -48,8 +65,11 @@ export default function Income() {
       income = income.filter((i) => i.budgetType === budgetFilter)
     }
 
-    return income.sort((a, b) => a.source.localeCompare(b.source))
-  }, [appData.income, currentView, budgetFilter])
+    // Convert to legacy format for display and sort
+    return income
+      .map(incomeSourceToLegacy)
+      .sort((a, b) => a.source.localeCompare(b.source))
+  }, [appData.incomeSources, currentView, budgetFilter])
 
   // Group income sources by category
   const incomeByCategory = useMemo(() => {
@@ -254,21 +274,52 @@ export default function Income() {
       .sort((a, b) => b.expected - a.expected)
   }, [filteredIncome, appData.transactions, currentView, budgetFilter, selectedMonth])
 
-  const handleAdd = (income: Omit<IncomeType, 'id'>) => {
-    addIncome(income)
+  const handleAdd = async (income: Omit<IncomeType, 'id'>) => {
+    // Map legacy Income format to new IncomeSource format
+    const incomeSource = {
+      name: income.source,
+      budgetType: income.budgetType,
+      incomeType: income.budgetType === 'household' ? 'salary' as const : 'project-income' as const,
+      categoryId: income.categoryId,
+      expectedAmount: income.expectedAmount || 0,
+      frequency: income.isRecurring
+        ? (income.recurringFrequency === 'bi-weekly' ? 'biweekly' as const
+           : income.recurringFrequency === 'same-day-each-month' ? 'monthly' as const
+           : income.recurringFrequency as any)
+        : 'irregular' as const,
+      nextExpectedDate: income.expectedDate,
+      clientSource: income.client,
+      isActive: true,
+    }
+    await addIncomeSource(incomeSource)
     setIsAddModalOpen(false)
   }
 
-  const handleUpdate = (income: Omit<IncomeType, 'id'>) => {
+  const handleUpdate = async (income: Omit<IncomeType, 'id'>) => {
     if (editingIncome) {
-      updateIncome(editingIncome.id, income)
+      // Map legacy Income format to new IncomeSource format
+      const updates = {
+        name: income.source,
+        budgetType: income.budgetType,
+        incomeType: income.budgetType === 'household' ? 'salary' as const : 'project-income' as const,
+        categoryId: income.categoryId,
+        expectedAmount: income.expectedAmount || 0,
+        frequency: income.isRecurring
+          ? (income.recurringFrequency === 'bi-weekly' ? 'biweekly' as const
+             : income.recurringFrequency === 'same-day-each-month' ? 'monthly' as const
+             : income.recurringFrequency as any)
+          : 'irregular' as const,
+        nextExpectedDate: income.expectedDate,
+        clientSource: income.client,
+      }
+      await updateIncomeSource(editingIncome.id, updates)
       setEditingIncome(null)
     }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this income source?')) {
-      deleteIncome(id)
+      await deleteIncomeSource(id)
     }
   }
 

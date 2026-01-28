@@ -1350,23 +1350,28 @@ function IncomeSourceManager({
     isActive: true,
   })
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!formData.name.trim()) {
       alert('Please enter an income source name')
       return
     }
     const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : 0
-    onAddIncome({
-      name: formData.name,
-      budgetType: formData.budgetType,
-      incomeType: formData.incomeType,
-      clientSource: formData.clientSource || undefined,
-      expectedAmount,
-      frequency: formData.frequency,
-      isActive: formData.isActive,
-    })
-    setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
-    setIsAdding(false)
+    try {
+      await onAddIncome({
+        name: formData.name,
+        budgetType: formData.budgetType,
+        incomeType: formData.incomeType,
+        clientSource: formData.clientSource || undefined,
+        expectedAmount,
+        frequency: formData.frequency,
+        isActive: formData.isActive,
+      })
+      setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
+      setIsAdding(false)
+    } catch (error) {
+      console.error('Failed to add income source:', error)
+      alert('Failed to add income source. Please check the console for details.')
+    }
   }
 
   const handleEdit = (income: any) => {
@@ -1382,23 +1387,28 @@ function IncomeSourceManager({
     })
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!formData.name.trim()) {
       alert('Please enter an income source name')
       return
     }
     const expectedAmount = formData.expectedAmount ? parseFloat(formData.expectedAmount) : 0
-    onUpdateIncome(editingId!, {
-      name: formData.name,
-      budgetType: formData.budgetType,
-      incomeType: formData.incomeType,
-      clientSource: formData.clientSource || undefined,
-      expectedAmount,
-      frequency: formData.frequency,
-      isActive: formData.isActive,
-    })
-    setEditingId(null)
-    setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
+    try {
+      await onUpdateIncome(editingId!, {
+        name: formData.name,
+        budgetType: formData.budgetType,
+        incomeType: formData.incomeType,
+        clientSource: formData.clientSource || undefined,
+        expectedAmount,
+        frequency: formData.frequency,
+        isActive: formData.isActive,
+      })
+      setEditingId(null)
+      setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
+    } catch (error) {
+      console.error('Failed to update income source:', error)
+      alert('Failed to update income source. Please check the console for details.')
+    }
   }
 
   const handleCancel = () => {
@@ -1407,9 +1417,14 @@ function IncomeSourceManager({
     setFormData({ name: '', budgetType: 'household', incomeType: 'salary', clientSource: '', expectedAmount: '', frequency: 'monthly', isActive: true })
   }
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete the income source "${name}"?`)) {
-      onDeleteIncome(id)
+      try {
+        await onDeleteIncome(id)
+      } catch (error) {
+        console.error('Failed to delete income source:', error)
+        alert('Failed to delete income source. Please check the console for details.')
+      }
     }
   }
 

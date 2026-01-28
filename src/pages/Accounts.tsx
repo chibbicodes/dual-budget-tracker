@@ -2,6 +2,7 @@ import { useBudget } from '../contexts/BudgetContext'
 import { useState, useMemo } from 'react'
 import Modal from '../components/Modal'
 import BudgetBadge from '../components/BudgetBadge'
+import ExportButtons from '../components/ExportButtons'
 import {
   Plus,
   Edit,
@@ -13,6 +14,7 @@ import {
   formatCurrency,
   getCreditUtilizationColor,
 } from '../utils/calculations'
+import { exportToCSV, exportToPDF } from '../utils/export'
 import type { Account, AccountType, BudgetType } from '../types'
 
 type BudgetFilter = 'household' | 'business' | 'all'
@@ -66,6 +68,51 @@ export default function Accounts() {
     setIsEditModalOpen(true)
   }
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = filteredAccounts.map(account => ({
+      Name: account.name,
+      Type: account.type,
+      Budget: account.budgetType === 'household' ? 'Household' : 'Business',
+      Balance: account.balance,
+      'Credit Limit': account.creditLimit || '',
+      'Credit Utilization': account.creditLimit
+        ? `${((account.balance / account.creditLimit) * 100).toFixed(1)}%`
+        : '',
+      'Interest Rate': account.interestRate ? `${account.interestRate}%` : '',
+      'Statement Date': account.statementDate || '',
+      'Due Date': account.dueDate || '',
+      Notes: account.notes || ''
+    }))
+
+    const filename = `accounts-${currentView}-${new Date().toISOString().split('T')[0]}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = filteredAccounts.map(account => ({
+      name: account.name,
+      type: account.type,
+      budget: account.budgetType === 'household' ? 'Household' : 'Business',
+      balance: formatCurrency(account.balance),
+      creditLimit: account.creditLimit ? formatCurrency(account.creditLimit) : 'N/A',
+      utilization: account.creditLimit
+        ? `${((account.balance / account.creditLimit) * 100).toFixed(1)}%`
+        : 'N/A'
+    }))
+
+    const filename = `accounts-${currentView}-${new Date().toISOString().split('T')[0]}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Accounts`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Name', 'Type', 'Budget', 'Balance', 'Credit Limit', 'Utilization'],
+      ['name', 'type', 'budget', 'balance', 'creditLimit', 'utilization']
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -74,13 +121,20 @@ export default function Accounts() {
           <h1 className="text-3xl font-bold text-gray-900">Accounts</h1>
           <p className="text-gray-600 mt-2">Manage your financial accounts</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Account
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={filteredAccounts.length === 0}
+          />
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Account
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

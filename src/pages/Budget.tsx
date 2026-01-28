@@ -4,6 +4,8 @@ import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
 import { getAllBuckets } from '../data/defaultCategories'
 import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2, Archive, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns'
+import { exportToCSV, exportToPDF } from '../utils/export'
+import ExportButtons from '../components/ExportButtons'
 import type { BudgetType, Category, BucketId } from '../types'
 import Modal from '../components/Modal'
 import { useNavigate } from 'react-router-dom'
@@ -240,6 +242,44 @@ export default function Budget() {
     }
   }
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = budgetSummary.categoryDetails.map(item => ({
+      Category: item.category.name,
+      Bucket: item.bucket ? item.bucket.charAt(0).toUpperCase() + item.bucket.slice(1) : 'N/A',
+      'Budget Amount': item.budgeted,
+      'Spent Amount': item.spent,
+      'Remaining': item.remaining,
+      'Percent Used': `${item.percentUsed.toFixed(1)}%`,
+      Status: item.remaining < 0 ? 'Over Budget' : item.percentUsed > 90 ? 'Near Limit' : 'On Track'
+    }))
+
+    const filename = `budget-${budgetType}-${selectedMonthString}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = budgetSummary.categoryDetails.map(item => ({
+      category: item.category.name,
+      bucket: item.bucket ? item.bucket.charAt(0).toUpperCase() + item.bucket.slice(1) : 'N/A',
+      budgeted: formatCurrency(item.budgeted),
+      spent: formatCurrency(item.spent),
+      remaining: formatCurrency(item.remaining),
+      percentUsed: `${item.percentUsed.toFixed(1)}%`
+    }))
+
+    const filename = `budget-${budgetType}-${selectedMonthString}`
+    const title = `${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget - ${format(selectedMonth, 'MMMM yyyy')}`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Category', 'Bucket', 'Budgeted', 'Spent', 'Remaining', '% Used'],
+      ['category', 'bucket', 'budgeted', 'spent', 'remaining', 'percentUsed']
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -253,6 +293,11 @@ export default function Budget() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={budgetSummary.categoryDetails.length === 0}
+          />
           <button
             onClick={() => navigate('/budget-archive')}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

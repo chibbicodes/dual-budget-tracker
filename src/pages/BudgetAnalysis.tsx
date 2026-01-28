@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency, calculateBudgetSummary } from '../utils/calculations'
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lightbulb } from 'lucide-react'
+import ExportButtons from '../components/ExportButtons'
+import { exportToCSV, exportToPDF } from '../utils/export'
 import type { BudgetType, Category } from '../types'
 import { subMonths, format, startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns'
 
@@ -319,6 +321,43 @@ export default function BudgetAnalysis() {
     }
   }, [budgetType, analysis, appData])
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = analysis.categoryComparison.map(item => ({
+      Category: item.category.name,
+      'Average Spending': item.average,
+      'Latest Month': item.latestMonth,
+      'Change vs Average': formatCurrency(item.changeVsAverage),
+      'Trend': item.trend,
+      'Percent Change': `${item.percentChange.toFixed(1)}%`
+    }))
+
+    const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = analysis.categoryComparison.map(item => ({
+      category: item.category.name,
+      average: formatCurrency(item.average),
+      latest: formatCurrency(item.latestMonth),
+      change: formatCurrency(item.changeVsAverage),
+      trend: item.trend,
+      percentChange: `${item.percentChange.toFixed(1)}%`
+    }))
+
+    const filename = `budget-analysis-${budgetType}-${timeRange}-${format(new Date(), 'yyyy-MM-dd')}`
+    const title = `${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget Analysis`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Category', 'Average', 'Latest', 'Change', 'Trend', '% Change'],
+      ['category', 'average', 'latest', 'change', 'trend', 'percentChange']
+    )
+  }
+
   if (currentView === 'combined' && budgetFilter === 'all') {
     return (
       <div>
@@ -377,6 +416,12 @@ export default function BudgetAnalysis() {
             <option value="ytd">Year to Date</option>
             <option value="last_year">Last Year</option>
           </select>
+
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={analysis.categoryComparison.length === 0}
+          />
         </div>
       </div>
 

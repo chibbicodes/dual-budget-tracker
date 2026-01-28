@@ -3,9 +3,11 @@ import { useBudget } from '../contexts/BudgetContext'
 import { formatCurrency } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
 import Modal from '../components/Modal'
+import ExportButtons from '../components/ExportButtons'
 import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { BudgetType, Income as IncomeType, IncomeSource } from '../types'
 import { startOfMonth, endOfMonth, format, parseISO, addMonths, subMonths, differenceInDays } from 'date-fns'
+import { exportToCSV, exportToPDF } from '../utils/export'
 
 type BudgetFilter = 'all' | BudgetType
 
@@ -326,6 +328,57 @@ export default function Income() {
   const variance = actualIncomeThisMonth - expectedIncomeThisMonth
   const variancePercent = expectedIncomeThisMonth > 0 ? (variance / expectedIncomeThisMonth) * 100 : 0
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = filteredIncome.map(income => {
+      const category = appData.categories.find(c => c.id === income.categoryId)
+      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
+      const expectedThisMonth = income.expectedAmount * occurrences
+
+      return {
+        Source: income.source,
+        Category: category?.name || 'Uncategorized',
+        Budget: income.budgetType === 'household' ? 'Household' : 'Business',
+        Client: income.client || '',
+        'Expected Amount': income.expectedAmount,
+        Frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
+        'Expected This Month': expectedThisMonth,
+        'Next Expected Date': income.expectedDate ? format(parseISO(income.expectedDate), 'MM/dd/yyyy') : ''
+      }
+    })
+
+    const filename = `income-sources-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = filteredIncome.map(income => {
+      const category = appData.categories.find(c => c.id === income.categoryId)
+      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
+      const expectedThisMonth = income.expectedAmount * occurrences
+
+      return {
+        source: income.source,
+        category: category?.name || 'Uncategorized',
+        budget: income.budgetType === 'household' ? 'Household' : 'Business',
+        expected: formatCurrency(income.expectedAmount),
+        frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
+        expectedMonth: formatCurrency(expectedThisMonth)
+      }
+    })
+
+    const filename = `income-sources-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Income Sources`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Source', 'Category', 'Budget', 'Expected', 'Frequency', 'Expected/Month'],
+      ['source', 'category', 'budget', 'expected', 'frequency', 'expectedMonth']
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -367,6 +420,12 @@ export default function Income() {
               </button>
             </div>
           )}
+
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={filteredIncome.length === 0}
+          />
 
           <button
             onClick={() => setIsAddCategoryModalOpen(true)}

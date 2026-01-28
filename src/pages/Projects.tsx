@@ -4,7 +4,9 @@ import { formatCurrency } from '../utils/calculations'
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears } from 'date-fns'
 import Modal from '../components/Modal'
 import BudgetBadge from '../components/BudgetBadge'
+import ExportButtons from '../components/ExportButtons'
 import { Plus, Edit2, Trash2, FolderOpen, TrendingUp, DollarSign } from 'lucide-react'
+import { exportToCSV, exportToPDF } from '../utils/export'
 import type { Project, BudgetType } from '../types'
 
 type BudgetFilter = 'all' | BudgetType
@@ -246,6 +248,69 @@ export default function Projects() {
     return source?.source || 'Unknown'
   }
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = filteredProjects.map(project => {
+      const spent = appData.transactions
+        .filter((t) => t.projectId === project.id)
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const remaining = project.budget - spent
+      const percentUsed = project.budget > 0 ? (spent / project.budget) * 100 : 0
+
+      return {
+        Name: project.name,
+        Type: getProjectTypeName(project.projectTypeId),
+        Status: getStatusName(project.statusId),
+        Budget: project.budgetType === 'household' ? 'Household' : 'Business',
+        'Date Created': format(parseISO(project.dateCreated), 'MM/dd/yyyy'),
+        'Project Budget': project.budget,
+        Spent: spent,
+        Remaining: remaining,
+        'Percent Used': `${percentUsed.toFixed(1)}%`,
+        Revenue: project.revenue || 0,
+        Profit: (project.revenue || 0) - spent,
+        'Profit Margin': project.revenue ? `${(((project.revenue - spent) / project.revenue) * 100).toFixed(1)}%` : 'N/A',
+        'Income Source': getIncomeSourceName(project.incomeSourceId) || '',
+        Notes: project.notes || ''
+      }
+    })
+
+    const filename = `projects-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = filteredProjects.map(project => {
+      const spent = appData.transactions
+        .filter((t) => t.projectId === project.id)
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const remaining = project.budget - spent
+      const profit = (project.revenue || 0) - spent
+
+      return {
+        name: project.name,
+        type: getProjectTypeName(project.projectTypeId),
+        status: getStatusName(project.statusId),
+        budget: formatCurrency(project.budget),
+        spent: formatCurrency(spent),
+        remaining: formatCurrency(remaining),
+        revenue: formatCurrency(project.revenue || 0),
+        profit: formatCurrency(profit)
+      }
+    })
+
+    const filename = `projects-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Projects`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Name', 'Type', 'Status', 'Budget', 'Spent', 'Remaining', 'Revenue', 'Profit'],
+      ['name', 'type', 'status', 'budget', 'spent', 'remaining', 'revenue', 'profit']
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -254,13 +319,20 @@ export default function Projects() {
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
           <p className="text-gray-600">Track profitability by performance, craft project, or event</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          Add Project
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={filteredProjects.length === 0}
+          />
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Add Project
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

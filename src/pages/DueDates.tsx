@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { useBudget } from '../contexts/BudgetContext'
 import { getUpcomingDueDates, formatCurrency, getBudgetTypeColors } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
+import ExportButtons from '../components/ExportButtons'
 import { Calendar, List, AlertTriangle, ExternalLink, Eye, CreditCard } from 'lucide-react'
 import { format, setDate, startOfMonth } from 'date-fns'
+import { exportToCSV, exportToPDF } from '../utils/export'
 import type { BudgetType, Account } from '../types'
 import Modal from '../components/Modal'
 
@@ -77,6 +79,49 @@ export default function DueDates() {
     return weeks
   }, [upcomingDueDates])
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = upcomingDueDates.map(item => ({
+      Account: item.account.name,
+      Budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
+      'Due Date': format(item.dueDate, 'MM/dd/yyyy'),
+      'Days Until Due': item.daysUntilDue,
+      'Statement Date': item.account.statementDate || 'N/A',
+      Balance: item.account.balance,
+      'Credit Limit': item.account.creditLimit || 'N/A',
+      'Utilization': item.account.creditLimit
+        ? `${((item.account.balance / item.account.creditLimit) * 100).toFixed(1)}%`
+        : 'N/A',
+      'Interest Rate': item.account.interestRate ? `${item.account.interestRate}%` : 'N/A',
+      Status: item.isOverdue ? 'Overdue' : 'Upcoming'
+    }))
+
+    const filename = `due-dates-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = upcomingDueDates.map(item => ({
+      account: item.account.name,
+      budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
+      dueDate: format(item.dueDate, 'MM/dd/yyyy'),
+      daysUntil: item.daysUntilDue.toString(),
+      balance: formatCurrency(item.account.balance),
+      status: item.isOverdue ? 'Overdue' : 'Upcoming'
+    }))
+
+    const filename = `due-dates-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Payment Due Dates`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Account', 'Budget', 'Due Date', 'Days Until', 'Balance', 'Status'],
+      ['account', 'budget', 'dueDate', 'daysUntil', 'balance', 'status']
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -144,6 +189,12 @@ export default function DueDates() {
               </button>
             </div>
           )}
+
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={upcomingDueDates.length === 0}
+          />
         </div>
       </div>
 

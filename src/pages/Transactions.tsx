@@ -2,6 +2,7 @@ import { useBudget } from '../contexts/BudgetContext'
 import { useState, useMemo } from 'react'
 import Modal from '../components/Modal'
 import BudgetBadge from '../components/BudgetBadge'
+import ExportButtons from '../components/ExportButtons'
 import {
   Plus,
   Edit,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '../utils/calculations'
 import { format, parseISO } from 'date-fns'
+import { exportToCSV, exportToPDF } from '../utils/export'
 import type { Transaction, BudgetType, Account } from '../types'
 
 type BudgetFilter = 'household' | 'business' | 'all'
@@ -754,6 +756,56 @@ export default function Transactions() {
     return { income, expenses, net: income - expenses }
   }, [filteredTransactions])
 
+  // Export handlers
+  const handleExportCSV = () => {
+    const exportData = filteredTransactions.map(transaction => {
+      const account = appData.accounts.find(a => a.id === transaction.accountId)
+      const category = appData.categories.find(c => c.id === transaction.categoryId)
+
+      return {
+        Date: format(parseISO(transaction.date), 'MM/dd/yyyy'),
+        Description: transaction.description,
+        Account: account?.name || 'Unknown',
+        Category: category?.name || 'Uncategorized',
+        Budget: transaction.budgetType === 'household' ? 'Household' : 'Business',
+        Amount: transaction.amount,
+        Reconciled: transaction.reconciled ? 'Yes' : 'No',
+        Notes: transaction.notes || ''
+      }
+    })
+
+    const filename = `transactions-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    exportToCSV(exportData, filename)
+  }
+
+  const handleExportPDF = () => {
+    const exportData = filteredTransactions.map(transaction => {
+      const account = appData.accounts.find(a => a.id === transaction.accountId)
+      const category = appData.categories.find(c => c.id === transaction.categoryId)
+
+      return {
+        date: format(parseISO(transaction.date), 'MM/dd/yyyy'),
+        description: transaction.description,
+        account: account?.name || 'Unknown',
+        category: category?.name || 'Uncategorized',
+        budget: transaction.budgetType === 'household' ? 'Household' : 'Business',
+        amount: formatCurrency(transaction.amount),
+        reconciled: transaction.reconciled ? 'Yes' : 'No'
+      }
+    })
+
+    const filename = `transactions-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Transactions`
+
+    exportToPDF(
+      exportData,
+      filename,
+      title,
+      ['Date', 'Description', 'Account', 'Category', 'Budget', 'Amount', 'Reconciled'],
+      ['date', 'description', 'account', 'category', 'budget', 'amount', 'reconciled']
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -765,6 +817,11 @@ export default function Transactions() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={filteredTransactions.length === 0}
+          />
           <label className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
             <Upload className="w-5 h-5 mr-2" />
             Import CSV

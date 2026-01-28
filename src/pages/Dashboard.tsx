@@ -2,6 +2,7 @@ import { useBudget } from '../contexts/BudgetContext'
 import { useMemo } from 'react'
 import SummaryCard from '../components/SummaryCard'
 import BudgetBadge from '../components/BudgetBadge'
+import ExportButtons from '../components/ExportButtons'
 import {
   Wallet,
   TrendingUp,
@@ -16,6 +17,7 @@ import {
   formatCurrency,
   getCreditUtilizationColor,
 } from '../utils/calculations'
+import { exportDashboardToPDF, exportToCSV } from '../utils/export'
 import type { BudgetType } from '../types'
 
 export default function Dashboard() {
@@ -75,13 +77,95 @@ export default function Dashboard() {
     [appData.transactions, appData.categories]
   )
 
+  // Export handlers for combined view
+  const handleCombinedExportCSV = () => {
+    const accountsData = appData.accounts.map(acc => ({
+      Name: acc.name,
+      Type: acc.type,
+      Budget: acc.budgetType === 'household' ? 'Household' : 'Business',
+      Balance: acc.balance
+    }))
+
+    const filename = `combined-dashboard-${new Date().toISOString().split('T')[0]}`
+    exportToCSV(accountsData, filename)
+  }
+
+  const handleCombinedExportPDF = () => {
+    exportDashboardToPDF(
+      'combined',
+      {
+        netWorth: combinedSummary.netWorth,
+        income: householdBudget.totalIncome + businessBudget.totalIncome,
+        expenses: householdBudget.totalExpenses + businessBudget.totalExpenses,
+        remaining: householdBudget.remainingBudget + businessBudget.remainingBudget
+      },
+      appData.accounts.map(acc => ({ name: acc.name, type: acc.type, balance: acc.balance })),
+      []
+    )
+  }
+
+  // Export handlers for single budget view
+  const handleSingleViewExportCSV = () => {
+    const budgetType = currentView as BudgetType
+    const summary = budgetType === 'household' ? householdSummary : businessSummary
+    const budget = budgetType === 'household' ? householdBudget : businessBudget
+    const topSpending = budgetType === 'household' ? householdTopSpending : businessTopSpending
+
+    const accountsData = appData.accounts
+      .filter(acc => acc.budgetType === budgetType)
+      .map(acc => ({
+        Name: acc.name,
+        Type: acc.type,
+        Balance: acc.balance
+      }))
+
+    const filename = `${budgetType}-dashboard-${new Date().toISOString().split('T')[0]}`
+    exportToCSV(accountsData, filename)
+  }
+
+  const handleSingleViewExportPDF = () => {
+    const budgetType = currentView as BudgetType
+    const summary = budgetType === 'household' ? householdSummary : businessSummary
+    const budget = budgetType === 'household' ? householdBudget : businessBudget
+    const topSpending = budgetType === 'household' ? householdTopSpending : businessTopSpending
+
+    const accounts = appData.accounts
+      .filter(acc => acc.budgetType === budgetType)
+      .map(acc => ({ name: acc.name, type: acc.type, balance: acc.balance }))
+
+    const topCategories = topSpending.map(cat => ({
+      name: cat.category.name,
+      amount: cat.amount,
+      percentage: cat.percentage
+    }))
+
+    exportDashboardToPDF(
+      budgetType,
+      {
+        netWorth: summary.netWorth,
+        income: budget.totalIncome,
+        expenses: budget.totalExpenses,
+        remaining: budget.remainingBudget
+      },
+      accounts,
+      topCategories
+    )
+  }
+
   // Render combined view
   if (currentView === 'combined') {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Combined Dashboard</h1>
-          <p className="text-gray-600 mt-2">Overview of all your finances</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Combined Dashboard</h1>
+            <p className="text-gray-600 mt-2">Overview of all your finances</p>
+          </div>
+          <ExportButtons
+            onExportCSV={handleCombinedExportCSV}
+            onExportPDF={handleCombinedExportPDF}
+            disabled={appData.accounts.length === 0}
+          />
         </div>
 
         {/* Combined Net Worth */}
@@ -301,7 +385,14 @@ export default function Dashboard() {
             Overview of your {currentView} finances
           </p>
         </div>
-        <BudgetBadge budgetType={budgetType} size="lg" />
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportCSV={handleSingleViewExportCSV}
+            onExportPDF={handleSingleViewExportPDF}
+            disabled={accounts.length === 0}
+          />
+          <BudgetBadge budgetType={budgetType} size="lg" />
+        </div>
       </div>
 
       {/* Summary Cards */}

@@ -79,15 +79,39 @@ export default function Dashboard() {
 
   // Export handlers for combined view
   const handleCombinedExportCSV = () => {
-    const accountsData = appData.accounts.map(acc => ({
-      Name: acc.name,
-      Type: acc.type,
-      Budget: acc.budgetType === 'household' ? 'Household' : 'Business',
-      Balance: acc.balance
-    }))
+    // Create comprehensive CSV with multiple sections
+    const csvData = [
+      // Summary section
+      { Section: 'COMBINED OVERVIEW' },
+      { Section: 'Total Assets', Value: combinedSummary.totalAssets.toFixed(2) },
+      { Section: 'Total Liabilities', Value: combinedSummary.totalLiabilities.toFixed(2) },
+      { Section: 'Net Worth', Value: combinedSummary.netWorth.toFixed(2) },
+      { Section: '' },
+      { Section: 'HOUSEHOLD' },
+      { Section: 'Net Worth', Value: householdSummary.netWorth.toFixed(2) },
+      { Section: 'This Month Income', Value: householdBudget.totalIncome.toFixed(2) },
+      { Section: 'This Month Expenses', Value: householdBudget.totalExpenses.toFixed(2) },
+      { Section: 'Remaining', Value: householdBudget.remainingBudget.toFixed(2) },
+      { Section: '' },
+      { Section: 'BUSINESS' },
+      { Section: 'Net Worth', Value: businessSummary.netWorth.toFixed(2) },
+      { Section: 'This Month Revenue', Value: businessBudget.totalIncome.toFixed(2) },
+      { Section: 'This Month Expenses', Value: businessBudget.totalExpenses.toFixed(2) },
+      { Section: 'Net Profit', Value: businessBudget.remainingBudget.toFixed(2) },
+      { Section: '' },
+      { Section: 'ACCOUNTS' },
+      { Account: 'Name', Type: 'Type', Budget: 'Budget', Balance: 'Balance', Utilization: 'Utilization' },
+      ...appData.accounts.map(acc => ({
+        Account: acc.name,
+        Type: acc.type,
+        Budget: acc.budgetType === 'household' ? 'Household' : 'Business',
+        Balance: acc.balance.toFixed(2),
+        Utilization: acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'
+      }))
+    ]
 
     const filename = `combined-dashboard-${new Date().toISOString().split('T')[0]}`
-    exportToCSV(accountsData, filename)
+    exportToCSV(csvData, filename)
   }
 
   const handleCombinedExportPDF = () => {
@@ -95,11 +119,27 @@ export default function Dashboard() {
       'combined',
       {
         netWorth: combinedSummary.netWorth,
+        totalAssets: combinedSummary.totalAssets,
+        totalLiabilities: combinedSummary.totalLiabilities,
         income: householdBudget.totalIncome + businessBudget.totalIncome,
         expenses: householdBudget.totalExpenses + businessBudget.totalExpenses,
-        remaining: householdBudget.remainingBudget + businessBudget.remainingBudget
+        remaining: householdBudget.remainingBudget + businessBudget.remainingBudget,
+        householdNetWorth: householdSummary.netWorth,
+        householdIncome: householdBudget.totalIncome,
+        householdExpenses: householdBudget.totalExpenses,
+        householdRemaining: householdBudget.remainingBudget,
+        businessNetWorth: businessSummary.netWorth,
+        businessRevenue: businessBudget.totalIncome,
+        businessExpenses: businessBudget.totalExpenses,
+        businessNetProfit: businessBudget.remainingBudget
       },
-      appData.accounts.map(acc => ({ name: acc.name, type: acc.type, balance: acc.balance })),
+      appData.accounts.map(acc => ({
+        name: acc.name,
+        type: acc.type,
+        balance: acc.balance,
+        budgetType: acc.budgetType,
+        creditUtilization: acc.creditUtilization
+      })),
       []
     )
   }
@@ -111,16 +151,54 @@ export default function Dashboard() {
     const budget = budgetType === 'household' ? householdBudget : businessBudget
     const topSpending = budgetType === 'household' ? householdTopSpending : businessTopSpending
 
-    const accountsData = appData.accounts
-      .filter(acc => acc.budgetType === budgetType)
-      .map(acc => ({
-        Name: acc.name,
-        Type: acc.type,
-        Balance: acc.balance
+    const incomeLabel = budgetType === 'household' ? 'This Month Income' : 'This Month Revenue'
+    const remainingLabel = budgetType === 'household' ? 'Remaining' : 'Net Profit'
+
+    // Create comprehensive CSV with multiple sections
+    const csvData = [
+      // Summary metrics
+      { Section: 'SUMMARY METRICS' },
+      { Section: 'Total Assets', Value: summary.totalAssets.toFixed(2) },
+      { Section: 'Total Liabilities', Value: summary.totalLiabilities.toFixed(2) },
+      { Section: 'Net Worth', Value: summary.netWorth.toFixed(2) },
+      { Section: '' },
+      { Section: 'MONTHLY STATS' },
+      { Section: incomeLabel, Value: budget.totalIncome.toFixed(2) },
+      { Section: 'This Month Expenses', Value: budget.totalExpenses.toFixed(2) },
+      { Section: remainingLabel, Value: budget.remainingBudget.toFixed(2) },
+      { Section: '' },
+      { Section: 'ACCOUNTS' },
+      { Account: 'Name', Type: 'Type', Balance: 'Balance', Utilization: 'Utilization' },
+      ...appData.accounts
+        .filter(acc => acc.budgetType === budgetType)
+        .map(acc => ({
+          Account: acc.name,
+          Type: acc.type,
+          Balance: acc.balance.toFixed(2),
+          Utilization: acc.creditUtilization !== undefined ? `${acc.creditUtilization.toFixed(1)}%` : '-'
+        })),
+      { Section: '' },
+      { Section: 'TOP SPENDING THIS MONTH' },
+      { Category: 'Category', Amount: 'Amount', Transactions: 'Transactions' },
+      ...topSpending.map(item => ({
+        Category: item.category.name,
+        Amount: item.amount.toFixed(2),
+        Transactions: item.transactionCount.toString()
+      })),
+      { Section: '' },
+      { Section: 'SPENDING BY CATEGORY BUCKET' },
+      { Bucket: 'Bucket', Target: 'Target', Actual: 'Actual', Difference: 'Difference', PercentOfIncome: '% of Income' },
+      ...budget.bucketBreakdown.map(bucket => ({
+        Bucket: bucket.bucketName,
+        Target: bucket.targetAmount.toFixed(2),
+        Actual: bucket.actualAmount.toFixed(2),
+        Difference: bucket.overUnder.toFixed(2),
+        PercentOfIncome: `${bucket.percentOfIncome.toFixed(1)}%`
       }))
+    ]
 
     const filename = `${budgetType}-dashboard-${new Date().toISOString().split('T')[0]}`
-    exportToCSV(accountsData, filename)
+    exportToCSV(csvData, filename)
   }
 
   const handleSingleViewExportPDF = () => {
@@ -131,24 +209,35 @@ export default function Dashboard() {
 
     const accounts = appData.accounts
       .filter(acc => acc.budgetType === budgetType)
-      .map(acc => ({ name: acc.name, type: acc.type, balance: acc.balance }))
+      .map(acc => ({
+        name: acc.name,
+        type: acc.type,
+        balance: acc.balance,
+        creditUtilization: acc.creditUtilization
+      }))
+
+    // Calculate total spending for percentage calculation
+    const totalSpending = topSpending.reduce((sum, cat) => sum + cat.amount, 0)
 
     const topCategories = topSpending.map(cat => ({
       name: cat.category.name,
       amount: cat.amount,
-      percentage: cat.percentage
+      percentage: totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0
     }))
 
     exportDashboardToPDF(
       budgetType,
       {
         netWorth: summary.netWorth,
+        totalAssets: summary.totalAssets,
+        totalLiabilities: summary.totalLiabilities,
         income: budget.totalIncome,
         expenses: budget.totalExpenses,
         remaining: budget.remainingBudget
       },
       accounts,
-      topCategories
+      topCategories,
+      budget.bucketBreakdown
     )
   }
 

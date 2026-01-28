@@ -72,16 +72,15 @@ export default function Accounts() {
   const handleExportCSV = () => {
     const exportData = filteredAccounts.map(account => ({
       Name: account.name,
-      Type: account.type,
+      Type: account.accountType,
       Budget: account.budgetType === 'household' ? 'Household' : 'Business',
       Balance: account.balance,
       'Credit Limit': account.creditLimit || '',
       'Credit Utilization': account.creditLimit
-        ? `${((account.balance / account.creditLimit) * 100).toFixed(1)}%`
+        ? `${((Math.abs(account.balance) / account.creditLimit) * 100).toFixed(1)}%`
         : '',
       'Interest Rate': account.interestRate ? `${account.interestRate}%` : '',
-      'Statement Date': account.statementDate || '',
-      'Due Date': account.dueDate || '',
+      'Due Date': account.paymentDueDate || '',
       Notes: account.notes || ''
     }))
 
@@ -92,12 +91,12 @@ export default function Accounts() {
   const handleExportPDF = () => {
     const exportData = filteredAccounts.map(account => ({
       name: account.name,
-      type: account.type,
+      type: account.accountType,
       budget: account.budgetType === 'household' ? 'Household' : 'Business',
       balance: formatCurrency(account.balance),
       creditLimit: account.creditLimit ? formatCurrency(account.creditLimit) : 'N/A',
       utilization: account.creditLimit
-        ? `${((account.balance / account.creditLimit) * 100).toFixed(1)}%`
+        ? `${((Math.abs(account.balance) / account.creditLimit) * 100).toFixed(1)}%`
         : 'N/A'
     }))
 

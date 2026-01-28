@@ -79,7 +79,12 @@ export function calculateBudgetSummary(
   })
 
   // Calculate totals (exclude transactions with excludeFromBudget categories)
+  // Note: Income transactions are always included, only expenses check excludeFromBudget
   const includedTransactions = monthTransactions.filter((t) => {
+    // Always include income transactions
+    if (t.amount > 0) return true
+
+    // For expenses, check if category should be excluded from budget
     const category = categories.find((c) => c.id === t.categoryId)
     return !category?.excludeFromBudget
   })

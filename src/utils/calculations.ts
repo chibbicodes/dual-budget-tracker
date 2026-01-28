@@ -265,9 +265,10 @@ export function formatCurrencyWithSign(
  * Get color class for budget percentage
  */
 export function getBudgetColorClass(percentUsed: number): string {
-  if (percentUsed < 70) return 'text-green-600'
-  if (percentUsed < 90) return 'text-yellow-600'
-  return 'text-red-600'
+  if (percentUsed > 100.9) return 'text-red-600'
+  if (percentUsed >= 99) return 'text-green-600'
+  if (percentUsed >= 90) return 'text-yellow-600'
+  return 'text-green-600'
 }
 
 /**

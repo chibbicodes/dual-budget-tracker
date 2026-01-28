@@ -147,7 +147,7 @@ export default function Projects() {
       const spent = expenses // For household, "spent" is typically expenses
       const remaining = budget - spent
       const percentUsed = budget > 0 ? (spent / budget) * 100 : 0
-      const isOverBudget = spent > budget && budget > 0
+      const isOverBudget = percentUsed > 100.9 && budget > 0
 
       return {
         project,
@@ -719,7 +719,7 @@ export default function Projects() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <span className={percentUsed > 100 ? 'text-red-600 font-semibold' : percentUsed > 80 ? 'text-yellow-600' : 'text-gray-900'}>
+                        <span className={percentUsed > 100.9 ? 'text-red-600 font-semibold' : percentUsed >= 99 ? 'text-green-600 font-semibold' : percentUsed >= 90 ? 'text-yellow-600' : 'text-gray-900'}>
                           {percentUsed.toFixed(1)}%
                         </span>
                       </td>
@@ -1430,7 +1430,7 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
     )
     const remaining = budget - spent
     const percentUsed = budget > 0 ? (spent / budget) * 100 : 0
-    const isOverBudget = spent > budget && budget > 0
+    const isOverBudget = percentUsed > 100.9 && budget > 0
 
     return { budget, spent, remaining, percentUsed, isOverBudget }
   }, [transactions, project.budget])
@@ -1632,11 +1632,11 @@ function ProjectDetailView({ project, onClose }: ProjectDetailViewProps) {
                   {formatCurrency(Math.abs(budgetMetrics.remaining))}
                 </p>
               </div>
-              <div className={`${budgetMetrics.percentUsed > 100 ? 'bg-red-50' : budgetMetrics.percentUsed > 80 ? 'bg-yellow-50' : 'bg-purple-50'} rounded-lg p-4`}>
-                <h4 className={`text-sm font-medium ${budgetMetrics.percentUsed > 100 ? 'text-red-900' : budgetMetrics.percentUsed > 80 ? 'text-yellow-900' : 'text-purple-900'}`}>
+              <div className={`${budgetMetrics.percentUsed > 100.9 ? 'bg-red-50' : budgetMetrics.percentUsed >= 99 ? 'bg-green-50' : budgetMetrics.percentUsed >= 90 ? 'bg-yellow-50' : 'bg-purple-50'} rounded-lg p-4`}>
+                <h4 className={`text-sm font-medium ${budgetMetrics.percentUsed > 100.9 ? 'text-red-900' : budgetMetrics.percentUsed >= 99 ? 'text-green-900' : budgetMetrics.percentUsed >= 90 ? 'text-yellow-900' : 'text-purple-900'}`}>
                   % Used
                 </h4>
-                <p className={`text-xl font-bold mt-1 ${budgetMetrics.percentUsed > 100 ? 'text-red-600' : budgetMetrics.percentUsed > 80 ? 'text-yellow-600' : 'text-purple-600'}`}>
+                <p className={`text-xl font-bold mt-1 ${budgetMetrics.percentUsed > 100.9 ? 'text-red-600' : budgetMetrics.percentUsed >= 99 ? 'text-green-600' : budgetMetrics.percentUsed >= 90 ? 'text-yellow-600' : 'text-purple-600'}`}>
                   {budgetMetrics.percentUsed.toFixed(1)}%
                 </p>
               </div>

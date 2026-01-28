@@ -257,7 +257,7 @@ export default function Budget() {
             'Spent Amount': categoryBreakdown.actual,
             'Remaining': categoryBreakdown.overUnder,
             'Percent Used': `${categoryBreakdown.percentUsed.toFixed(1)}%`,
-            Status: categoryBreakdown.overUnder < 0 ? 'Over Budget' : categoryBreakdown.percentUsed > 90 ? 'Near Limit' : 'On Track'
+            Status: categoryBreakdown.percentUsed > 100.9 ? 'Over Budget' : categoryBreakdown.percentUsed >= 99 ? 'On Budget' : categoryBreakdown.percentUsed >= 90 ? 'Near Limit' : 'On Track'
           })
         }
       })
@@ -579,9 +579,11 @@ export default function Budget() {
                               <div className="w-24 bg-gray-200 rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full ${
-                                    percentUsed > 100
+                                    percentUsed > 100.9
                                       ? 'bg-red-500'
-                                      : percentUsed > 90
+                                      : percentUsed >= 99
+                                      ? 'bg-green-500'
+                                      : percentUsed >= 90
                                       ? 'bg-yellow-500'
                                       : 'bg-green-500'
                                   }`}
@@ -592,9 +594,11 @@ export default function Budget() {
                               </div>
                               <span
                                 className={`text-xs font-medium ${
-                                  percentUsed > 100
+                                  percentUsed > 100.9
                                     ? 'text-red-600'
-                                    : percentUsed > 90
+                                    : percentUsed >= 99
+                                    ? 'text-green-600'
+                                    : percentUsed >= 90
                                     ? 'text-yellow-600'
                                     : 'text-green-600'
                                 }`}

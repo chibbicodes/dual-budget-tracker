@@ -244,29 +244,47 @@ export default function Budget() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = budgetSummary.categoryDetails.map(item => ({
-      Category: item.category.name,
-      Bucket: item.bucket ? item.bucket.charAt(0).toUpperCase() + item.bucket.slice(1) : 'N/A',
-      'Budget Amount': item.budgeted,
-      'Spent Amount': item.spent,
-      'Remaining': item.remaining,
-      'Percent Used': `${item.percentUsed.toFixed(1)}%`,
-      Status: item.remaining < 0 ? 'Over Budget' : item.percentUsed > 90 ? 'Near Limit' : 'On Track'
-    }))
+    // Flatten bucket breakdown into category details for export
+    const exportData: any[] = []
+    budgetSummary.bucketBreakdown.forEach(bucket => {
+      bucket.categories.forEach(categoryBreakdown => {
+        const category = appData.categories.find(c => c.id === categoryBreakdown.categoryId)
+        if (category) {
+          exportData.push({
+            Category: category.name,
+            Bucket: bucket.bucketName,
+            'Budget Amount': categoryBreakdown.budgeted,
+            'Spent Amount': categoryBreakdown.actual,
+            'Remaining': categoryBreakdown.overUnder,
+            'Percent Used': `${categoryBreakdown.percentUsed.toFixed(1)}%`,
+            Status: categoryBreakdown.overUnder < 0 ? 'Over Budget' : categoryBreakdown.percentUsed > 90 ? 'Near Limit' : 'On Track'
+          })
+        }
+      })
+    })
 
     const filename = `budget-${budgetType}-${selectedMonthString}`
     exportToCSV(exportData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = budgetSummary.categoryDetails.map(item => ({
-      category: item.category.name,
-      bucket: item.bucket ? item.bucket.charAt(0).toUpperCase() + item.bucket.slice(1) : 'N/A',
-      budgeted: formatCurrency(item.budgeted),
-      spent: formatCurrency(item.spent),
-      remaining: formatCurrency(item.remaining),
-      percentUsed: `${item.percentUsed.toFixed(1)}%`
-    }))
+    // Flatten bucket breakdown into category details for export
+    const exportData: any[] = []
+    budgetSummary.bucketBreakdown.forEach(bucket => {
+      bucket.categories.forEach(categoryBreakdown => {
+        const category = appData.categories.find(c => c.id === categoryBreakdown.categoryId)
+        if (category) {
+          exportData.push({
+            category: category.name,
+            bucket: bucket.bucketName,
+            budgeted: formatCurrency(categoryBreakdown.budgeted),
+            spent: formatCurrency(categoryBreakdown.actual),
+            remaining: formatCurrency(categoryBreakdown.overUnder),
+            percentUsed: `${categoryBreakdown.percentUsed.toFixed(1)}%`
+          })
+        }
+      })
+    })
 
     const filename = `budget-${budgetType}-${selectedMonthString}`
     const title = `${budgetType.charAt(0).toUpperCase() + budgetType.slice(1)} Budget - ${format(selectedMonth, 'MMMM yyyy')}`
@@ -296,7 +314,7 @@ export default function Budget() {
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={budgetSummary.categoryDetails.length === 0}
+            disabled={budgetSummary.bucketBreakdown.every(b => b.categories.length === 0)}
           />
           <button
             onClick={() => navigate('/budget-archive')}

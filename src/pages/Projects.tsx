@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import BudgetBadge from '../components/BudgetBadge'
 import ExportButtons from '../components/ExportButtons'
 import { Plus, Edit2, Trash2, FolderOpen, TrendingUp, DollarSign } from 'lucide-react'
-import { exportToCSV, exportToPDF } from '../utils/export'
+import { exportToCSV } from '../utils/export'
 import type { Project, BudgetType } from '../types'
 
 type BudgetFilter = 'all' | BudgetType
@@ -250,29 +250,367 @@ export default function Projects() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = filteredProjects.map(project => {
-      const spent = appData.transactions
-        .filter((t) => t.projectId === project.id)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-      const remaining = project.budget - spent
-      const percentUsed = project.budget > 0 ? (spent / project.budget) * 100 : 0
+    // Create comprehensive export data with summary
+    const exportData: any[] = []
 
-      return {
-        Name: project.name,
-        Type: getProjectTypeName(project.projectTypeId),
-        Status: getStatusName(project.statusId),
-        Budget: project.budgetType === 'household' ? 'Household' : 'Business',
-        'Date Created': format(parseISO(project.dateCreated), 'MM/dd/yyyy'),
-        'Project Budget': project.budget,
-        Spent: spent,
-        Remaining: remaining,
-        'Percent Used': `${percentUsed.toFixed(1)}%`,
-        Revenue: project.revenue || 0,
-        Profit: (project.revenue || 0) - spent,
-        'Profit Margin': project.revenue ? `${(((project.revenue - spent) / project.revenue) * 100).toFixed(1)}%` : 'N/A',
-        'Income Source': getIncomeSourceName(project.incomeSourceId) || '',
-        Notes: project.notes || ''
+    // Add summary section
+    const filterDescription = [
+      dateRangeFilter !== 'all' ? dateRangeFilter : 'All Time',
+      statusFilter !== 'all' ? `Status: ${getStatusName(statusFilter)}` : '',
+      projectTypeFilter !== 'all' ? `Type: ${getProjectTypeName(projectTypeFilter)}` : '',
+      incomeSourceFilter !== 'all' ? `Source: ${getIncomeSourceName(incomeSourceFilter)}` : ''
+    ].filter(Boolean).join(' | ')
+
+    exportData.push({
+      'Project Name': 'PROJECT SUMMARY',
+      'Project Type': filterDescription,
+      'Status': format(new Date(), 'MM/dd/yyyy'),
+      'Budget Type': '',
+      'Date Created': '',
+      'Date Completed': '',
+      'Budget/Revenue': '',
+      'Spent/Expenses': '',
+      'Remaining/Profit': '',
+      'Percent/Margin': '',
+      'Income Source': '',
+      'Commission Paid': '',
+      'Notes': ''
+    })
+
+    // Add summary metrics based on budget type
+    if (effectiveBudgetFilter === 'household' || effectiveBudgetFilter === 'all') {
+      exportData.push({
+        'Project Name': 'HOUSEHOLD SUMMARY',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      const householdProjects = sortedProjects.filter(pm => pm.project.budgetType === 'household')
+      const householdSummary = householdProjects.reduce(
+        (acc, pm) => ({
+          count: acc.count + 1,
+          budget: acc.budget + pm.budget,
+          spent: acc.spent + pm.spent,
+          remaining: acc.remaining + pm.remaining,
+          overBudget: acc.overBudget + (pm.isOverBudget ? 1 : 0)
+        }),
+        { count: 0, budget: 0, spent: 0, remaining: 0, overBudget: 0 }
+      )
+
+      exportData.push({
+        'Project Name': 'Total Projects',
+        'Project Type': householdSummary.count.toString(),
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Budget',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': householdSummary.budget,
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Spent',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': householdSummary.spent,
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Remaining',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': householdSummary.remaining,
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Average % Used',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': householdSummary.budget > 0 ? `${((householdSummary.spent / householdSummary.budget) * 100).toFixed(1)}%` : '0.0%',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Projects Over Budget',
+        'Project Type': householdSummary.overBudget.toString(),
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      // Blank row
+      exportData.push({
+        'Project Name': '',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+    }
+
+    if (effectiveBudgetFilter === 'business' || effectiveBudgetFilter === 'all') {
+      exportData.push({
+        'Project Name': 'BUSINESS SUMMARY',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      const businessProjects = sortedProjects.filter(pm => pm.project.budgetType === 'business')
+      const businessSummary = businessProjects.reduce(
+        (acc, pm) => ({
+          count: acc.count + 1,
+          revenue: acc.revenue + pm.revenue,
+          expenses: acc.expenses + pm.expenses,
+          profit: acc.profit + pm.profit
+        }),
+        { count: 0, revenue: 0, expenses: 0, profit: 0 }
+      )
+
+      exportData.push({
+        'Project Name': 'Total Projects',
+        'Project Type': businessSummary.count.toString(),
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Revenue',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': businessSummary.revenue,
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Expenses',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': businessSummary.expenses,
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Total Profit',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': businessSummary.profit,
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      exportData.push({
+        'Project Name': 'Average Margin',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': businessSummary.revenue > 0 ? `${((businessSummary.profit / businessSummary.revenue) * 100).toFixed(1)}%` : '0.0%',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      // Blank row
+      exportData.push({
+        'Project Name': '',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+    }
+
+    // Group by status
+    const statusGroups = new Map<string, typeof sortedProjects>()
+    sortedProjects.forEach(pm => {
+      const status = getStatusName(pm.project.statusId)
+      if (!statusGroups.has(status)) {
+        statusGroups.set(status, [])
       }
+      statusGroups.get(status)!.push(pm)
+    })
+
+    // Add detailed data grouped by status
+    statusGroups.forEach((projects, status) => {
+      // Status header
+      exportData.push({
+        'Project Name': `STATUS: ${status}`,
+        'Project Type': `(${projects.length} projects)`,
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
+
+      // Projects in this status
+      projects.forEach(({ project, revenue, expenses, profit, margin, budget, spent, remaining, percentUsed }) => {
+        exportData.push({
+          'Project Name': project.name,
+          'Project Type': getProjectTypeName(project.projectTypeId),
+          'Status': status,
+          'Budget Type': project.budgetType === 'household' ? 'Household' : 'Business',
+          'Date Created': format(parseISO(project.dateCreated), 'MM/dd/yyyy'),
+          'Date Completed': project.dateCompleted ? format(parseISO(project.dateCompleted), 'MM/dd/yyyy') : '',
+          'Budget/Revenue': project.budgetType === 'household' ? budget : revenue,
+          'Spent/Expenses': project.budgetType === 'household' ? spent : expenses,
+          'Remaining/Profit': project.budgetType === 'household' ? remaining : profit,
+          'Percent/Margin': project.budgetType === 'household' ? `${percentUsed.toFixed(1)}%` : `${margin.toFixed(1)}%`,
+          'Income Source': getIncomeSourceName(project.incomeSourceId) || '',
+          'Commission Paid': project.commissionPaid ? 'Yes' : 'No',
+          'Notes': project.notes || ''
+        })
+      })
+
+      // Blank row after each status
+      exportData.push({
+        'Project Name': '',
+        'Project Type': '',
+        'Status': '',
+        'Budget Type': '',
+        'Date Created': '',
+        'Date Completed': '',
+        'Budget/Revenue': '',
+        'Spent/Expenses': '',
+        'Remaining/Profit': '',
+        'Percent/Margin': '',
+        'Income Source': '',
+        'Commission Paid': '',
+        'Notes': ''
+      })
     })
 
     const filename = `projects-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
@@ -280,35 +618,180 @@ export default function Projects() {
   }
 
   const handleExportPDF = () => {
-    const exportData = filteredProjects.map(project => {
-      const spent = appData.transactions
-        .filter((t) => t.projectId === project.id)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-      const remaining = project.budget - spent
-      const profit = (project.revenue || 0) - spent
+    // Import jsPDF and autoTable dynamically
+    import('jspdf').then((jsPDFModule) => {
+      import('jspdf-autotable').then((autoTableModule) => {
+        const jsPDF = jsPDFModule.default
+        const autoTable = autoTableModule.default
 
-      return {
-        name: project.name,
-        type: getProjectTypeName(project.projectTypeId),
-        status: getStatusName(project.statusId),
-        budget: formatCurrency(project.budget),
-        spent: formatCurrency(spent),
-        remaining: formatCurrency(remaining),
-        revenue: formatCurrency(project.revenue || 0),
-        profit: formatCurrency(profit)
-      }
+        const doc = new jsPDF()
+        let yPos = 20
+
+        // Title
+        doc.setFontSize(18)
+        const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Projects`
+        doc.text(title, 14, yPos)
+        yPos += 10
+
+        // Date and filters
+        doc.setFontSize(9)
+        doc.text(`Generated on: ${format(new Date(), 'MM/dd/yyyy')}`, 14, yPos)
+        yPos += 5
+
+        const filterDescription = [
+          dateRangeFilter !== 'all' ? dateRangeFilter : 'All Time',
+          statusFilter !== 'all' ? `Status: ${getStatusName(statusFilter)}` : '',
+          projectTypeFilter !== 'all' ? `Type: ${getProjectTypeName(projectTypeFilter)}` : '',
+          incomeSourceFilter !== 'all' ? `Source: ${getIncomeSourceName(incomeSourceFilter)}` : ''
+        ].filter(Boolean).join(' | ')
+
+        if (filterDescription) {
+          doc.text(`Filters: ${filterDescription}`, 14, yPos)
+          yPos += 5
+        }
+
+        yPos += 5
+
+        // Summary Section
+        doc.setFontSize(14)
+        doc.text('Summary', 14, yPos)
+        yPos += 6
+
+        doc.setFontSize(9)
+
+        if (effectiveBudgetFilter === 'household' || effectiveBudgetFilter === 'all') {
+          const householdProjects = sortedProjects.filter(pm => pm.project.budgetType === 'household')
+          const householdSummary = householdProjects.reduce(
+            (acc, pm) => ({
+              count: acc.count + 1,
+              budget: acc.budget + pm.budget,
+              spent: acc.spent + pm.spent,
+              remaining: acc.remaining + pm.remaining,
+              overBudget: acc.overBudget + (pm.isOverBudget ? 1 : 0)
+            }),
+            { count: 0, budget: 0, spent: 0, remaining: 0, overBudget: 0 }
+          )
+
+          doc.setFontSize(12)
+          doc.text('Household Projects', 14, yPos)
+          yPos += 6
+
+          doc.setFontSize(9)
+          doc.text(`Total Projects: ${householdSummary.count}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Budget: ${formatCurrency(householdSummary.budget)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Spent: ${formatCurrency(householdSummary.spent)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Remaining: ${formatCurrency(householdSummary.remaining)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Average % Used: ${householdSummary.budget > 0 ? ((householdSummary.spent / householdSummary.budget) * 100).toFixed(1) : '0.0'}%`, 20, yPos)
+          yPos += 5
+          doc.text(`Projects Over Budget: ${householdSummary.overBudget}`, 20, yPos)
+          yPos += 8
+        }
+
+        if (effectiveBudgetFilter === 'business' || effectiveBudgetFilter === 'all') {
+          const businessProjects = sortedProjects.filter(pm => pm.project.budgetType === 'business')
+          const businessSummary = businessProjects.reduce(
+            (acc, pm) => ({
+              count: acc.count + 1,
+              revenue: acc.revenue + pm.revenue,
+              expenses: acc.expenses + pm.expenses,
+              profit: acc.profit + pm.profit
+            }),
+            { count: 0, revenue: 0, expenses: 0, profit: 0 }
+          )
+
+          doc.setFontSize(12)
+          doc.text('Business Projects', 14, yPos)
+          yPos += 6
+
+          doc.setFontSize(9)
+          doc.text(`Total Projects: ${businessSummary.count}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Revenue: ${formatCurrency(businessSummary.revenue)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Expenses: ${formatCurrency(businessSummary.expenses)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Total Profit: ${formatCurrency(businessSummary.profit)}`, 20, yPos)
+          yPos += 5
+          doc.text(`Average Margin: ${businessSummary.revenue > 0 ? ((businessSummary.profit / businessSummary.revenue) * 100).toFixed(1) : '0.0'}%`, 20, yPos)
+          yPos += 8
+        }
+
+        // Check if we need a new page
+        if (yPos > 240) {
+          doc.addPage()
+          yPos = 20
+        }
+
+        // Projects by Status
+        doc.setFontSize(14)
+        doc.text('Projects by Status', 14, yPos)
+        yPos += 3
+
+        // Group by status
+        const statusGroups = new Map<string, typeof sortedProjects>()
+        sortedProjects.forEach(pm => {
+          const status = getStatusName(pm.project.statusId)
+          if (!statusGroups.has(status)) {
+            statusGroups.set(status, [])
+          }
+          statusGroups.get(status)!.push(pm)
+        })
+
+        statusGroups.forEach((projects, status) => {
+          // Check if we need a new page
+          if (yPos > 250) {
+            doc.addPage()
+            yPos = 20
+          }
+
+          doc.setFontSize(11)
+          doc.text(`${status} (${projects.length})`, 14, yPos)
+          yPos += 3
+
+          const tableData = projects.map(({ project, revenue, expenses, profit, margin, budget, spent, remaining, percentUsed }) => {
+            if (project.budgetType === 'household') {
+              return [
+                project.name.substring(0, 25),
+                getProjectTypeName(project.projectTypeId).substring(0, 15),
+                'Household',
+                formatCurrency(budget),
+                formatCurrency(spent),
+                formatCurrency(remaining),
+                `${percentUsed.toFixed(1)}%`
+              ]
+            } else {
+              return [
+                project.name.substring(0, 25),
+                getProjectTypeName(project.projectTypeId).substring(0, 15),
+                'Business',
+                formatCurrency(revenue),
+                formatCurrency(expenses),
+                formatCurrency(profit),
+                `${margin.toFixed(1)}%`
+              ]
+            }
+          })
+
+          autoTable(doc, {
+            head: [['Name', 'Type', 'Budget', 'Budget/Rev', 'Spent/Exp', 'Remain/Profit', '%/Margin']],
+            body: tableData,
+            startY: yPos,
+            styles: { fontSize: 7 },
+            headStyles: { fillColor: [59, 130, 246] },
+            margin: { left: 14, right: 14 }
+          })
+
+          yPos = (doc as any).lastAutoTable.finalY + 8
+        })
+
+        const filename = `projects-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
+        doc.save(`${filename}.pdf`)
+      })
     })
-
-    const filename = `projects-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
-    const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Projects`
-
-    exportToPDF(
-      exportData,
-      filename,
-      title,
-      ['Name', 'Type', 'Status', 'Budget', 'Spent', 'Remaining', 'Revenue', 'Profit'],
-      ['name', 'type', 'status', 'budget', 'spent', 'remaining', 'revenue', 'profit']
-    )
   }
 
   return (

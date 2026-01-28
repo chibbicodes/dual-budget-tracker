@@ -84,7 +84,7 @@ export default function BudgetAnalysis() {
 
     for (let i = 0; i < dateRange.monthsCount; i++) {
       const monthDate = subMonths(dateRange.endDate, i)
-      const summary = calculateBudgetSummary(appData.transactions, appData.categories, budgetType, monthDate)
+      const summary = calculateBudgetSummary(appData.transactions, appData.categories, budgetType, monthDate, appData.monthlyBudgets)
 
       // Calculate category spending
       const categorySpending: Record<string, number> = {}
@@ -104,7 +104,7 @@ export default function BudgetAnalysis() {
     }
 
     return months.reverse() // Oldest to newest
-  }, [appData.transactions, appData.categories, budgetType, dateRange])
+  }, [appData.transactions, appData.categories, budgetType, dateRange, appData.monthlyBudgets])
 
   // Calculate averages and trends
   const analysis = useMemo(() => {
@@ -301,7 +301,7 @@ export default function BudgetAnalysis() {
   const budgetCompliance = useMemo(() => {
     if (budgetType !== 'household' || analysis.avgIncome === 0) return null
 
-    const currentMonth = calculateBudgetSummary(appData.transactions, appData.categories, 'household')
+    const currentMonth = calculateBudgetSummary(appData.transactions, appData.categories, 'household', undefined, appData.monthlyBudgets)
 
     const needsActual =
       currentMonth.bucketBreakdown.find((b) => b.bucketId === 'needs')?.actualAmount || 0

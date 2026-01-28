@@ -44,15 +44,17 @@ export default function Dashboard() {
       calculateBudgetSummary(
         appData.transactions,
         appData.categories,
-        'household'
+        'household',
+        undefined,
+        appData.monthlyBudgets
       ),
-    [appData.transactions, appData.categories]
+    [appData.transactions, appData.categories, appData.monthlyBudgets]
   )
 
   const businessBudget = useMemo(
     () =>
-      calculateBudgetSummary(appData.transactions, appData.categories, 'business'),
-    [appData.transactions, appData.categories]
+      calculateBudgetSummary(appData.transactions, appData.categories, 'business', undefined, appData.monthlyBudgets),
+    [appData.transactions, appData.categories, appData.monthlyBudgets]
   )
 
   const householdTopSpending = useMemo(

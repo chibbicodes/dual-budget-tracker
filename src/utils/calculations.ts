@@ -7,9 +7,10 @@ import type {
   BudgetSummary,
   BucketBreakdown,
   CategoryBreakdown,
+  MonthlyBudget,
 } from '../types'
 import { getAllBuckets } from '../data/defaultCategories'
-import { startOfMonth, endOfMonth } from 'date-fns'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
 
 /**
  * Calculate account summary (total assets, liabilities, net worth)
@@ -62,11 +63,13 @@ export function calculateBudgetSummary(
   transactions: Transaction[],
   categories: Category[],
   budgetType: BudgetType,
-  month?: Date
+  month?: Date,
+  monthlyBudgets?: MonthlyBudget[]
 ): BudgetSummary {
   const currentMonth = month || new Date()
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
+  const monthString = format(currentMonth, 'yyyy-MM')
 
   // Filter transactions for current month and budget type
   const monthTransactions = transactions.filter((t) => {
@@ -137,7 +140,13 @@ export function calculateBudgetSummary(
             .filter((t) => t.amount < 0)
             .reduce((sum, t) => sum + t.amount, 0)
         )
-        const budgeted = category.monthlyBudget
+
+        // Use monthly budget override if available, otherwise use default
+        const monthlyBudget = monthlyBudgets?.find(
+          (b) => b.month === monthString && b.categoryId === category.id
+        )
+        const budgeted = monthlyBudget?.amount ?? category.monthlyBudget
+
         const overUnder = budgeted - actual
         const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0
 

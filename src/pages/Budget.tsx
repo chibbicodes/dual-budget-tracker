@@ -73,8 +73,8 @@ export default function Budget() {
 
   // Calculate budget summary for selected month
   const budgetSummary = useMemo(
-    () => calculateBudgetSummary(appData.transactions, appData.categories, budgetType, selectedMonth),
-    [appData.transactions, appData.categories, budgetType, selectedMonth]
+    () => calculateBudgetSummary(appData.transactions, appData.categories, budgetType, selectedMonth, appData.monthlyBudgets),
+    [appData.transactions, appData.categories, budgetType, selectedMonth, appData.monthlyBudgets]
   )
 
   // Calculate suggested budgets based on last 6 months of spending

@@ -3,20 +3,39 @@ import { useBudget } from '../contexts/BudgetContext'
 import { getUpcomingDueDates, formatCurrency, getBudgetTypeColors } from '../utils/calculations'
 import BudgetBadge from '../components/BudgetBadge'
 import ExportButtons from '../components/ExportButtons'
-import { Calendar, List, AlertTriangle, ExternalLink, Eye, CreditCard } from 'lucide-react'
+import { Calendar, List, AlertTriangle, ExternalLink, Eye, CreditCard, Check } from 'lucide-react'
 import { format, setDate, startOfMonth } from 'date-fns'
 import { exportToCSV, exportToPDF } from '../utils/export'
 import type { BudgetType, Account } from '../types'
 import Modal from '../components/Modal'
 
+// Get current month in YYYY-MM format
+const getCurrentMonth = () => format(new Date(), 'yyyy-MM')
+
 type BudgetFilter = 'all' | BudgetType
 type ViewMode = 'calendar' | 'list'
 
 export default function DueDates() {
-  const { currentView, appData } = useBudget()
+  const { currentView, appData, updateAccount } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [viewingAccount, setViewingAccount] = useState<Account | null>(null)
+
+  // Check if payment is marked as paid for current month
+  const isPaymentMadeThisMonth = (account: Account) => {
+    const currentMonth = getCurrentMonth()
+    return account.lastPaymentMonth === currentMonth
+  }
+
+  // Toggle payment status for an account
+  const togglePaymentStatus = (account: Account) => {
+    const currentMonth = getCurrentMonth()
+    const isPaid = isPaymentMadeThisMonth(account)
+
+    updateAccount(account.id, {
+      lastPaymentMonth: isPaid ? undefined : currentMonth,
+    })
+  }
 
   // Helper function to calculate next due date
   const getNextDueDate = (paymentDueDate: string) => {
@@ -81,33 +100,41 @@ export default function DueDates() {
 
   // Export handlers
   const handleExportCSV = () => {
-    const exportData = upcomingDueDates.map(item => ({
-      Account: item.account.name,
-      Budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
-      'Due Date': format(item.dueDate, 'MM/dd/yyyy'),
-      'Days Until Due': item.daysUntilDue,
-      Balance: item.account.balance,
-      'Credit Limit': item.account.creditLimit || 'N/A',
-      'Utilization': item.account.creditLimit
-        ? `${((item.account.balance / item.account.creditLimit) * 100).toFixed(1)}%`
-        : 'N/A',
-      'Interest Rate': item.account.interestRate ? `${item.account.interestRate}%` : 'N/A',
-      Status: item.isOverdue ? 'Overdue' : 'Upcoming'
-    }))
+    const exportData = upcomingDueDates.map(item => {
+      const isPaid = isPaymentMadeThisMonth(item.account)
+      return {
+        Account: item.account.name,
+        Budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
+        'Due Date': format(item.dueDate, 'MM/dd/yyyy'),
+        'Days Until Due': item.daysUntilDue,
+        Balance: item.account.balance,
+        'Credit Limit': item.account.creditLimit || 'N/A',
+        'Utilization': item.account.creditLimit
+          ? `${((item.account.balance / item.account.creditLimit) * 100).toFixed(1)}%`
+          : 'N/A',
+        'Interest Rate': item.account.interestRate ? `${item.account.interestRate}%` : 'N/A',
+        'Paid This Month': isPaid ? 'Yes' : 'No',
+        Status: isPaid ? 'Paid' : item.isOverdue ? 'Overdue' : 'Upcoming'
+      }
+    })
 
     const filename = `due-dates-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
     exportToCSV(exportData, filename)
   }
 
   const handleExportPDF = () => {
-    const exportData = upcomingDueDates.map(item => ({
-      account: item.account.name,
-      budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
-      dueDate: format(item.dueDate, 'MM/dd/yyyy'),
-      daysUntil: item.daysUntilDue.toString(),
-      balance: formatCurrency(item.account.balance),
-      status: item.isOverdue ? 'Overdue' : 'Upcoming'
-    }))
+    const exportData = upcomingDueDates.map(item => {
+      const isPaid = isPaymentMadeThisMonth(item.account)
+      return {
+        account: item.account.name,
+        budget: item.account.budgetType === 'household' ? 'Household' : 'Business',
+        dueDate: format(item.dueDate, 'MM/dd/yyyy'),
+        daysUntil: item.daysUntilDue.toString(),
+        balance: formatCurrency(item.account.balance),
+        paid: isPaid ? 'Yes' : 'No',
+        status: isPaid ? 'Paid' : item.isOverdue ? 'Overdue' : 'Upcoming'
+      }
+    })
 
     const filename = `due-dates-${currentView}-${format(new Date(), 'yyyy-MM-dd')}`
     const title = `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Payment Due Dates`
@@ -116,8 +143,8 @@ export default function DueDates() {
       exportData,
       filename,
       title,
-      ['Account', 'Budget', 'Due Date', 'Days Until', 'Balance', 'Status'],
-      ['account', 'budget', 'dueDate', 'daysUntil', 'balance', 'status']
+      ['Account', 'Budget', 'Due Date', 'Days Until', 'Balance', 'Paid', 'Status'],
+      ['account', 'budget', 'dueDate', 'daysUntil', 'balance', 'paid', 'status']
     )
   }
 
@@ -236,6 +263,9 @@ export default function DueDates() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                  Paid
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Account
                 </th>
@@ -261,16 +291,30 @@ export default function DueDates() {
                 const minimumPayment =
                   item.account.minimumPayment ||
                   (item.account.creditLimit ? Math.abs(item.account.balance) * 0.02 : 0)
+                const isPaid = isPaymentMadeThisMonth(item.account)
 
                 return (
                   <tr
                     key={item.account.id}
-                    className={item.isOverdue ? 'bg-red-50' : item.daysUntilDue <= 7 ? 'bg-yellow-50' : ''}
+                    className={isPaid ? 'bg-green-50' : item.isOverdue ? 'bg-red-50' : item.daysUntilDue <= 7 ? 'bg-yellow-50' : ''}
                   >
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => togglePaymentStatus(item.account)}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                          isPaid
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'border-gray-300 hover:border-green-400'
+                        }`}
+                        title={isPaid ? 'Mark as unpaid' : 'Mark as paid'}
+                      >
+                        {isPaid && <Check className="h-4 w-4" />}
+                      </button>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {item.isOverdue && <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />}
-                        <span className="text-sm font-medium text-gray-900">{item.account.name}</span>
+                        {item.isOverdue && !isPaid && <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />}
+                        <span className={`text-sm font-medium ${isPaid ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{item.account.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -356,55 +400,74 @@ export default function DueDates() {
                     const minimumPayment =
                       item.account.minimumPayment ||
                       (item.account.creditLimit ? Math.abs(item.account.balance) * 0.02 : 0)
+                    const isPaid = isPaymentMadeThisMonth(item.account)
 
                     return (
                       <div
                         key={item.account.id}
                         className={`px-6 py-4 ${
-                          item.isOverdue ? 'bg-red-50' : item.daysUntilDue <= 7 ? 'bg-yellow-50' : ''
+                          isPaid ? 'bg-green-50' : item.isOverdue ? 'bg-red-50' : item.daysUntilDue <= 7 ? 'bg-yellow-50' : ''
                         }`}
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              {item.isOverdue && <AlertTriangle className="h-5 w-5 text-red-600" />}
-                              <h4 className="text-base font-semibold text-gray-900">{item.account.name}</h4>
-                              <BudgetBadge budgetType={item.account.budgetType} />
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">Due:</span>{' '}
-                                <span className="font-medium text-gray-900">
-                                  Day {item.account.paymentDueDate}
-                                </span>
+                          <div className="flex items-start gap-4 flex-1">
+                            <button
+                              onClick={() => togglePaymentStatus(item.account)}
+                              className={`mt-1 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                                isPaid
+                                  ? 'bg-green-500 border-green-500 text-white'
+                                  : 'border-gray-300 hover:border-green-400'
+                              }`}
+                              title={isPaid ? 'Mark as unpaid' : 'Mark as paid'}
+                            >
+                              {isPaid && <Check className="h-4 w-4" />}
+                            </button>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                {item.isOverdue && !isPaid && <AlertTriangle className="h-5 w-5 text-red-600" />}
+                                <h4 className={`text-base font-semibold ${isPaid ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{item.account.name}</h4>
+                                <BudgetBadge budgetType={item.account.budgetType} />
+                                {isPaid && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded">Paid</span>}
                               </div>
-                              <div>
-                                <span className="text-gray-500">Days:</span>{' '}
-                                <span
-                                  className={`font-medium ${
-                                    item.isOverdue
-                                      ? 'text-red-600'
-                                      : item.daysUntilDue <= 7
-                                      ? 'text-yellow-600'
-                                      : 'text-gray-900'
-                                  }`}
-                                >
-                                  {item.isOverdue
-                                    ? `${Math.abs(item.daysUntilDue)} overdue`
-                                    : item.daysUntilDue === 0
-                                    ? 'Due today'
-                                    : item.daysUntilDue}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Min Payment:</span>{' '}
-                                <span className="font-medium text-gray-900">
-                                  {formatCurrency(minimumPayment)}
-                                </span>
+                              <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Due:</span>{' '}
+                                  <span className="font-medium text-gray-900">
+                                    Day {item.account.paymentDueDate}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Days:</span>{' '}
+                                  <span
+                                    className={`font-medium ${
+                                      isPaid
+                                        ? 'text-green-600'
+                                        : item.isOverdue
+                                        ? 'text-red-600'
+                                        : item.daysUntilDue <= 7
+                                        ? 'text-yellow-600'
+                                        : 'text-gray-900'
+                                    }`}
+                                  >
+                                    {isPaid
+                                      ? 'Paid'
+                                      : item.isOverdue
+                                      ? `${Math.abs(item.daysUntilDue)} overdue`
+                                      : item.daysUntilDue === 0
+                                      ? 'Due today'
+                                      : item.daysUntilDue}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Min Payment:</span>{' '}
+                                  <span className="font-medium text-gray-900">
+                                    {formatCurrency(minimumPayment)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          {item.account.websiteUrl && (
+                          {item.account.websiteUrl && !isPaid && (
                             <a
                               href={item.account.websiteUrl}
                               target="_blank"

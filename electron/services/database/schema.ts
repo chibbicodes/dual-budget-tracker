@@ -452,5 +452,21 @@ export const applyMigrations = (db: Database.Database): void => {
     console.log('Migration 3 completed')
   }
 
+  // Migration 4: Add last_payment_month column to accounts for payment tracking
+  if (currentVersion < 4) {
+    console.log('Applying migration 4: Adding last_payment_month column to accounts...')
+
+    try {
+      db.exec('ALTER TABLE accounts ADD COLUMN last_payment_month TEXT DEFAULT NULL')
+      console.log('Added last_payment_month column to accounts')
+    } catch (e) {
+      console.log('last_payment_month column already exists or error:', e)
+    }
+
+    // Update version
+    db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '4')
+    console.log('Migration 4 completed')
+  }
+
   console.log('All migrations applied')
 }

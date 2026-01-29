@@ -38,6 +38,7 @@ export function convertDbAccount(dbAccount: any): Account {
     paymentDueDate: dbAccount.payment_due_date,
     minimumPayment: dbAccount.minimum_payment,
     websiteUrl: dbAccount.website_url,
+    lastPaymentMonth: dbAccount.last_payment_month,
     notes: dbAccount.notes,
     createdAt: dbAccount.created_at,
     updatedAt: dbAccount.updated_at,

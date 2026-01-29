@@ -31,6 +31,7 @@ export interface Account {
   minimumPayment?: number
   websiteUrl?: string // Bill pay URL
   billPayWebsite?: string // Legacy alias for websiteUrl
+  lastPaymentMonth?: string // YYYY-MM format for tracking if payment was made this month (resets each month)
   notes?: string
   createdAt: string
   updatedAt: string

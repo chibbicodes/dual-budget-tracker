@@ -307,6 +307,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           payment_due_date: newAccount.paymentDueDate,
           minimum_payment: newAccount.minimumPayment,
           website_url: newAccount.websiteUrl,
+          last_payment_month: newAccount.lastPaymentMonth,
           notes: newAccount.notes,
         })
       } catch (error) {
@@ -335,6 +336,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       if (updates.paymentDueDate !== undefined) dbUpdates.payment_due_date = updates.paymentDueDate
       if (updates.minimumPayment !== undefined) dbUpdates.minimum_payment = updates.minimumPayment
       if (updates.websiteUrl !== undefined) dbUpdates.website_url = updates.websiteUrl
+      if (updates.lastPaymentMonth !== undefined) dbUpdates.last_payment_month = updates.lastPaymentMonth
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes
 
       databaseService.updateAccount(id, dbUpdates)

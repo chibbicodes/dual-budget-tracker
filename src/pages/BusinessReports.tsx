@@ -319,8 +319,8 @@ ${revenueByClient.map((item) => `${item.client.padEnd(30)} ${formatCurrency(item
           <PieChart className="h-5 w-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Expenses by Category</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div>
+          <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -393,8 +393,8 @@ ${revenueByClient.map((item) => `${item.client.padEnd(30)} ${formatCurrency(item
           <h3 className="text-lg font-semibold text-gray-900">Revenue by Client/Source</h3>
           <p className="text-sm text-gray-500 mt-1">Top 10 revenue sources</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div>
+          <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

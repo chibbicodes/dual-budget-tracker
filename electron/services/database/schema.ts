@@ -418,5 +418,39 @@ export const applyMigrations = (db: Database.Database): void => {
     db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '2')
   }
 
+  // Migration 3: Add bucket customization columns
+  if (currentVersion < 3) {
+    console.log('Applying migration 3: Adding bucket customization columns...')
+
+    try {
+      // Add columns for household bucket customization
+      db.exec('ALTER TABLE settings ADD COLUMN household_needs_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN household_wants_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN household_savings_name TEXT DEFAULT NULL')
+
+      // Add columns for business bucket customization
+      db.exec('ALTER TABLE settings ADD COLUMN business_travel_performance_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_travel_performance_percentage REAL DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_craft_business_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_craft_business_percentage REAL DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_online_marketing_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_online_marketing_percentage REAL DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_professional_services_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_professional_services_percentage REAL DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_administrative_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_administrative_percentage REAL DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_personnel_name TEXT DEFAULT NULL')
+      db.exec('ALTER TABLE settings ADD COLUMN business_personnel_percentage REAL DEFAULT NULL')
+
+      console.log('Added bucket customization columns to settings')
+    } catch (e) {
+      console.log('Bucket customization columns already exist or error:', e)
+    }
+
+    // Update version
+    db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '3')
+    console.log('Migration 3 completed')
+  }
+
   console.log('All migrations applied')
 }

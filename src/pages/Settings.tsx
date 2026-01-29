@@ -24,9 +24,6 @@ export default function Settings() {
     addMissingDefaultCategories,
     cleanupOldBusinessExpenseCategories,
     addCategoryGroupsToBusinessExpenses,
-    addIncome,
-    updateIncome,
-    deleteIncome,
     addIncomeSource,
     updateIncomeSource,
     deleteIncomeSource,
@@ -36,6 +33,7 @@ export default function Settings() {
     addProjectStatus,
     updateProjectStatus,
     deleteProjectStatus,
+    updateCategory,
   } = useBudget()
   const [activeTab, setActiveTab] = useState<Tab>('profiles')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -650,42 +648,10 @@ export default function Settings() {
 
       {/* Categories Tab */}
       {activeTab === 'categories' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Category Management</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage your budget categories. Note: Most category fields like bucket assignments and monthly budgets are best managed from the Budget page.
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-              <p className="text-sm text-blue-700">
-                For now, detailed category management (budgets, buckets, etc.) should be done from the Budget page for each budget type. This section will be expanded in a future update.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Household Categories</h4>
-                <p className="text-sm text-gray-600 mb-2">
-                  {appData.categories.filter((c) => c.budgetType === 'household' && c.isActive).length} active categories
-                </p>
-                <p className="text-sm text-gray-500">
-                  View and edit categories from the Budget page in Household view
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Business Categories</h4>
-                <p className="text-sm text-gray-600 mb-2">
-                  {appData.categories.filter((c) => c.budgetType === 'business' && c.isActive).length} active categories
-                </p>
-                <p className="text-sm text-gray-500">
-                  View and edit categories from the Budget page in Business view
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CategoryManager
+          categories={appData.categories}
+          onUpdateCategory={updateCategory}
+        />
       )}
 
       {/* Income Sources Tab */}
@@ -1319,6 +1285,249 @@ function ProjectStatusesManager({
             + Add Status
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Category Manager Component
+interface CategoryManagerProps {
+  categories: any[]
+  onUpdateCategory: (id: string, updates: any) => void
+}
+
+function CategoryManager({
+  categories,
+  onUpdateCategory,
+}: CategoryManagerProps) {
+  const [filterType, setFilterType] = useState<'all' | 'household' | 'business'>('all')
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    isActive: true,
+  })
+
+  const handleEdit = (category: any) => {
+    setEditingId(category.id)
+    setFormData({
+      name: category.name,
+      isActive: category.isActive,
+    })
+  }
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a category name')
+      return
+    }
+    onUpdateCategory(editingId!, {
+      name: formData.name,
+      isActive: formData.isActive,
+    })
+    setEditingId(null)
+    setFormData({ name: '', isActive: true })
+  }
+
+  const handleCancel = () => {
+    setEditingId(null)
+    setFormData({ name: '', isActive: true })
+  }
+
+  // Filter categories
+  const filteredCategories = categories
+    .filter((c) => {
+      // Filter by budget type
+      if (filterType !== 'all' && c.budgetType !== filterType) return false
+
+      // Filter by active status
+      if (filterActive === 'active' && !c.isActive) return false
+      if (filterActive === 'inactive' && c.isActive) return false
+
+      return true
+    })
+    .sort((a, b) => {
+      // Sort by budget type first, then by name
+      if (a.budgetType !== b.budgetType) {
+        return a.budgetType === 'household' ? -1 : 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">Category Management</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          View and edit all categories, including inactive ones. To edit budgets and bucket assignments, use the Budget page.
+        </p>
+      </div>
+      <div className="p-6 space-y-4">
+        {/* Filters */}
+        <div className="flex gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Budget Type</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterType === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterType('household')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterType === 'household'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Household
+              </button>
+              <button
+                onClick={() => setFilterType('business')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterType === 'business'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Business
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilterActive('all')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterActive === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterActive('active')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterActive === 'active'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setFilterActive('inactive')}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  filterActive === 'inactive'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Inactive
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Category List */}
+        <div className="space-y-2">
+          {filteredCategories.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No categories found matching the selected filters
+            </div>
+          ) : (
+            filteredCategories.map((category) =>
+              editingId === category.id ? (
+                <div key={category.id} className="border border-blue-300 rounded-lg p-4 bg-blue-50">
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Category Name"
+                    />
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.isActive}
+                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Active</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleUpdate}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancel}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{category.name}</span>
+                      {!category.isActive && (
+                        <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                          Inactive
+                        </span>
+                      )}
+                      {category.isIncomeCategory && (
+                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
+                          Income
+                        </span>
+                      )}
+                      {category.excludeFromBudget && (
+                        <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded">
+                          Transfer
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {category.budgetType === 'household' ? 'Household' : 'Business'} •{' '}
+                      {category.bucketId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      {category.isFixedExpense && ' • Fixed Expense'}
+                      {category.taxDeductibleByDefault && ' • Tax Deductible'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleEdit(category)}
+                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )
+            )
+          )}
+        </div>
+
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mt-6">
+          <p className="text-sm text-blue-700">
+            <strong>Note:</strong> You can edit the category name and active status here. To edit other fields like bucket assignments, monthly budgets, and tax settings, please use the Budget page for that specific budget type.
+          </p>
+        </div>
       </div>
     </div>
   )

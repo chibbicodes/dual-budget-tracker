@@ -11,12 +11,15 @@ import Modal from '../components/Modal'
 import { useNavigate } from 'react-router-dom'
 
 export default function Budget() {
-  const { currentView, appData, updateCategory, addCategory, deleteCategory, addMonthlyBudget, updateMonthlyBudget, getMonthlyBudget } = useBudget()
+  const { currentView, appData, updateCategory, addCategory, deleteCategory, addMonthlyBudget, updateMonthlyBudget, getMonthlyBudget, updateSettings } = useBudget()
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isBucketEditModalOpen, setIsBucketEditModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [selectedBucket, setSelectedBucket] = useState<{ id: string; name: string; percentage?: number } | null>(null)
+  const [bucketEditForm, setBucketEditForm] = useState({ name: '', percentage: 0 })
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
   const navigate = useNavigate()
 
@@ -49,6 +52,60 @@ export default function Budget() {
   }
 
   const budgetType = currentView as BudgetType
+
+  // Helper function to get customized bucket name and percentage
+  const getBucketDisplayInfo = (bucketId: BucketId) => {
+    const allBuckets = getAllBuckets()
+    const bucket = (budgetType === 'household' ? allBuckets.household : allBuckets.business).find(
+      (b) => b.id === bucketId
+    )
+    if (!bucket) return { name: bucketId, percentage: undefined }
+
+    const customization = appData.settings.bucketCustomization
+    if (!customization) return { name: bucket.name, percentage: bucket.targetPercentage }
+
+    // Get customized name and percentage based on bucket ID
+    let customName = bucket.name
+    let customPercentage = bucket.targetPercentage
+
+    if (budgetType === 'household') {
+      if (bucketId === 'needs' && customization.householdNeedsName) {
+        customName = customization.householdNeedsName
+      }
+      if (bucketId === 'wants' && customization.householdWantsName) {
+        customName = customization.householdWantsName
+      }
+      if (bucketId === 'savings' && customization.householdSavingsName) {
+        customName = customization.householdSavingsName
+      }
+      // For household, percentages are stored in householdTargets, not bucketCustomization
+      if (bucketId === 'needs') customPercentage = appData.settings.householdTargets.needsPercentage
+      if (bucketId === 'wants') customPercentage = appData.settings.householdTargets.wantsPercentage
+      if (bucketId === 'savings') customPercentage = appData.settings.householdTargets.savingsPercentage
+    } else {
+      if (bucketId === 'travel_performance') {
+        if (customization.businessTravelPerformanceName) customName = customization.businessTravelPerformanceName
+        if (customization.businessTravelPerformancePercentage !== undefined) customPercentage = customization.businessTravelPerformancePercentage
+      } else if (bucketId === 'craft_business') {
+        if (customization.businessCraftBusinessName) customName = customization.businessCraftBusinessName
+        if (customization.businessCraftBusinessPercentage !== undefined) customPercentage = customization.businessCraftBusinessPercentage
+      } else if (bucketId === 'online_marketing') {
+        if (customization.businessOnlineMarketingName) customName = customization.businessOnlineMarketingName
+        if (customization.businessOnlineMarketingPercentage !== undefined) customPercentage = customization.businessOnlineMarketingPercentage
+      } else if (bucketId === 'professional_services') {
+        if (customization.businessProfessionalServicesName) customName = customization.businessProfessionalServicesName
+        if (customization.businessProfessionalServicesPercentage !== undefined) customPercentage = customization.businessProfessionalServicesPercentage
+      } else if (bucketId === 'administrative') {
+        if (customization.businessAdministrativeName) customName = customization.businessAdministrativeName
+        if (customization.businessAdministrativePercentage !== undefined) customPercentage = customization.businessAdministrativePercentage
+      } else if (bucketId === 'personnel') {
+        if (customization.businessPersonnelName) customName = customization.businessPersonnelName
+        if (customization.businessPersonnelPercentage !== undefined) customPercentage = customization.businessPersonnelPercentage
+      }
+    }
+
+    return { name: customName, percentage: customPercentage }
+  }
 
   // Generate month options (3 months prior to 3 months future)
   const monthOptions = useMemo(() => {
@@ -242,6 +299,68 @@ export default function Budget() {
     }
   }
 
+  const handleOpenBucketEdit = (bucketId: BucketId) => {
+    const { name, percentage } = getBucketDisplayInfo(bucketId)
+    setSelectedBucket({ id: bucketId, name, percentage })
+    setBucketEditForm({ name, percentage: percentage || 0 })
+    setIsBucketEditModalOpen(true)
+  }
+
+  const handleSaveBucketEdit = () => {
+    if (!selectedBucket || !bucketEditForm.name.trim()) {
+      alert('Please enter a bucket name')
+      return
+    }
+
+    const bucketId = selectedBucket.id
+    const updates: any = {}
+
+    if (budgetType === 'household') {
+      // For household, update both name and percentage
+      updates.bucketCustomization = { ...appData.settings.bucketCustomization }
+      updates.householdTargets = { ...appData.settings.householdTargets }
+
+      if (bucketId === 'needs') {
+        updates.bucketCustomization.householdNeedsName = bucketEditForm.name
+        updates.householdTargets.needsPercentage = bucketEditForm.percentage
+      } else if (bucketId === 'wants') {
+        updates.bucketCustomization.householdWantsName = bucketEditForm.name
+        updates.householdTargets.wantsPercentage = bucketEditForm.percentage
+      } else if (bucketId === 'savings') {
+        updates.bucketCustomization.householdSavingsName = bucketEditForm.name
+        updates.householdTargets.savingsPercentage = bucketEditForm.percentage
+      }
+    } else {
+      // For business, update name and percentage in bucketCustomization
+      updates.bucketCustomization = { ...appData.settings.bucketCustomization }
+
+      if (bucketId === 'travel_performance') {
+        updates.bucketCustomization.businessTravelPerformanceName = bucketEditForm.name
+        updates.bucketCustomization.businessTravelPerformancePercentage = bucketEditForm.percentage
+      } else if (bucketId === 'craft_business') {
+        updates.bucketCustomization.businessCraftBusinessName = bucketEditForm.name
+        updates.bucketCustomization.businessCraftBusinessPercentage = bucketEditForm.percentage
+      } else if (bucketId === 'online_marketing') {
+        updates.bucketCustomization.businessOnlineMarketingName = bucketEditForm.name
+        updates.bucketCustomization.businessOnlineMarketingPercentage = bucketEditForm.percentage
+      } else if (bucketId === 'professional_services') {
+        updates.bucketCustomization.businessProfessionalServicesName = bucketEditForm.name
+        updates.bucketCustomization.businessProfessionalServicesPercentage = bucketEditForm.percentage
+      } else if (bucketId === 'administrative') {
+        updates.bucketCustomization.businessAdministrativeName = bucketEditForm.name
+        updates.bucketCustomization.businessAdministrativePercentage = bucketEditForm.percentage
+      } else if (bucketId === 'personnel') {
+        updates.bucketCustomization.businessPersonnelName = bucketEditForm.name
+        updates.bucketCustomization.businessPersonnelPercentage = bucketEditForm.percentage
+      }
+    }
+
+    updateSettings(updates)
+    setIsBucketEditModalOpen(false)
+    setSelectedBucket(null)
+    setBucketEditForm({ name: '', percentage: 0 })
+  }
+
   // Export handlers
   const handleExportCSV = () => {
     // Flatten bucket breakdown into category details for export
@@ -409,15 +528,29 @@ export default function Budget() {
           (c) => c.budgetType === budgetType && c.bucketId === bucket.bucketId && !c.isIncomeCategory && !c.excludeFromBudget
         )
 
+        const bucketDisplayInfo = getBucketDisplayInfo(bucket.bucketId)
+
         return (
           <div key={bucket.bucketId} className="bg-white rounded-lg shadow overflow-hidden">
             {/* Bucket Header */}
             <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{bucket.bucketName}</h2>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-gray-900">{bucketDisplayInfo.name}</h2>
+                    <button
+                      onClick={() => handleOpenBucketEdit(bucket.bucketId)}
+                      className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      title="Edit bucket"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  </div>
                   <p className="text-sm text-gray-600 mt-1">
                     Budgeted: {formatCurrency(bucket.totalBudgeted)} • {bucket.percentOfIncome.toFixed(1)}% of income
+                    {bucketDisplayInfo.percentage !== undefined && (
+                      <span className="text-gray-500"> (Target: {bucketDisplayInfo.percentage}%)</span>
+                    )}
                   </p>
                 </div>
                 <div className="text-right">
@@ -714,6 +847,76 @@ export default function Budget() {
             }}
           />
         )}
+      </Modal>
+
+      {/* Edit Bucket Modal */}
+      <Modal
+        isOpen={isBucketEditModalOpen}
+        onClose={() => {
+          setIsBucketEditModalOpen(false)
+          setSelectedBucket(null)
+          setBucketEditForm({ name: '', percentage: 0 })
+        }}
+        title="Edit Bucket"
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleSaveBucketEdit(); }} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bucket Name
+            </label>
+            <input
+              type="text"
+              value={bucketEditForm.name}
+              onChange={(e) => setBucketEditForm({ ...bucketEditForm, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g., Essential Needs, Fun Money"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Target Percentage of Income
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={bucketEditForm.percentage}
+                onChange={(e) => setBucketEditForm({ ...bucketEditForm, percentage: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="50"
+                min="0"
+                max="100"
+                step="0.1"
+                required
+              />
+              <span className="text-gray-500">%</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Recommended: {budgetType === 'household' ? 'Needs 50%, Wants 30%, Savings 20%' : 'Distribute based on your business model'}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsBucketEditModalOpen(false)
+                setSelectedBucket(null)
+                setBucketEditForm({ name: '', percentage: 0 })
+              }}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   )

@@ -269,10 +269,32 @@ export interface BusinessBudgetTargets {
 // Application Settings
 // ============================================================================
 
+export interface BucketCustomization {
+  // Household bucket customization
+  householdNeedsName?: string
+  householdWantsName?: string
+  householdSavingsName?: string
+
+  // Business bucket customization
+  businessTravelPerformanceName?: string
+  businessTravelPerformancePercentage?: number
+  businessCraftBusinessName?: string
+  businessCraftBusinessPercentage?: number
+  businessOnlineMarketingName?: string
+  businessOnlineMarketingPercentage?: number
+  businessProfessionalServicesName?: string
+  businessProfessionalServicesPercentage?: number
+  businessAdministrativeName?: string
+  businessAdministrativePercentage?: number
+  businessPersonnelName?: string
+  businessPersonnelPercentage?: number
+}
+
 export interface AppSettings {
   defaultBudgetView: BudgetViewType
   householdTargets: HouseholdBudgetTargets
   businessTargets: BusinessBudgetTargets
+  bucketCustomization?: BucketCustomization
   dateFormat: string
   currencySymbol: string
   firstRunCompleted: boolean

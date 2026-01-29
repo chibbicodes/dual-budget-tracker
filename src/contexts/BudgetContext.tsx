@@ -1499,6 +1499,58 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Handle bucket customization
+        if (updates.bucketCustomization) {
+          // Household buckets
+          if (updates.bucketCustomization.householdNeedsName !== undefined) {
+            dbUpdates.household_needs_name = updates.bucketCustomization.householdNeedsName
+          }
+          if (updates.bucketCustomization.householdWantsName !== undefined) {
+            dbUpdates.household_wants_name = updates.bucketCustomization.householdWantsName
+          }
+          if (updates.bucketCustomization.householdSavingsName !== undefined) {
+            dbUpdates.household_savings_name = updates.bucketCustomization.householdSavingsName
+          }
+
+          // Business buckets
+          if (updates.bucketCustomization.businessTravelPerformanceName !== undefined) {
+            dbUpdates.business_travel_performance_name = updates.bucketCustomization.businessTravelPerformanceName
+          }
+          if (updates.bucketCustomization.businessTravelPerformancePercentage !== undefined) {
+            dbUpdates.business_travel_performance_percentage = updates.bucketCustomization.businessTravelPerformancePercentage
+          }
+          if (updates.bucketCustomization.businessCraftBusinessName !== undefined) {
+            dbUpdates.business_craft_business_name = updates.bucketCustomization.businessCraftBusinessName
+          }
+          if (updates.bucketCustomization.businessCraftBusinessPercentage !== undefined) {
+            dbUpdates.business_craft_business_percentage = updates.bucketCustomization.businessCraftBusinessPercentage
+          }
+          if (updates.bucketCustomization.businessOnlineMarketingName !== undefined) {
+            dbUpdates.business_online_marketing_name = updates.bucketCustomization.businessOnlineMarketingName
+          }
+          if (updates.bucketCustomization.businessOnlineMarketingPercentage !== undefined) {
+            dbUpdates.business_online_marketing_percentage = updates.bucketCustomization.businessOnlineMarketingPercentage
+          }
+          if (updates.bucketCustomization.businessProfessionalServicesName !== undefined) {
+            dbUpdates.business_professional_services_name = updates.bucketCustomization.businessProfessionalServicesName
+          }
+          if (updates.bucketCustomization.businessProfessionalServicesPercentage !== undefined) {
+            dbUpdates.business_professional_services_percentage = updates.bucketCustomization.businessProfessionalServicesPercentage
+          }
+          if (updates.bucketCustomization.businessAdministrativeName !== undefined) {
+            dbUpdates.business_administrative_name = updates.bucketCustomization.businessAdministrativeName
+          }
+          if (updates.bucketCustomization.businessAdministrativePercentage !== undefined) {
+            dbUpdates.business_administrative_percentage = updates.bucketCustomization.businessAdministrativePercentage
+          }
+          if (updates.bucketCustomization.businessPersonnelName !== undefined) {
+            dbUpdates.business_personnel_name = updates.bucketCustomization.businessPersonnelName
+          }
+          if (updates.bucketCustomization.businessPersonnelPercentage !== undefined) {
+            dbUpdates.business_personnel_percentage = updates.bucketCustomization.businessPersonnelPercentage
+          }
+        }
+
         databaseService.updateSettings(profileId, dbUpdates)
       } catch (error) {
         console.error('Failed to update settings in database:', error)

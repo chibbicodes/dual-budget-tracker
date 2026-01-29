@@ -200,6 +200,26 @@ export function convertDbSettings(dbSettings: any): AppSettings {
       businessSavingsPercentage: dbSettings.business_savings_percentage || 0,
       monthlyRevenueBaseline: dbSettings.business_monthly_revenue_baseline || 0,
     },
+    bucketCustomization: {
+      // Household bucket customization
+      householdNeedsName: dbSettings.household_needs_name,
+      householdWantsName: dbSettings.household_wants_name,
+      householdSavingsName: dbSettings.household_savings_name,
+
+      // Business bucket customization
+      businessTravelPerformanceName: dbSettings.business_travel_performance_name,
+      businessTravelPerformancePercentage: dbSettings.business_travel_performance_percentage,
+      businessCraftBusinessName: dbSettings.business_craft_business_name,
+      businessCraftBusinessPercentage: dbSettings.business_craft_business_percentage,
+      businessOnlineMarketingName: dbSettings.business_online_marketing_name,
+      businessOnlineMarketingPercentage: dbSettings.business_online_marketing_percentage,
+      businessProfessionalServicesName: dbSettings.business_professional_services_name,
+      businessProfessionalServicesPercentage: dbSettings.business_professional_services_percentage,
+      businessAdministrativeName: dbSettings.business_administrative_name,
+      businessAdministrativePercentage: dbSettings.business_administrative_percentage,
+      businessPersonnelName: dbSettings.business_personnel_name,
+      businessPersonnelPercentage: dbSettings.business_personnel_percentage,
+    },
   }
 }
 

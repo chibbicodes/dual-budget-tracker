@@ -63,14 +63,20 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Draggable Title Bar for macOS - accounts for traffic light buttons */}
+      <div
+        className="h-10 bg-white border-b border-gray-200 flex-shrink-0"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      />
+
+      {/* Header - not draggable (has interactive elements) */}
+      <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0">
+        <div className="px-6">
+          <div className="flex justify-between items-center h-14">
             {/* Logo */}
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-gray-900">Dual Budget Tracker</h1>
+              <h1 className="text-xl font-bold text-gray-900">Dual Budget Tracker</h1>
 
               {/* Profile Indicator */}
               {activeProfile && (
@@ -147,47 +153,48 @@ export default function Layout() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
-          {/* Sidebar Navigation */}
-          <aside className="w-64 flex-shrink-0">
-            <nav className="space-y-1">
-              {navigation.map((item) => {
-                // Hide business reports for household view
-                if (item.businessOnly && currentView === 'household') {
-                  return null
-                }
+      {/* Main layout - sidebar fixed to left, content fills remaining space */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar Navigation - fixed width, no centering */}
+        <aside className="w-56 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
+          <nav className="p-4 space-y-1">
+            {navigation.map((item) => {
+              // Hide business reports for household view
+              if (item.businessOnly && currentView === 'household') {
+                return null
+              }
 
-                const isActive = location.pathname === item.path
-                const Icon = item.icon
+              const isActive = location.pathname === item.path
+              const Icon = item.icon
 
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                      isActive
-                        ? currentView === 'household'
-                          ? 'bg-household-100 text-household-700'
-                          : currentView === 'business'
-                          ? 'bg-business-100 text-business-700'
-                          : 'bg-purple-100 text-purple-700'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 mr-3" />
-                    {item.name}
-                  </Link>
-                )
-              })}
-            </nav>
-          </aside>
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? currentView === 'household'
+                        ? 'bg-household-100 text-household-700'
+                        : currentView === 'business'
+                        ? 'bg-business-100 text-business-700'
+                        : 'bg-purple-100 text-purple-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mr-3" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </nav>
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1">
+        {/* Main Content - fills remaining space */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-6xl">
             <Outlet />
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   )

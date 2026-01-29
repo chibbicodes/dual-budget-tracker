@@ -63,7 +63,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Draggable Title Bar for macOS - accounts for traffic light buttons */}
       <div
         className="h-10 bg-white border-b border-gray-200 flex-shrink-0"
@@ -71,7 +71,7 @@ export default function Layout() {
       />
 
       {/* Header - not draggable (has interactive elements) */}
-      <header className="bg-white shadow-sm sticky top-0 z-50 flex-shrink-0">
+      <header className="bg-white shadow-sm flex-shrink-0">
         <div className="px-6">
           <div className="flex justify-between items-center h-14">
             {/* Logo */}

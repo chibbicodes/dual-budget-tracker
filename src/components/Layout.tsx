@@ -189,9 +189,9 @@ export default function Layout() {
           </nav>
         </aside>
 
-        {/* Main Content - fills remaining space */}
+        {/* Main Content - fills remaining space, content centers within */}
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-6xl">
+          <div className="max-w-6xl mx-auto">
             <Outlet />
           </div>
         </main>

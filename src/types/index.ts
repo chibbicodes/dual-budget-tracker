@@ -520,7 +520,7 @@ export interface BudgetContextState {
   exportData: () => AppData
   clearAllData: () => void
   loadSampleData: () => void
-  addMissingDefaultCategories: () => number
+  addMissingDefaultCategories: () => Promise<number>
   cleanupOldBusinessExpenseCategories: () => number
   addCategoryGroupsToBusinessExpenses: () => number
 }

@@ -84,7 +84,6 @@ function calculateRecurringOccurrences(income: IncomeType, monthDate: Date): num
       // Check if this income source has started by the selected month
       if (income.expectedDate) {
         const startDate = parseISO(income.expectedDate + 'T12:00:00')
-        const monthStart = startOfMonth(monthDate)
 
         // If the start date is after this month, return 0
         if (startDate > endOfMonth(monthDate)) {
@@ -300,7 +299,7 @@ export default function Income() {
     const incomeSource = {
       name: income.source,
       budgetType: income.budgetType,
-      incomeType: income.budgetType === 'household' ? 'salary' as const : 'project-income' as const,
+      incomeType: income.budgetType === 'household' ? 'salary' as const : 'services' as const,
       categoryId: income.categoryId,
       expectedAmount: income.expectedAmount || 0,
       frequency: income.isRecurring
@@ -322,7 +321,7 @@ export default function Income() {
       const updates = {
         name: income.source,
         budgetType: income.budgetType,
-        incomeType: income.budgetType === 'household' ? 'salary' as const : 'project-income' as const,
+        incomeType: income.budgetType === 'household' ? 'salary' as const : 'services' as const,
         categoryId: income.categoryId,
         expectedAmount: income.expectedAmount || 0,
         frequency: income.isRecurring

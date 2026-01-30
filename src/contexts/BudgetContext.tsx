@@ -1421,12 +1421,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     // Save to database
     if (updatedBudget) {
       try {
+        const budget = updatedBudget as MonthlyBudget
         databaseService.upsertMonthlyBudget({
           profile_id: profileId,
-          month: updatedBudget.month,
-          budget_type: updatedBudget.budgetType,
-          category_id: updatedBudget.categoryId,
-          amount: updatedBudget.amount,
+          month: budget.month,
+          budget_type: budget.budgetType,
+          category_id: budget.categoryId,
+          amount: budget.amount,
         })
       } catch (error) {
         console.error('Failed to update monthly budget in database:', error)

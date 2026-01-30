@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateProfile: (id, updates) => ipcRenderer.invoke('db:updateProfile', id, updates),
     updateProfileLastAccessed: (id) => ipcRenderer.invoke('db:updateProfileLastAccessed', id),
     deleteProfile: (id) => ipcRenderer.invoke('db:deleteProfile', id),
+    clearProfileData: (profileId) => ipcRenderer.invoke('db:clearProfileData', profileId),
     getSettings: (profileId) => ipcRenderer.invoke('db:getSettings', profileId),
     updateSettings: (profileId, settings) => ipcRenderer.invoke('db:updateSettings', profileId, settings),
     getAccounts: (profileId, budgetType) => ipcRenderer.invoke('db:getAccounts', profileId, budgetType),

@@ -1586,14 +1586,35 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return appData
   }, [appData])
 
-  const clearAllData = useCallback(() => {
+  const clearAllData = useCallback(async () => {
+    const profileId = getProfileId()
+    if (!profileId) {
+      console.error('No active profile to clear data for')
+      return
+    }
+
+    console.log('Clearing all data for profile:', profileId)
+
+    // Clear data from the database
+    try {
+      await databaseService.clearProfileData(profileId)
+      console.log('Database data cleared successfully')
+    } catch (error) {
+      console.error('Failed to clear database data:', error)
+    }
+
+    // Reset local state to defaults
     const defaultData = StorageService.getDefaultData()
     setAppDataState({
       ...defaultData,
       categories: generateDefaultCategories(),
     })
+
+    // Clear legacy localStorage
     StorageService.clear()
-  }, [])
+
+    console.log('All data cleared successfully')
+  }, [getProfileId])
 
   const loadSampleData = useCallback(() => {
     // TODO: Implement sample data loading

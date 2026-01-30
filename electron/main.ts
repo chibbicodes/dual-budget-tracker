@@ -78,6 +78,13 @@ ipcMain.handle('db:deleteProfile', async (_event, id: string) => {
   return databaseService.deleteProfile(id)
 })
 
+ipcMain.handle('db:clearProfileData', async (_event, profileId: string) => {
+  console.log('IPC: db:clearProfileData called for profile:', profileId)
+  await databaseServicePromise
+  databaseService.clearProfileData(profileId)
+  console.log('IPC: db:clearProfileData completed')
+})
+
 ipcMain.handle('db:getSettings', async (_event, profileId: string) => {
   await databaseServicePromise
   return databaseService.getSettings(profileId)

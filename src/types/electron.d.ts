@@ -14,6 +14,7 @@ declare global {
         updateProfile: (id: string, updates: any) => Promise<any>
         updateProfileLastAccessed: (id: string) => Promise<void>
         deleteProfile: (id: string) => Promise<void>
+        clearProfileData: (profileId: string) => Promise<void>
         getSettings: (profileId: string) => Promise<any>
         updateSettings: (profileId: string, settings: any) => Promise<any>
         // Account operations

@@ -65,6 +65,70 @@ class DatabaseService {
     }
   }
 
+  /**
+   * Clear all data for a profile (keeps the profile itself)
+   */
+  clearProfileData(profileId: string): void {
+    console.log('DatabaseService.clearProfileData called for profile:', profileId)
+    const db = this.getDb()
+
+    // Delete all data in the correct order to avoid foreign key issues
+    // Using transactions for atomicity
+    const clearData = db.transaction(() => {
+      // Delete transactions first (depends on accounts and categories)
+      db.prepare('DELETE FROM transactions WHERE profile_id = ?').run(profileId)
+      console.log('Deleted transactions')
+
+      // Delete monthly budgets
+      db.prepare('DELETE FROM monthly_budgets WHERE profile_id = ?').run(profileId)
+      console.log('Deleted monthly budgets')
+
+      // Delete projects
+      db.prepare('DELETE FROM projects WHERE profile_id = ?').run(profileId)
+      console.log('Deleted projects')
+
+      // Delete project types
+      db.prepare('DELETE FROM project_types WHERE profile_id = ?').run(profileId)
+      console.log('Deleted project types')
+
+      // Delete project statuses
+      db.prepare('DELETE FROM project_statuses WHERE profile_id = ?').run(profileId)
+      console.log('Deleted project statuses')
+
+      // Delete income sources
+      db.prepare('DELETE FROM income_sources WHERE profile_id = ?').run(profileId)
+      console.log('Deleted income sources')
+
+      // Delete accounts
+      db.prepare('DELETE FROM accounts WHERE profile_id = ?').run(profileId)
+      console.log('Deleted accounts')
+
+      // Delete categories
+      db.prepare('DELETE FROM categories WHERE profile_id = ?').run(profileId)
+      console.log('Deleted categories')
+
+      // Delete auto categorization rules
+      db.prepare('DELETE FROM auto_categorization_rules WHERE profile_id = ?').run(profileId)
+      console.log('Deleted auto categorization rules')
+
+      // Reset settings to defaults (but keep the record)
+      db.prepare(`
+        UPDATE settings
+        SET default_budget_view = 'household',
+            theme = 'light',
+            currency = 'USD',
+            date_format = 'MM/DD/YYYY',
+            fiscal_year_start = 1,
+            updated_at = ?
+        WHERE profile_id = ?
+      `).run(new Date().toISOString(), profileId)
+      console.log('Reset settings')
+    })
+
+    clearData()
+    console.log('DatabaseService.clearProfileData completed')
+  }
+
   // ==================== Profile Operations ====================
 
   /**

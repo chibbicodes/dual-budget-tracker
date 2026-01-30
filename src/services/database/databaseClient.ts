@@ -72,6 +72,15 @@ class DatabaseClient {
   }
 
   /**
+   * Clear all data for a profile (keeps the profile itself)
+   */
+  clearProfileData(profileId: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.clearProfileData(profileId)
+    }
+  }
+
+  /**
    * Get settings for a profile
    */
   getSettings(profileId: string) {

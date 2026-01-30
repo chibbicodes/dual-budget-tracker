@@ -13,7 +13,8 @@
     "build:mac:x64": "npm run build && electron-builder --mac --x64",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "keywords": [
     "budget",
@@ -37,6 +38,7 @@
     "recharts": "^2.10.3"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
@@ -101,6 +103,9 @@
       "dist/**/*",
       "dist-electron/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
     ],
     "directories": {
       "buildResources": "build",

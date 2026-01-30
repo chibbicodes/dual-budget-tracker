@@ -1,8 +1,13 @@
 import type { Category, HouseholdBucket, BusinessBucket } from '../types'
 
-// Simple ID generator for client-side
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+// Generate a deterministic ID based on category name and budget type
+// This ensures the same category always gets the same ID, preventing duplicates
+function generateDeterministicId(name: string, budgetType: string): string {
+  const slug = `${budgetType}-${name}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  return `default-cat-${slug}`
 }
 
 // ============================================================================
@@ -1174,7 +1179,7 @@ export function generateDefaultCategories(): Category[] {
 
   return allCategories.map((cat) => ({
     ...cat,
-    id: generateId(),
+    id: generateDeterministicId(cat.name, cat.budgetType),
     createdAt: now,
     updatedAt: now,
   }))

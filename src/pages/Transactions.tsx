@@ -541,7 +541,7 @@ export default function Transactions() {
   }
 
   const handleImportTransactions = () => {
-    if (!columnMapping.date || columnMapping.description === null || columnMapping.amount === null) {
+    if (columnMapping.date === null || columnMapping.description === null || columnMapping.amount === null) {
       alert('Please map at least Date, Description, and Amount columns')
       return
     }

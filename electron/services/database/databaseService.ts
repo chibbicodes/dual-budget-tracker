@@ -115,13 +115,21 @@ class DatabaseService {
       db.prepare(`
         UPDATE settings
         SET default_budget_view = 'household',
-            theme = 'light',
-            currency = 'USD',
-            date_format = 'MM/DD/YYYY',
-            fiscal_year_start = 1,
-            updated_at = ?
+            date_format = 'MM/dd/yyyy',
+            currency_symbol = '$',
+            first_run_completed = 0,
+            track_business = 1,
+            track_household = 1,
+            household_needs_percentage = 50,
+            household_wants_percentage = 30,
+            household_savings_percentage = 20,
+            household_monthly_income_baseline = 0,
+            business_operating_percentage = 40,
+            business_growth_percentage = 20,
+            business_compensation_percentage = 30,
+            business_tax_reserve_percentage = 5
         WHERE profile_id = ?
-      `).run(new Date().toISOString(), profileId)
+      `).run(profileId)
       console.log('Reset settings')
     })
 

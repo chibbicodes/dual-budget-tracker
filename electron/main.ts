@@ -2,7 +2,6 @@ import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
-import Module from 'module'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -16,50 +15,13 @@ const require = createRequire(import.meta.url)
 
 // Load better-sqlite3
 // In production, native modules are unpacked outside the asar archive
-// We need to modify the module resolution to find them
 let Database: any
 
 if (isProd) {
-  // Log paths for debugging
-  console.log('Running in production mode')
-  console.log('app.getAppPath():', app.getAppPath())
-  console.log('process.resourcesPath:', process.resourcesPath)
-  console.log('__dirname:', __dirname)
-
   // The unpacked native module location
   const unpackedModulesPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
-  console.log('Unpacked modules path:', unpackedModulesPath)
-
-  // Add the unpacked modules path to Node's module resolution
-  // This allows better-sqlite3 to find its native bindings
-  const originalResolveLookupPaths = (Module as any)._resolveLookupPaths
-  ;(Module as any)._resolveLookupPaths = function(request: string, parent: any) {
-    const result = originalResolveLookupPaths.call(this, request, parent)
-    if (result && Array.isArray(result) && result.length > 1) {
-      // Add unpacked path to the beginning of lookup paths
-      result[1] = [unpackedModulesPath, ...result[1]]
-    }
-    return result
-  }
-
-  // Now require better-sqlite3 - it should find the native module in unpacked location
-  try {
-    Database = require(path.join(unpackedModulesPath, 'better-sqlite3'))
-    console.log('Successfully loaded better-sqlite3 from unpacked location')
-  } catch (err) {
-    console.error('Failed to load better-sqlite3 from unpacked location:', err)
-    // Fallback: try loading directly (might work if module resolution is fixed)
-    try {
-      Database = require('better-sqlite3')
-      console.log('Successfully loaded better-sqlite3 via standard require')
-    } catch (err2) {
-      console.error('Failed to load better-sqlite3 via standard require:', err2)
-      throw err2
-    }
-  }
+  Database = require(path.join(unpackedModulesPath, 'better-sqlite3'))
 } else {
-  // In development, use standard require
-  console.log('Running in development mode')
   Database = require('better-sqlite3')
 }
 

@@ -1634,7 +1634,7 @@ export default function Transactions() {
             </button>
             <button
               onClick={handleImportTransactions}
-              disabled={!columnMapping.date || columnMapping.description === null || columnMapping.amount === null}
+              disabled={columnMapping.date === null || columnMapping.description === null || columnMapping.amount === null}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Import {csvData.length} Transaction{csvData.length !== 1 ? 's' : ''}

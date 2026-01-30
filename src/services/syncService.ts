@@ -3,6 +3,7 @@ import {
   syncRecordToCloud,
   getRecordsFromCloud,
   subscribeToCollection,
+  deleteAllRecordsFromCloud,
 } from './firebase/firestore'
 import { getCurrentUser } from './firebase/auth'
 
@@ -1177,6 +1178,48 @@ class SyncService {
    */
   setAutoSyncEnabled(enabled: boolean): void {
     localStorage.setItem('autoSyncEnabled', enabled ? 'true' : 'false')
+  }
+
+  /**
+   * Clear all cloud data for a profile
+   */
+  async clearCloudData(profileId: string): Promise<void> {
+    if (!this.isAuthenticated()) {
+      console.log('Not authenticated, skipping cloud data clear')
+      return
+    }
+
+    this.notifyProgress({ status: 'syncing', message: 'Clearing cloud data...' })
+
+    try {
+      // Delete all data from each collection
+      const collections = [
+        'transactions',
+        'accounts',
+        'categories',
+        'incomeSources',
+        'monthlyBudgets',
+        'projects',
+        'projectTypes',
+        'projectStatuses',
+        'settings',
+      ]
+
+      for (const collectionName of collections) {
+        this.notifyProgress({
+          status: 'syncing',
+          message: `Clearing ${collectionName} from cloud...`
+        })
+        await deleteAllRecordsFromCloud(collectionName, profileId)
+      }
+
+      this.notifyProgress({ status: 'success', message: 'Cloud data cleared successfully' })
+      console.log('All cloud data cleared for profile:', profileId)
+    } catch (error) {
+      console.error('Failed to clear cloud data:', error)
+      this.notifyProgress({ status: 'error', message: 'Failed to clear cloud data' })
+      throw error
+    }
   }
 }
 

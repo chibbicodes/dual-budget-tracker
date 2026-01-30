@@ -1599,13 +1599,22 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     syncService.stopAutoSync()
     console.log('Stopped auto-sync')
 
-    // Clear data from the database
+    // Clear data from the local database
     try {
       await databaseService.clearProfileData(profileId)
-      console.log('Database data cleared successfully')
+      console.log('Local database data cleared successfully')
     } catch (error) {
-      console.error('Failed to clear database data:', error)
+      console.error('Failed to clear local database data:', error)
       return
+    }
+
+    // Clear data from the cloud (if authenticated)
+    try {
+      await syncService.clearCloudData(profileId)
+      console.log('Cloud data cleared successfully')
+    } catch (error) {
+      console.error('Failed to clear cloud data:', error)
+      // Continue anyway - local data is cleared
     }
 
     // Clear legacy localStorage

@@ -184,6 +184,36 @@ export async function deleteRecordFromCloud(
 }
 
 /**
+ * Delete all records for a profile from a Firestore collection
+ */
+export async function deleteAllRecordsFromCloud(
+  collectionName: string,
+  profileId: string
+): Promise<number> {
+  try {
+    const userCollection = getUserCollection(collectionName)
+    const q = query(
+      userCollection,
+      where('profileId', '==', profileId)
+    )
+
+    const snapshot = await getDocs(q)
+    let deletedCount = 0
+
+    for (const docSnapshot of snapshot.docs) {
+      await deleteDoc(docSnapshot.ref)
+      deletedCount++
+    }
+
+    console.log(`Deleted ${deletedCount} ${collectionName} records from cloud for profile ${profileId}`)
+    return deletedCount
+  } catch (error) {
+    console.error(`Failed to delete ${collectionName} records from cloud:`, error)
+    throw error
+  }
+}
+
+/**
  * Listen to real-time changes for a collection
  */
 export function subscribeToCollection(

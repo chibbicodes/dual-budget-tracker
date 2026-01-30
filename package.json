@@ -8,9 +8,12 @@
     "dev": "vite",
     "dev:electron": "vite",
     "build": "tsc && vite build",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:mac:arm64": "npm run build && electron-builder --mac --arm64",
-    "build:mac:x64": "npm run build && electron-builder --mac --x64",
+    "rebuild:arm64": "electron-rebuild -f -w better-sqlite3 --arch arm64",
+    "rebuild:x64": "electron-rebuild -f -w better-sqlite3 --arch x64",
+    "build:mac": "npm run rebuild:arm64 && npm run build && electron-builder --mac --arm64",
+    "build:mac:arm64": "npm run rebuild:arm64 && npm run build && electron-builder --mac --arm64",
+    "build:mac:x64": "npm run rebuild:x64 && npm run build && electron-builder --mac --x64",
+    "build:mac:universal": "npm run build && electron-builder --mac --universal",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx",
     "package": "electron-builder",
@@ -65,20 +68,7 @@
       "category": "public.app-category.finance",
       "icon": "build/icon.icns",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
+        "dmg"
       ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,

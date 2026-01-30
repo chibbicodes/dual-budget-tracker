@@ -1595,25 +1595,27 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
     console.log('Clearing all data for profile:', profileId)
 
+    // Stop auto-sync to prevent cloud data from being restored
+    syncService.stopAutoSync()
+    console.log('Stopped auto-sync')
+
     // Clear data from the database
     try {
       await databaseService.clearProfileData(profileId)
       console.log('Database data cleared successfully')
     } catch (error) {
       console.error('Failed to clear database data:', error)
+      return
     }
-
-    // Reset local state to defaults
-    const defaultData = StorageService.getDefaultData()
-    setAppDataState({
-      ...defaultData,
-      categories: generateDefaultCategories(),
-    })
 
     // Clear legacy localStorage
     StorageService.clear()
 
-    console.log('All data cleared successfully')
+    console.log('All data cleared successfully, reloading app...')
+
+    // Reload the page to reinitialize everything properly
+    // This ensures default categories, project types, etc. are created fresh
+    window.location.reload()
   }, [getProfileId])
 
   const loadSampleData = useCallback(() => {

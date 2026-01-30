@@ -574,6 +574,19 @@ app.on('window-all-closed', () => {
   }
 })
 
+// Properly close database when app is quitting
+app.on('before-quit', async () => {
+  if (databaseService) {
+    console.log('Closing database before quit...')
+    try {
+      databaseService.close()
+      console.log('Database closed successfully')
+    } catch (error) {
+      console.error('Error closing database:', error)
+    }
+  }
+})
+
 // IPC handlers for communication with renderer
 ipcMain.handle('get-app-path', () => {
   return app.getPath('userData')

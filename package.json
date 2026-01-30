@@ -102,6 +102,7 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "node_modules/better-sqlite3/**/*",
       "package.json"
     ],
     "asarUnpack": [

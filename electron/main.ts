@@ -7,11 +7,23 @@ import { createRequire } from 'module'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load better-sqlite3 using require from project root (where node_modules is)
-// In dev mode, process.cwd() is the project root where node_modules is located
-// createRequire needs a file path in that directory
-const require = createRequire(path.join(process.cwd(), 'index.js'))
-const Database = require('better-sqlite3')
+// Determine if we're running in production (packaged) or development
+const isProd = app.isPackaged
+
+// Load better-sqlite3 using require
+// In production: load from unpacked asar location
+// In development: load from project root node_modules
+let modulePath: string
+if (isProd) {
+  // In packaged app, native modules are unpacked to app.asar.unpacked
+  modulePath = path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'better-sqlite3')
+} else {
+  // In development, use the project root
+  modulePath = path.join(process.cwd(), 'node_modules', 'better-sqlite3')
+}
+
+const require = createRequire(import.meta.url)
+const Database = require(modulePath)
 
 // Import database service (runs in main process only)
 // Pass Database constructor to avoid bundling issues

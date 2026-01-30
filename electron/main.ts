@@ -42,8 +42,10 @@ databaseServicePromise = import('./services/database/databaseService.js').then(m
 // Register IPC handlers BEFORE app.whenReady()
 // Handlers will await the database service to be loaded
 ipcMain.handle('db:initialize', async () => {
+  console.log('IPC: db:initialize called')
   await databaseServicePromise
   await databaseService.initialize()
+  console.log('IPC: db:initialize completed')
 })
 
 ipcMain.handle('db:getAllProfiles', async () => {
@@ -102,13 +104,19 @@ ipcMain.handle('db:getAccount', async (_event, id: string) => {
 })
 
 ipcMain.handle('db:createAccount', async (_event, account: any) => {
+  console.log('IPC: db:createAccount called with:', account)
   await databaseServicePromise
-  return databaseService.createAccount(account)
+  const result = databaseService.createAccount(account)
+  console.log('IPC: db:createAccount result:', result)
+  return result
 })
 
 ipcMain.handle('db:updateAccount', async (_event, id: string, updates: any) => {
+  console.log('IPC: db:updateAccount called with id:', id, 'updates:', updates)
   await databaseServicePromise
-  return databaseService.updateAccount(id, updates)
+  const result = databaseService.updateAccount(id, updates)
+  console.log('IPC: db:updateAccount result:', result)
+  return result
 })
 
 ipcMain.handle('db:deleteAccount', async (_event, id: string) => {

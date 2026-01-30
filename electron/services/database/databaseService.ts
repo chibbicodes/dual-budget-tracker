@@ -298,6 +298,7 @@ class DatabaseService {
     website_url?: string
     notes?: string
   }) {
+    console.log('DatabaseService.createAccount called with:', account)
     const db = this.getDb()
     const now = new Date().toISOString()
 
@@ -309,7 +310,7 @@ class DatabaseService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
-    stmt.run(
+    const result = stmt.run(
       account.id,
       account.profile_id,
       account.name,
@@ -325,8 +326,11 @@ class DatabaseService {
       now,
       now
     )
+    console.log('DatabaseService.createAccount insert result:', result)
 
-    return this.getAccount(account.id)
+    const created = this.getAccount(account.id)
+    console.log('DatabaseService.createAccount returning:', created)
+    return created
   }
 
   /**

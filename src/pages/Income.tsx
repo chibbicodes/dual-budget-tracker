@@ -336,25 +336,22 @@ export default function Income() {
       income = income.filter((i) => i.budgetType === budgetFilter)
     }
 
-    // Convert to legacy format for display
-    let legacyIncome = income.map(incomeSourceToLegacy)
-
-    // Filter out ended income sources unless showEndedIncome is true
-    if (!showEndedIncome) {
-      legacyIncome = legacyIncome.filter((i) => !hasIncomeEnded(i, new Date()))
-    }
-
-    // Sort by source name
-    return legacyIncome.sort((a, b) => a.source.localeCompare(b.source))
-  }, [appData.incomeSources, currentView, budgetFilter, showEndedIncome])
+    // Convert to legacy format for display and sort by source name
+    return income.map(incomeSourceToLegacy).sort((a, b) => a.source.localeCompare(b.source))
+  }, [appData.incomeSources, currentView, budgetFilter])
 
   // Filter income sources for the selected month (only show sources expected in that month)
   const filteredIncomeForMonth = useMemo(() => {
     return filteredIncome.filter((income) => {
-      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
-      return occurrences > 0
+      const dates = getExpectedDatesForMonth(income, selectedMonth)
+      // Show if there are occurrences in this month
+      if (dates.length > 0) return true
+      // If showEndedIncome is true, also show income sources that have ended
+      // (useful for viewing historical data)
+      if (showEndedIncome && hasIncomeEnded(income, new Date())) return true
+      return false
     })
-  }, [filteredIncome, selectedMonth])
+  }, [filteredIncome, selectedMonth, showEndedIncome])
 
   // Group income sources by category (for selected month only)
   const incomeByCategory = useMemo(() => {
@@ -418,10 +415,7 @@ export default function Income() {
   // Calculate expected income for selected month (with recurring occurrences)
   const expectedIncomeThisMonth = useMemo(() => {
     return filteredIncome
-      .map((i) => {
-        const occurrences = calculateRecurringOccurrences(i, selectedMonth)
-        return occurrences * (i.expectedAmount || 0)
-      })
+      .map((i) => getExpectedAmountForMonth(i, selectedMonth))
       .reduce((sum, amount) => sum + amount, 0)
   }, [filteredIncome, selectedMonth])
 
@@ -432,11 +426,11 @@ export default function Income() {
 
     const sourceMap = new Map<string, { expected: number; actual: number; source: IncomeType }>()
 
-    // Initialize with expected amounts (with recurring occurrences calculated)
+    // Initialize with expected amounts (using getExpectedAmountForMonth which respects
+    // first occurrence amounts and end conditions)
     filteredIncome.forEach((income) => {
-      const occurrences = calculateRecurringOccurrences(income, selectedMonth)
       sourceMap.set(income.id, {
-        expected: occurrences * (income.expectedAmount || 0),
+        expected: getExpectedAmountForMonth(income, selectedMonth),
         actual: 0,
         source: income,
       })
@@ -1115,7 +1109,7 @@ export default function Income() {
                             >
                               {income.isRecurring ? 'Recurring' : 'One-time'}
                             </span>
-                            {hasIncomeEnded(income, new Date()) && (
+                            {hasIncomeEnded(income, endOfMonth(selectedMonth)) && (
                               <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
                                 Ended
                               </span>

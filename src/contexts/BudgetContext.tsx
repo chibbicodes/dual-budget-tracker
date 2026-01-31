@@ -404,13 +404,6 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       const transactionWithoutLinking = { ...transaction }
       delete (transactionWithoutLinking as any).linkingOption
 
-      // Debug logging for linked transaction
-      console.log('addTransaction called with:', {
-        linkingOption,
-        linkedTransactionId: transactionWithoutLinking.linkedTransactionId,
-        toAccountId: transactionWithoutLinking.toAccountId,
-      })
-
       // Validate account exists
       const account = appData.accounts.find(a => a.id === transactionWithoutLinking.accountId)
       if (!account) {
@@ -489,13 +482,6 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
-      // Debug log the transaction being created
-      console.log('Creating main transaction:', {
-        id: newTransaction.id,
-        linkedTransactionId: newTransaction.linkedTransactionId,
-        shouldCreatePaired,
-      })
-
       // Save main transaction to database
       try {
         await databaseService.createTransaction({
@@ -516,7 +502,6 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           reconciled: newTransaction.reconciled ? 1 : 0,
           notes: newTransaction.notes,
         })
-        console.log('Main transaction saved successfully')
       } catch (error) {
         console.error('Failed to create transaction in database:', error)
         return
@@ -544,9 +529,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           // If the category doesn't match the destination budget type, try to find a matching Transfer/Payment category
           const pairedCategory = appData.categories.find(c => c.id === categoryId && c.budgetType === destAccount.budgetType)
           if (!pairedCategory) {
-            // Look for Transfer/Payment category in destination budget
+            // Look for Transfer income category in destination budget (for receiving money)
             const transferCategory = appData.categories.find(
-              c => c.name === 'Transfer/Payment' && c.budgetType === destAccount.budgetType
+              c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === destAccount.budgetType
             )
             if (transferCategory) {
               pairedCategoryId = transferCategory.id
@@ -603,26 +588,35 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             console.error('Failed to update destination account balance in database:', error)
           }
         } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
-          // Link to existing transaction - update the existing transaction to link back to main
-          console.log('Updating existing transaction to link back:', {
-            existingTransactionId: transactionWithoutLinking.linkedTransactionId,
-            linkingTo: mainTransactionId,
-          })
+          // Link to existing transaction - update the existing transaction to link back and change category
+          // Find the linked transaction to get its budget type
+          const linkedTx = appData.transactions.find(t => t.id === transactionWithoutLinking.linkedTransactionId)
+
+          // Find the Transfer income category for the linked transaction
+          const transferCategory = linkedTx ? appData.categories.find(
+            c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === linkedTx.budgetType
+          ) : null
+
           try {
-            await databaseService.updateTransaction(transactionWithoutLinking.linkedTransactionId, {
+            const updateData: any = {
               linked_transaction_id: mainTransactionId,
-            })
-            console.log('Existing transaction updated successfully')
+            }
+            // Update the receiving transaction's category to Transfer income category
+            if (transferCategory) {
+              updateData.category_id = transferCategory.id
+              updateData.bucket_id = transferCategory.bucketId
+            }
+            await databaseService.updateTransaction(transactionWithoutLinking.linkedTransactionId, updateData)
+
+            // Also update in-memory state for the linked transaction
+            if (linkedTx && transferCategory) {
+              linkedTx.linkedTransactionId = mainTransactionId
+              linkedTx.categoryId = transferCategory.id
+              linkedTx.bucketId = transferCategory.bucketId
+            }
           } catch (error) {
             console.error('Failed to update existing transaction link in database:', error)
           }
-        } else {
-          console.log('Link_existing branch NOT executed:', {
-            linkingOption,
-            linkedTransactionId: transactionWithoutLinking.linkedTransactionId,
-            hasToAccountId: !!transactionWithoutLinking.toAccountId,
-            hasDestAccount: !!destAccount,
-          })
         }
       }
 

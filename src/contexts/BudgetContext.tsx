@@ -522,21 +522,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       // Handle transfer linking
       if (transactionWithoutLinking.toAccountId && destAccount) {
         if (linkingOption === 'create_paired') {
-          // Find the category for the paired transaction (should match budget type)
+          // Find the Transfer income category for the paired/receiving transaction
+          // The receiving transaction (money coming in) should always use the Transfer income category
           let pairedCategoryId = categoryId
           let pairedBucketId = bucketId
 
-          // If the category doesn't match the destination budget type, try to find a matching Transfer/Payment category
-          const pairedCategory = appData.categories.find(c => c.id === categoryId && c.budgetType === destAccount.budgetType)
-          if (!pairedCategory) {
-            // Look for Transfer income category in destination budget (for receiving money)
-            const transferCategory = appData.categories.find(
-              c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === destAccount.budgetType
-            )
-            if (transferCategory) {
-              pairedCategoryId = transferCategory.id
-              pairedBucketId = transferCategory.bucketId
-            }
+          const transferIncomeCategory = appData.categories.find(
+            c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === destAccount.budgetType
+          )
+          if (transferIncomeCategory) {
+            pairedCategoryId = transferIncomeCategory.id
+            pairedBucketId = transferIncomeCategory.bucketId
           }
 
           // Create paired transaction and link both

@@ -2569,6 +2569,7 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     accountId?: string
     budgetType?: BudgetType
     taxDeductible?: boolean
+    reconciled?: boolean
     notes?: string
   }>({})
 
@@ -2624,6 +2625,7 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     if (formData.accountId) updates.accountId = formData.accountId
     if (formData.budgetType) updates.budgetType = formData.budgetType
     if (formData.taxDeductible !== undefined) updates.taxDeductible = formData.taxDeductible
+    if (formData.reconciled !== undefined) updates.reconciled = formData.reconciled
     if (formData.notes) updates.notes = formData.notes
 
     if (Object.keys(updates).length === 0) {
@@ -2764,26 +2766,49 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
         </select>
       </div>
 
-      {/* Tax Deductible */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Tax Deductible (optional)
-        </label>
-        <select
-          value={formData.taxDeductible === undefined ? '' : formData.taxDeductible.toString()}
-          onChange={(e) => {
-            const value = e.target.value
-            setFormData({
-              ...formData,
-              taxDeductible: value === '' ? undefined : value === 'true'
-            })
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">-- Keep Current --</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </select>
+      {/* Tax Deductible and Reconciled */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tax Deductible (optional)
+          </label>
+          <select
+            value={formData.taxDeductible === undefined ? '' : formData.taxDeductible.toString()}
+            onChange={(e) => {
+              const value = e.target.value
+              setFormData({
+                ...formData,
+                taxDeductible: value === '' ? undefined : value === 'true'
+              })
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Keep Current --</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reconciled (optional)
+          </label>
+          <select
+            value={formData.reconciled === undefined ? '' : formData.reconciled.toString()}
+            onChange={(e) => {
+              const value = e.target.value
+              setFormData({
+                ...formData,
+                reconciled: value === '' ? undefined : value === 'true'
+              })
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Keep Current --</option>
+            <option value="true">Yes (Checked)</option>
+            <option value="false">No (Unchecked)</option>
+          </select>
+        </div>
       </div>
 
       {/* Notes */}

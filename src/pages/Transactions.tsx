@@ -1500,6 +1500,8 @@ export default function Transactions() {
           transactionCount={selectedTransactionIds.size}
           accounts={appData.accounts}
           categories={appData.categories}
+          incomeSources={appData.incomeSources}
+          projects={appData.projects}
           onSubmit={handleBulkEdit}
           onCancel={() => setIsBulkEditModalOpen(false)}
         />
@@ -2556,11 +2558,13 @@ interface BulkEditFormProps {
   transactionCount: number
   accounts: Account[]
   categories: any[]
+  incomeSources: IncomeSource[]
+  projects: Project[]
   onSubmit: (updates: Partial<Transaction>) => void
   onCancel: () => void
 }
 
-function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCancel }: BulkEditFormProps) {
+function BulkEditForm({ transactionCount, accounts, categories, incomeSources, projects, onSubmit, onCancel }: BulkEditFormProps) {
   const [formData, setFormData] = useState<{
     date?: string
     description?: string
@@ -2570,6 +2574,8 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     budgetType?: BudgetType
     taxDeductible?: boolean
     reconciled?: boolean
+    incomeSourceId?: string | null
+    projectId?: string | null
     notes?: string
   }>({})
 
@@ -2626,6 +2632,10 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
     if (formData.budgetType) updates.budgetType = formData.budgetType
     if (formData.taxDeductible !== undefined) updates.taxDeductible = formData.taxDeductible
     if (formData.reconciled !== undefined) updates.reconciled = formData.reconciled
+    // incomeSourceId: null means clear, undefined means keep current, string means set to that value
+    if (formData.incomeSourceId !== undefined) updates.incomeSourceId = formData.incomeSourceId || undefined
+    // projectId: null means clear, undefined means keep current, string means set to that value
+    if (formData.projectId !== undefined) updates.projectId = formData.projectId || undefined
     if (formData.notes) updates.notes = formData.notes
 
     if (Object.keys(updates).length === 0) {
@@ -2748,6 +2758,59 @@ function BulkEditForm({ transactionCount, accounts, categories, onSubmit, onCanc
             )
           })}
         </select>
+      </div>
+
+      {/* Income Source and Project */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Income Source (optional)
+          </label>
+          <select
+            value={formData.incomeSourceId === undefined ? '' : (formData.incomeSourceId || '__clear__')}
+            onChange={(e) => {
+              const value = e.target.value
+              setFormData({
+                ...formData,
+                incomeSourceId: value === '' ? undefined : (value === '__clear__' ? null : value)
+              })
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Keep Current --</option>
+            <option value="__clear__">-- Clear Income Source --</option>
+            {incomeSources.filter(s => s.isActive !== false).map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name} ({source.budgetType})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Project (optional)
+          </label>
+          <select
+            value={formData.projectId === undefined ? '' : (formData.projectId || '__clear__')}
+            onChange={(e) => {
+              const value = e.target.value
+              setFormData({
+                ...formData,
+                projectId: value === '' ? undefined : (value === '__clear__' ? null : value)
+              })
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Keep Current --</option>
+            <option value="__clear__">-- Clear Project --</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name} ({project.budgetType})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Budget Type */}

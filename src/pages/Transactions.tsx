@@ -202,23 +202,19 @@ export default function Transactions() {
     const isCreatingNewLink = updates.linkedTransactionId && !selectedTransaction.linkedTransactionId
 
     if (isCreatingNewLink && updates.linkedTransactionId) {
-      console.log('Creating new link from edit:', {
-        currentTransaction: selectedTransaction.id,
-        linkingTo: updates.linkedTransactionId,
-      })
-
       // Update current transaction with the new linkedTransactionId
       await updateTransaction(selectedTransaction.id, updates)
 
       // Find the linked transaction to get its budget type
       const linkedTx = appData.transactions.find(t => t.id === updates.linkedTransactionId)
       if (linkedTx) {
-        // Find the Transfer/Payment category for the linked transaction's budget type
+        // Find the Transfer income category for the linked transaction's budget type
+        // The receiving transaction (money-coming-in) should use the "Transfer" income category
         const transferCategory = appData.categories.find(
-          c => c.name === 'Transfer/Payment' && c.budgetType === linkedTx.budgetType
+          c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === linkedTx.budgetType
         )
 
-        // Update the target transaction to link back and change category to Transfer/Payment
+        // Update the target transaction to link back and change category to Transfer
         const linkedUpdates: Partial<Transaction> = {
           linkedTransactionId: selectedTransaction.id,
         }
@@ -2097,12 +2093,6 @@ function TransactionForm({
         transactionData.linkedTransactionId = formData.linkedTransactionId
       }
 
-      // Debug logging
-      console.log('Form submission - transfer linking:', {
-        linkingOption: formData.linkingOption,
-        linkedTransactionId: formData.linkedTransactionId,
-        transactionDataLinkedId: transactionData.linkedTransactionId,
-      })
     } else {
       // If changing from transfer to something else, explicitly clear transfer fields
       if (transaction?.toAccountId) {

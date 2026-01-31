@@ -1116,8 +1116,22 @@ export default function Income() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(income.expectedAmount || 0)}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {(() => {
+                            const dates = getExpectedDatesForMonth(income, selectedMonth)
+                            if (dates.length === 0) return '-'
+                            const regularAmount = income.expectedAmount || 0
+                            const firstAmount = income.firstOccurrenceAmount || regularAmount
+                            return (
+                              <div className="flex flex-col gap-1">
+                                {dates.map((_, idx) => (
+                                  <span key={idx}>
+                                    {formatCurrency(idx === 0 ? firstAmount : regularAmount)}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {(() => {

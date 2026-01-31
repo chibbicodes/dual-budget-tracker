@@ -99,6 +99,88 @@ function calculateRecurringOccurrences(income: IncomeType, monthDate: Date): num
   }
 }
 
+// Helper function to get all expected dates for a recurring income in a given month
+function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
+  const monthStart = startOfMonth(monthDate)
+  const monthEnd = endOfMonth(monthDate)
+  const dates: Date[] = []
+
+  if (!income.isRecurring) {
+    // One-time income: check if expected date falls in this month
+    if (income.expectedDate) {
+      const expectedDate = parseISO(income.expectedDate + 'T12:00:00')
+      if (expectedDate >= monthStart && expectedDate <= monthEnd) {
+        dates.push(expectedDate)
+      }
+    }
+    return dates
+  }
+
+  switch (income.recurringFrequency) {
+    case 'weekly':
+    case 'bi-weekly':
+    case 'every-15-days': {
+      if (!income.expectedDate) {
+        return dates
+      }
+
+      let currentDate = parseISO(income.expectedDate + 'T12:00:00')
+      const interval = income.recurringFrequency === 'weekly' ? 7 :
+                      income.recurringFrequency === 'bi-weekly' ? 14 : 15
+
+      // If start date is before this month, fast-forward to first occurrence in or after this month
+      while (currentDate < monthStart) {
+        currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+      }
+
+      // Collect all occurrences that fall within this month
+      while (currentDate <= monthEnd) {
+        if (currentDate >= monthStart) {
+          dates.push(new Date(currentDate))
+        }
+        currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+      }
+      break
+    }
+    case 'monthly':
+    case 'same-day-each-month': {
+      if (income.expectedDate) {
+        const startDate = parseISO(income.expectedDate + 'T12:00:00')
+
+        // If the start date is after this month, no dates
+        if (startDate > monthEnd) {
+          return dates
+        }
+
+        // Get the day of month from the original expected date
+        const dayOfMonth = startDate.getDate()
+
+        // Create a date for this month with the same day
+        const thisMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayOfMonth, 12, 0, 0)
+
+        // Handle edge case where day doesn't exist in this month (e.g., 31st in February)
+        if (thisMonthDate.getMonth() === monthDate.getMonth()) {
+          dates.push(thisMonthDate)
+        } else {
+          // If the day overflowed to next month, use last day of current month
+          dates.push(endOfMonth(monthDate))
+        }
+      }
+      break
+    }
+    default:
+      // For unknown frequencies, try to show the original date if it's in this month
+      if (income.expectedDate) {
+        const expectedDate = parseISO(income.expectedDate + 'T12:00:00')
+        if (expectedDate >= monthStart && expectedDate <= monthEnd) {
+          dates.push(expectedDate)
+        }
+      }
+  }
+
+  return dates
+}
+
 export default function Income() {
   const { currentView, appData, addIncomeSource, updateIncomeSource, deleteIncomeSource, addCategory } = useBudget()
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
@@ -367,7 +449,7 @@ export default function Income() {
       'Variance': '',
       'Percent Achieved': '',
       Frequency: '',
-      'Next Expected Date': ''
+      'Expected Dates': ''
     })
 
     exportData.push({
@@ -381,7 +463,7 @@ export default function Income() {
       'Variance': '',
       'Percent Achieved': '',
       Frequency: '',
-      'Next Expected Date': ''
+      'Expected Dates': ''
     })
 
     exportData.push({
@@ -395,7 +477,7 @@ export default function Income() {
       'Variance': '',
       'Percent Achieved': '',
       Frequency: '',
-      'Next Expected Date': ''
+      'Expected Dates': ''
     })
 
     exportData.push({
@@ -409,7 +491,7 @@ export default function Income() {
       'Variance': variance,
       'Percent Achieved': `${variancePercent.toFixed(1)}%`,
       Frequency: '',
-      'Next Expected Date': ''
+      'Expected Dates': ''
     })
 
     // Add blank row
@@ -424,7 +506,7 @@ export default function Income() {
       'Variance': '',
       'Percent Achieved': '',
       Frequency: '',
-      'Next Expected Date': ''
+      'Expected Dates': ''
     })
 
     // Add income by category with all sources
@@ -441,7 +523,7 @@ export default function Income() {
         'Variance': '',
         'Percent Achieved': '',
         Frequency: '',
-        'Next Expected Date': ''
+        'Expected Dates': ''
       })
 
       // Income sources in this category
@@ -451,6 +533,11 @@ export default function Income() {
         const percentAchieved = sourceData && sourceData.expected > 0
           ? (sourceData.actual / sourceData.expected) * 100
           : 0
+
+        const expectedDates = getExpectedDatesForMonth(income, selectedMonth)
+        const expectedDatesStr = expectedDates.length > 0
+          ? expectedDates.map(d => format(d, 'MM/dd/yyyy')).join(', ')
+          : ''
 
         exportData.push({
           Source: income.source,
@@ -463,7 +550,7 @@ export default function Income() {
           'Variance': itemVariance,
           'Percent Achieved': `${percentAchieved.toFixed(1)}%`,
           Frequency: income.isRecurring ? income.recurringFrequency : 'One-time',
-          'Next Expected Date': income.expectedDate ? format(parseISO(income.expectedDate), 'MM/dd/yyyy') : ''
+          'Expected Dates': expectedDatesStr
         })
       })
 
@@ -479,7 +566,7 @@ export default function Income() {
         'Variance': '',
         'Percent Achieved': '',
         Frequency: '',
-        'Next Expected Date': ''
+        'Expected Dates': ''
       })
     })
 
@@ -841,7 +928,7 @@ export default function Income() {
                   Expected Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Expected Date
+                  Expected Dates
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -890,8 +977,18 @@ export default function Income() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatCurrency(income.expectedAmount || 0)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {income.expectedDate ? format(parseISO(income.expectedDate + 'T12:00:00'), 'MMM d, yyyy') : '-'}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {(() => {
+                            const dates = getExpectedDatesForMonth(income, selectedMonth)
+                            if (dates.length === 0) return '-'
+                            return (
+                              <div className="flex flex-col gap-1">
+                                {dates.map((date, idx) => (
+                                  <span key={idx}>{format(date, 'MMM d, yyyy')}</span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                           <button

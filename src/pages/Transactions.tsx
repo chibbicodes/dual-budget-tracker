@@ -50,9 +50,9 @@ export default function Transactions() {
     description: null,
     amount: null,
     category: null,
-    account: null,
     notes: null,
   })
+  const [importAccountId, setImportAccountId] = useState<string>('')
   const [vendorMatchModalOpen, setVendorMatchModalOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<{
     cleanedDescription: string
@@ -523,7 +523,6 @@ export default function Transactions() {
       description: null,
       amount: null,
       category: null,
-      account: null,
       notes: null,
     }
 
@@ -533,7 +532,6 @@ export default function Transactions() {
       else if (lower.includes('description') || lower.includes('memo') || lower.includes('payee')) mapping.description = index
       else if (lower.includes('amount') || lower.includes('debit') || lower.includes('credit')) mapping.amount = index
       else if (lower.includes('category')) mapping.category = index
-      else if (lower.includes('account')) mapping.account = index
       else if (lower.includes('note')) mapping.notes = index
     })
 
@@ -543,6 +541,18 @@ export default function Transactions() {
   const handleImportTransactions = () => {
     if (columnMapping.date === null || columnMapping.description === null || columnMapping.amount === null) {
       alert('Please map at least Date, Description, and Amount columns')
+      return
+    }
+
+    if (!importAccountId) {
+      alert('Please select an account to import transactions to')
+      return
+    }
+
+    // Get the selected account to determine budget type
+    const selectedAccount = appData.accounts.find(a => a.id === importAccountId)
+    if (!selectedAccount) {
+      alert('Selected account not found')
       return
     }
 
@@ -589,15 +599,8 @@ export default function Transactions() {
         // Get optional fields
         const notes = columnMapping.notes !== null ? row[columnMapping.notes] : undefined
 
-        // Find or use default account
-        let accountId = appData.accounts[0]?.id
-        if (columnMapping.account !== null && row[columnMapping.account]) {
-          const accountName = row[columnMapping.account]
-          const foundAccount = appData.accounts.find(
-            (a) => a.name.toLowerCase() === accountName.toLowerCase()
-          )
-          if (foundAccount) accountId = foundAccount.id
-        }
+        // Use the selected account
+        const accountId = importAccountId
 
         // Find or use default category
         let categoryId = appData.categories[0]?.id
@@ -647,9 +650,9 @@ export default function Transactions() {
         description: null,
         amount: null,
         category: null,
-        account: null,
         notes: null,
       })
+      setImportAccountId('')
       return
     }
 
@@ -670,9 +673,9 @@ export default function Transactions() {
         description: null,
         amount: null,
         category: null,
-        account: null,
         notes: null,
       })
+      setImportAccountId('')
       setPendingImports([])
       setCurrentImportIndex(0)
 
@@ -1539,23 +1542,20 @@ export default function Transactions() {
                 </select>
               </div>
 
-              {/* Account Mapping */}
+              {/* Account Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Account (Optional)
+                  Import to Account * <span className="text-red-500">(Required)</span>
                 </label>
                 <select
-                  value={columnMapping.account ?? ''}
-                  onChange={(e) => setColumnMapping({
-                    ...columnMapping,
-                    account: e.target.value === '' ? null : parseInt(e.target.value)
-                  })}
+                  value={importAccountId}
+                  onChange={(e) => setImportAccountId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">-- Skip Column --</option>
-                  {csvHeaders.map((header, index) => (
-                    <option key={index} value={index}>
-                      {header} ({csvData[0]?.[index] || 'empty'})
+                  <option value="">-- Select Account --</option>
+                  {appData.accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} ({account.budgetType})
                     </option>
                   ))}
                 </select>
@@ -1608,8 +1608,8 @@ export default function Transactions() {
                     {columnMapping.category !== null && (
                       <li><strong>Category:</strong> {csvData[0][columnMapping.category]}</li>
                     )}
-                    {columnMapping.account !== null && (
-                      <li><strong>Account:</strong> {csvData[0][columnMapping.account]}</li>
+                    {importAccountId && (
+                      <li><strong>Account:</strong> {appData.accounts.find(a => a.id === importAccountId)?.name || 'Unknown'}</li>
                     )}
                     {columnMapping.notes !== null && (
                       <li><strong>Notes:</strong> {csvData[0][columnMapping.notes]}</li>
@@ -1634,7 +1634,7 @@ export default function Transactions() {
             </button>
             <button
               onClick={handleImportTransactions}
-              disabled={columnMapping.date === null || columnMapping.description === null || columnMapping.amount === null}
+              disabled={columnMapping.date === null || columnMapping.description === null || columnMapping.amount === null || !importAccountId}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Import {csvData.length} Transaction{csvData.length !== 1 ? 's' : ''}

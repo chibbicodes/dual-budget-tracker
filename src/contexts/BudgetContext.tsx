@@ -404,6 +404,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       const transactionWithoutLinking = { ...transaction }
       delete (transactionWithoutLinking as any).linkingOption
 
+      // Debug logging for linked transaction
+      console.log('addTransaction called with:', {
+        linkingOption,
+        linkedTransactionId: transactionWithoutLinking.linkedTransactionId,
+        toAccountId: transactionWithoutLinking.toAccountId,
+      })
+
       // Validate account exists
       const account = appData.accounts.find(a => a.id === transactionWithoutLinking.accountId)
       if (!account) {
@@ -482,6 +489,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       }
 
+      // Debug log the transaction being created
+      console.log('Creating main transaction:', {
+        id: newTransaction.id,
+        linkedTransactionId: newTransaction.linkedTransactionId,
+        shouldCreatePaired,
+      })
+
       // Save main transaction to database
       try {
         await databaseService.createTransaction({
@@ -502,6 +516,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           reconciled: newTransaction.reconciled ? 1 : 0,
           notes: newTransaction.notes,
         })
+        console.log('Main transaction saved successfully')
       } catch (error) {
         console.error('Failed to create transaction in database:', error)
         return
@@ -589,13 +604,25 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
           // Link to existing transaction - update the existing transaction to link back to main
+          console.log('Updating existing transaction to link back:', {
+            existingTransactionId: transactionWithoutLinking.linkedTransactionId,
+            linkingTo: mainTransactionId,
+          })
           try {
             await databaseService.updateTransaction(transactionWithoutLinking.linkedTransactionId, {
               linked_transaction_id: mainTransactionId,
             })
+            console.log('Existing transaction updated successfully')
           } catch (error) {
             console.error('Failed to update existing transaction link in database:', error)
           }
+        } else {
+          console.log('Link_existing branch NOT executed:', {
+            linkingOption,
+            linkedTransactionId: transactionWithoutLinking.linkedTransactionId,
+            hasToAccountId: !!transactionWithoutLinking.toAccountId,
+            hasDestAccount: !!destAccount,
+          })
         }
       }
 

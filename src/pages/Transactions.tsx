@@ -2058,6 +2058,13 @@ function TransactionForm({
       if (formData.linkingOption === 'link_existing' && formData.linkedTransactionId) {
         transactionData.linkedTransactionId = formData.linkedTransactionId
       }
+
+      // Debug logging
+      console.log('Form submission - transfer linking:', {
+        linkingOption: formData.linkingOption,
+        linkedTransactionId: formData.linkedTransactionId,
+        transactionDataLinkedId: transactionData.linkedTransactionId,
+      })
     } else {
       // If changing from transfer to something else, explicitly clear transfer fields
       if (transaction?.toAccountId) {

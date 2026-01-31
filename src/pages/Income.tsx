@@ -20,9 +20,13 @@ function incomeSourceToLegacy(source: IncomeSource): IncomeType {
     categoryId: source.categoryId,
     client: source.clientSource,
     expectedAmount: source.expectedAmount,
+    firstOccurrenceAmount: source.firstOccurrenceAmount,
     isRecurring: source.frequency !== 'irregular',
     recurringFrequency: source.frequency === 'biweekly' ? 'bi-weekly' : source.frequency as any,
     expectedDate: source.nextExpectedDate,
+    endCondition: source.endCondition || 'none',
+    endDate: source.endDate,
+    totalOccurrences: source.totalOccurrences,
     createdAt: source.createdAt,
     updatedAt: source.updatedAt,
   }
@@ -506,12 +510,16 @@ export default function Income() {
       incomeType: income.budgetType === 'household' ? 'salary' as const : 'services' as const,
       categoryId: income.categoryId,
       expectedAmount: income.expectedAmount || 0,
+      firstOccurrenceAmount: income.firstOccurrenceAmount || undefined,
       frequency: income.isRecurring
         ? (income.recurringFrequency === 'bi-weekly' ? 'biweekly' as const
            : income.recurringFrequency === 'same-day-each-month' ? 'monthly' as const
            : income.recurringFrequency as any)
         : 'irregular' as const,
       nextExpectedDate: income.expectedDate,
+      endCondition: income.endCondition || 'none',
+      endDate: income.endDate || undefined,
+      totalOccurrences: income.totalOccurrences || undefined,
       clientSource: income.client,
       isActive: true,
     }
@@ -528,12 +536,16 @@ export default function Income() {
         incomeType: income.budgetType === 'household' ? 'salary' as const : 'services' as const,
         categoryId: income.categoryId,
         expectedAmount: income.expectedAmount || 0,
+        firstOccurrenceAmount: income.firstOccurrenceAmount || null,
         frequency: income.isRecurring
           ? (income.recurringFrequency === 'bi-weekly' ? 'biweekly' as const
              : income.recurringFrequency === 'same-day-each-month' ? 'monthly' as const
              : income.recurringFrequency as any)
           : 'irregular' as const,
         nextExpectedDate: income.expectedDate,
+        endCondition: income.endCondition || 'none',
+        endDate: income.endDate || null,
+        totalOccurrences: income.totalOccurrences || null,
         clientSource: income.client,
       }
       await updateIncomeSource(editingIncome.id, updates)

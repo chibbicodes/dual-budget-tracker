@@ -927,8 +927,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           income_type: newIncome.incomeType,
           category_id: newIncome.categoryId,
           expected_amount: newIncome.expectedAmount,
+          first_occurrence_amount: newIncome.firstOccurrenceAmount,
           frequency: newIncome.frequency,
           next_expected_date: newIncome.nextExpectedDate,
+          end_condition: newIncome.endCondition || 'none',
+          end_date: newIncome.endDate,
+          total_occurrences: newIncome.totalOccurrences,
           client_source: newIncome.clientSource,
           is_active: newIncome.isActive !== false ? 1 : 0,
         })
@@ -955,8 +959,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       if (updates.incomeType !== undefined) dbUpdates.income_type = updates.incomeType
       if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId
       if (updates.expectedAmount !== undefined) dbUpdates.expected_amount = updates.expectedAmount
+      if (updates.firstOccurrenceAmount !== undefined) dbUpdates.first_occurrence_amount = updates.firstOccurrenceAmount
       if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency
       if (updates.nextExpectedDate !== undefined) dbUpdates.next_expected_date = updates.nextExpectedDate
+      if (updates.endCondition !== undefined) dbUpdates.end_condition = updates.endCondition
+      if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate
+      if (updates.totalOccurrences !== undefined) dbUpdates.total_occurrences = updates.totalOccurrences
       if (updates.clientSource !== undefined) dbUpdates.client_source = updates.clientSource
       if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive ? 1 : 0
 

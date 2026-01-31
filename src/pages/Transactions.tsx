@@ -231,6 +231,28 @@ export default function Transactions() {
       return
     }
 
+    // Check if we're REMOVING a link (was linked before, but now being unlinked)
+    const isRemovingLink = selectedTransaction.linkedTransactionId &&
+      (updates.linkedTransactionId === undefined || updates.linkedTransactionId === null || updates.linkedTransactionId === '')
+
+    if (isRemovingLink && selectedTransaction.linkedTransactionId) {
+      // Find the previously linked transaction and remove its link back to us
+      const previouslyLinkedTx = appData.transactions.find(t => t.id === selectedTransaction.linkedTransactionId)
+      if (previouslyLinkedTx) {
+        // Remove the link from the other transaction
+        await updateTransaction(selectedTransaction.linkedTransactionId, {
+          linkedTransactionId: undefined,
+        })
+      }
+
+      // Update current transaction (which will clear the linkedTransactionId)
+      await updateTransaction(selectedTransaction.id, updates)
+
+      setIsEditModalOpen(false)
+      setSelectedTransaction(null)
+      return
+    }
+
     // Check if this transaction is already linked
     if (selectedTransaction.linkedTransactionId) {
       const linkedTx = appData.transactions.find(t => t.id === selectedTransaction.linkedTransactionId)
@@ -2095,7 +2117,9 @@ function TransactionForm({
 
     } else {
       // If changing from transfer to something else, explicitly clear transfer fields
-      if (transaction?.toAccountId) {
+      // Check both toAccountId and linkedTransactionId since a transaction can be linked
+      // without having a toAccountId (via "link to existing transaction")
+      if (transaction?.toAccountId || transaction?.linkedTransactionId) {
         transactionData.toAccountId = undefined
         transactionData.linkedTransactionId = undefined
       }

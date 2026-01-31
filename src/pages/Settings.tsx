@@ -1306,6 +1306,7 @@ function CategoryManager({
   const [formData, setFormData] = useState({
     name: '',
     isActive: true,
+    excludeFromBudget: false,
   })
 
   const handleEdit = (category: any) => {
@@ -1313,6 +1314,7 @@ function CategoryManager({
     setFormData({
       name: category.name,
       isActive: category.isActive,
+      excludeFromBudget: category.excludeFromBudget || false,
     })
   }
 
@@ -1324,14 +1326,15 @@ function CategoryManager({
     onUpdateCategory(editingId!, {
       name: formData.name,
       isActive: formData.isActive,
+      excludeFromBudget: formData.excludeFromBudget,
     })
     setEditingId(null)
-    setFormData({ name: '', isActive: true })
+    setFormData({ name: '', isActive: true, excludeFromBudget: false })
   }
 
   const handleCancel = () => {
     setEditingId(null)
-    setFormData({ name: '', isActive: true })
+    setFormData({ name: '', isActive: true, excludeFromBudget: false })
   }
 
   // Filter categories
@@ -1463,6 +1466,17 @@ function CategoryManager({
                         className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                       />
                       <span className="ml-2 text-sm text-gray-700">Active</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.excludeFromBudget}
+                        onChange={(e) => setFormData({ ...formData, excludeFromBudget: e.target.checked })}
+                        className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        Exclude from calculations (transfers, reimbursements, etc.)
+                      </span>
                     </label>
                     <div className="flex gap-2">
                       <button

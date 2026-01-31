@@ -45,13 +45,19 @@ export default function BusinessReports() {
     }
   }, [reportPeriod, customStartDate, customEndDate])
 
-  // Filter business transactions for the period
+  // Filter business transactions for the period (excluding transfers and other non-budget categories)
   const businessTransactions = useMemo(() => {
     return appData.transactions.filter((t) => {
       const transDate = new Date(t.date)
-      return t.budgetType === 'business' && transDate >= dateRange.start && transDate <= dateRange.end
+      const category = appData.categories.find((c) => c.id === t.categoryId)
+      return (
+        t.budgetType === 'business' &&
+        transDate >= dateRange.start &&
+        transDate <= dateRange.end &&
+        !category?.excludeFromBudget
+      )
     })
-  }, [appData.transactions, dateRange])
+  }, [appData.transactions, appData.categories, dateRange])
 
   // Calculate P&L Statement
   const profitLoss = useMemo(() => {

@@ -185,6 +185,10 @@ export default function Income() {
       .filter((t) => {
         const transDate = new Date(t.date)
 
+        // Exclude transactions with categories marked as excludeFromBudget (e.g., transfers)
+        const category = appData.categories.find((c) => c.id === t.categoryId)
+        if (category?.excludeFromBudget) return false
+
         // For transfers, check the destination account's budget type
         if (t.toAccountId) {
           const toAccount = appData.accounts.find(a => a.id === t.toAccountId)
@@ -205,7 +209,7 @@ export default function Income() {
         return t.amount > 0 && transDate >= monthStart && transDate <= monthEnd && matchesBudget
       })
       .reduce((sum, t) => sum + t.amount, 0)
-  }, [appData.transactions, appData.accounts, currentView, budgetFilter, selectedMonth])
+  }, [appData.transactions, appData.accounts, appData.categories, currentView, budgetFilter, selectedMonth])
 
   // Calculate expected income for selected month (with recurring occurrences)
   const expectedIncomeThisMonth = useMemo(() => {

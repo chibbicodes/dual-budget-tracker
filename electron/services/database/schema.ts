@@ -468,5 +468,46 @@ export const applyMigrations = (db: Database.Database): void => {
     console.log('Migration 4 completed')
   }
 
+  // Migration 5: Add income source end conditions and first occurrence amount
+  if (currentVersion < 5) {
+    console.log('Applying migration 5: Adding income source end conditions and first occurrence amount...')
+
+    // Add first_occurrence_amount column
+    try {
+      db.exec('ALTER TABLE income_sources ADD COLUMN first_occurrence_amount REAL DEFAULT NULL')
+      console.log('Added first_occurrence_amount column to income_sources')
+    } catch (e) {
+      console.log('first_occurrence_amount column already exists or error:', e)
+    }
+
+    // Add end_condition column
+    try {
+      db.exec("ALTER TABLE income_sources ADD COLUMN end_condition TEXT DEFAULT 'none'")
+      console.log('Added end_condition column to income_sources')
+    } catch (e) {
+      console.log('end_condition column already exists or error:', e)
+    }
+
+    // Add end_date column
+    try {
+      db.exec('ALTER TABLE income_sources ADD COLUMN end_date TEXT DEFAULT NULL')
+      console.log('Added end_date column to income_sources')
+    } catch (e) {
+      console.log('end_date column already exists or error:', e)
+    }
+
+    // Add total_occurrences column
+    try {
+      db.exec('ALTER TABLE income_sources ADD COLUMN total_occurrences INTEGER DEFAULT NULL')
+      console.log('Added total_occurrences column to income_sources')
+    } catch (e) {
+      console.log('total_occurrences column already exists or error:', e)
+    }
+
+    // Update version
+    db.prepare('INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)').run('db_version', '5')
+    console.log('Migration 5 completed')
+  }
+
   console.log('All migrations applied')
 }

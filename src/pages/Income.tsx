@@ -99,11 +99,71 @@ function calculateRecurringOccurrences(income: IncomeType, monthDate: Date): num
   }
 }
 
+// Helper function to check if income has ended based on end conditions
+function hasIncomeEnded(income: IncomeType, checkDate: Date): boolean {
+  if (!income.isRecurring || income.endCondition === 'none' || !income.endCondition) {
+    return false
+  }
+
+  if (income.endCondition === 'date' && income.endDate) {
+    const endDate = parseISO(income.endDate + 'T23:59:59')
+    return checkDate > endDate
+  }
+
+  // For occurrence-based ending, we need to count occurrences up to the check date
+  if (income.endCondition === 'occurrences' && income.totalOccurrences && income.expectedDate) {
+    const occurrencesSoFar = countOccurrencesUpToDate(income, checkDate)
+    return occurrencesSoFar >= income.totalOccurrences
+  }
+
+  return false
+}
+
+// Helper function to count total occurrences from start date up to a given date
+function countOccurrencesUpToDate(income: IncomeType, upToDate: Date): number {
+  if (!income.isRecurring || !income.expectedDate) {
+    return income.expectedDate ? 1 : 0
+  }
+
+  const startDate = parseISO(income.expectedDate + 'T12:00:00')
+  if (upToDate < startDate) {
+    return 0
+  }
+
+  switch (income.recurringFrequency) {
+    case 'weekly':
+    case 'bi-weekly':
+    case 'every-15-days': {
+      const interval = income.recurringFrequency === 'weekly' ? 7 :
+                      income.recurringFrequency === 'bi-weekly' ? 14 : 15
+      const daysDiff = differenceInDays(upToDate, startDate)
+      return Math.floor(daysDiff / interval) + 1
+    }
+    case 'monthly':
+    case 'same-day-each-month': {
+      // Count months between start and upToDate
+      const months = (upToDate.getFullYear() - startDate.getFullYear()) * 12 +
+                    (upToDate.getMonth() - startDate.getMonth())
+      // Add 1 if we've passed the day in the current month
+      const dayOfMonth = startDate.getDate()
+      const currentDayInMonth = upToDate.getDate()
+      return months + (currentDayInMonth >= dayOfMonth ? 1 : 0)
+    }
+    default:
+      return 1
+  }
+}
+
 // Helper function to get all expected dates for a recurring income in a given month
 function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
   const monthStart = startOfMonth(monthDate)
   const monthEnd = endOfMonth(monthDate)
   const dates: Date[] = []
+
+  // Check if income has ended before this month
+  if (hasIncomeEnded(income, monthStart)) {
+    return dates
+  }
 
   if (!income.isRecurring) {
     // One-time income: check if expected date falls in this month
@@ -114,6 +174,15 @@ function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
       }
     }
     return dates
+  }
+
+  // Get the effective end date for this income
+  let effectiveEndDate = monthEnd
+  if (income.endCondition === 'date' && income.endDate) {
+    const endDate = parseISO(income.endDate + 'T23:59:59')
+    if (endDate < monthEnd) {
+      effectiveEndDate = endDate
+    }
   }
 
   switch (income.recurringFrequency) {
@@ -129,16 +198,26 @@ function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
                       income.recurringFrequency === 'bi-weekly' ? 14 : 15
 
       // If start date is before this month, fast-forward to first occurrence in or after this month
+      let occurrenceCount = 0
       while (currentDate < monthStart) {
         currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+        occurrenceCount++
       }
 
-      // Collect all occurrences that fall within this month
-      while (currentDate <= monthEnd) {
+      // Collect all occurrences that fall within this month (respecting end conditions)
+      while (currentDate <= effectiveEndDate) {
+        // Check occurrence limit
+        if (income.endCondition === 'occurrences' && income.totalOccurrences) {
+          if (occurrenceCount >= income.totalOccurrences) {
+            break
+          }
+        }
+
         if (currentDate >= monthStart) {
           dates.push(new Date(currentDate))
         }
         currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
+        occurrenceCount++
       }
       break
     }
@@ -152,18 +231,29 @@ function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
           return dates
         }
 
+        // Check occurrence limit for monthly income
+        if (income.endCondition === 'occurrences' && income.totalOccurrences) {
+          const occurrencesSoFar = countOccurrencesUpToDate(income, monthStart)
+          if (occurrencesSoFar >= income.totalOccurrences) {
+            return dates
+          }
+        }
+
         // Get the day of month from the original expected date
         const dayOfMonth = startDate.getDate()
 
         // Create a date for this month with the same day
-        const thisMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayOfMonth, 12, 0, 0)
+        let thisMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayOfMonth, 12, 0, 0)
 
         // Handle edge case where day doesn't exist in this month (e.g., 31st in February)
-        if (thisMonthDate.getMonth() === monthDate.getMonth()) {
-          dates.push(thisMonthDate)
-        } else {
+        if (thisMonthDate.getMonth() !== monthDate.getMonth()) {
           // If the day overflowed to next month, use last day of current month
-          dates.push(endOfMonth(monthDate))
+          thisMonthDate = endOfMonth(monthDate)
+        }
+
+        // Check if this date is before the effective end date
+        if (thisMonthDate <= effectiveEndDate) {
+          dates.push(thisMonthDate)
         }
       }
       break
@@ -172,13 +262,34 @@ function getExpectedDatesForMonth(income: IncomeType, monthDate: Date): Date[] {
       // For unknown frequencies, try to show the original date if it's in this month
       if (income.expectedDate) {
         const expectedDate = parseISO(income.expectedDate + 'T12:00:00')
-        if (expectedDate >= monthStart && expectedDate <= monthEnd) {
+        if (expectedDate >= monthStart && expectedDate <= effectiveEndDate) {
           dates.push(expectedDate)
         }
       }
   }
 
   return dates
+}
+
+// Helper function to calculate expected income amount for a month
+// considering first occurrence amount for recurring income
+function getExpectedAmountForMonth(income: IncomeType, monthDate: Date): number {
+  const dates = getExpectedDatesForMonth(income, monthDate)
+  if (dates.length === 0) {
+    return 0
+  }
+
+  // If no first occurrence amount, all occurrences use the regular amount
+  if (!income.firstOccurrenceAmount || !income.isRecurring) {
+    return dates.length * (income.expectedAmount || 0)
+  }
+
+  // Calculate total considering first occurrence amount for the first occurrence each month
+  const regularAmount = income.expectedAmount || 0
+  const firstAmount = income.firstOccurrenceAmount
+
+  // First occurrence in the month uses firstOccurrenceAmount, rest use regularAmount
+  return firstAmount + (dates.length - 1) * regularAmount
 }
 
 export default function Income() {
@@ -1067,10 +1178,14 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
     categoryId: (income as any)?.categoryId || '',
     client: income?.client || '',
     expectedAmount: income?.expectedAmount?.toString() || '',
+    firstOccurrenceAmount: income?.firstOccurrenceAmount?.toString() || '',
     isRecurring: income?.isRecurring ?? true,
     recurringFrequency: income?.recurringFrequency || 'monthly',
     recurringDayOfMonth: income?.recurringDayOfMonth?.toString() || '1',
     expectedDate: income?.expectedDate || '',
+    endCondition: income?.endCondition || 'none',
+    endDate: income?.endDate || '',
+    totalOccurrences: income?.totalOccurrences?.toString() || '',
   })
 
   // Get income categories for the selected budget type
@@ -1086,8 +1201,12 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
       categoryId: formData.categoryId || undefined,
       client: formData.client || undefined,
       expectedAmount: parseFloat(formData.expectedAmount) || 0,
+      firstOccurrenceAmount: formData.firstOccurrenceAmount ? parseFloat(formData.firstOccurrenceAmount) : undefined,
       isRecurring: formData.isRecurring,
       expectedDate: formData.expectedDate || undefined,
+      endCondition: formData.endCondition || 'none',
+      endDate: formData.endCondition === 'date' ? formData.endDate : undefined,
+      totalOccurrences: formData.endCondition === 'occurrences' ? parseInt(formData.totalOccurrences) : undefined,
     }
 
     // Add recurring frequency options if recurring
@@ -1173,6 +1292,24 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
         />
       </div>
 
+      {/* First Occurrence Amount - only for recurring income */}
+      {formData.isRecurring && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">First Occurrence Amount (Optional)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.firstOccurrenceAmount}
+            onChange={(e) => setFormData({ ...formData, firstOccurrenceAmount: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="0.00"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            If the first occurrence each month has a different amount (e.g., extra deductions), enter it here
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="flex items-center gap-2">
           <input
@@ -1226,7 +1363,9 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Date</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {formData.isRecurring ? 'Start Date' : 'Expected Date'}
+        </label>
         <input
           type="date"
           value={formData.expectedDate}
@@ -1234,9 +1373,61 @@ function IncomeForm({ income, onSubmit, onCancel, defaultBudgetType }: IncomeFor
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <p className="text-sm text-gray-500 mt-1">
-          {formData.isRecurring ? 'Next expected date for this recurring income' : 'Expected date for this one-time income'}
+          {formData.isRecurring ? 'First expected date for this recurring income' : 'Expected date for this one-time income'}
         </p>
       </div>
+
+      {/* End Condition - only for recurring income */}
+      {formData.isRecurring && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">End Condition</label>
+          <select
+            value={formData.endCondition}
+            onChange={(e) => setFormData({ ...formData, endCondition: e.target.value as 'none' | 'date' | 'occurrences' })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="none">No End (Continues Indefinitely)</option>
+            <option value="date">End After Date</option>
+            <option value="occurrences">End After Number of Occurrences</option>
+          </select>
+        </div>
+      )}
+
+      {/* End Date - shown when endCondition is 'date' */}
+      {formData.isRecurring && formData.endCondition === 'date' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
+          <input
+            type="date"
+            value={formData.endDate}
+            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            This income will stop recurring after this date
+          </p>
+        </div>
+      )}
+
+      {/* Total Occurrences - shown when endCondition is 'occurrences' */}
+      {formData.isRecurring && formData.endCondition === 'occurrences' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Total Occurrences *</label>
+          <input
+            type="number"
+            min="1"
+            value={formData.totalOccurrences}
+            onChange={(e) => setFormData({ ...formData, totalOccurrences: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 12"
+            required
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            This income will stop recurring after this many total occurrences
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-end gap-3 pt-4">
         <button

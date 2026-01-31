@@ -207,8 +207,12 @@ export interface IncomeSource {
   incomeType: HouseholdIncomeType | BusinessIncomeType
   categoryId?: string // Link to income category
   expectedAmount: number
+  firstOccurrenceAmount?: number // Different amount for first occurrence of each month
   frequency: IncomeFrequency
-  nextExpectedDate?: string // ISO date string
+  nextExpectedDate?: string // ISO date string - start date for recurring income
+  endCondition?: 'none' | 'date' | 'occurrences' // How/when the recurring income ends
+  endDate?: string // ISO date string - stop recurring after this date
+  totalOccurrences?: number // Stop after this many total occurrences
   clientSource?: string // For business income tracking
   isActive: boolean
   createdAt: string
@@ -223,10 +227,14 @@ export interface Income {
   categoryId?: string // Link to income category
   client?: string // For business income - client/customer name
   expectedAmount?: number
+  firstOccurrenceAmount?: number // Different amount for first occurrence of each month
   isRecurring: boolean // Monthly recurring or one-time
   recurringFrequency?: 'weekly' | 'bi-weekly' | 'every-15-days' | 'monthly' | 'same-day-each-month' // How often it recurs
   recurringDayOfMonth?: number // 1-31, for same-day-each-month frequency
-  expectedDate?: string // ISO date string
+  expectedDate?: string // ISO date string - start date for recurring income
+  endCondition?: 'none' | 'date' | 'occurrences' // How/when the recurring income ends
+  endDate?: string // ISO date string - stop recurring after this date
+  totalOccurrences?: number // Stop after this many total occurrences
   createdAt?: string
   updatedAt?: string
 }

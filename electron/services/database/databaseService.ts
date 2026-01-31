@@ -932,9 +932,10 @@ class DatabaseService {
     const stmt = db.prepare(`
       INSERT INTO income_sources (
         id, profile_id, name, budget_type, income_type, category_id,
-        expected_amount, frequency, next_expected_date, client_source,
-        is_active, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        expected_amount, first_occurrence_amount, frequency, next_expected_date,
+        end_condition, end_date, total_occurrences,
+        client_source, is_active, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     stmt.run(
@@ -945,8 +946,12 @@ class DatabaseService {
       source.income_type,
       source.category_id || null,
       source.expected_amount || 0,
+      source.first_occurrence_amount || null,
       source.frequency,
       source.next_expected_date || null,
+      source.end_condition || 'none',
+      source.end_date || null,
+      source.total_occurrences || null,
       source.client_source || null,
       source.is_active !== undefined ? source.is_active : 1,
       now,

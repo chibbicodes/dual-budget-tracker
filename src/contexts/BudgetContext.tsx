@@ -390,7 +390,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ============================================================================
 
   const addTransaction = useCallback(
-    (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> & { linkingOption?: string }) => {
+    async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> & { linkingOption?: string }) => {
       const profileId = getProfileId()
       if (!profileId) {
         console.error('No active profile')
@@ -452,32 +452,39 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Validate destination account exists if provided (for transfers)
-      if (transactionWithoutLinking.toAccountId) {
-        const toAccount = appData.accounts.find(a => a.id === transactionWithoutLinking.toAccountId)
-        if (!toAccount) {
-          console.error('Destination account not found:', transactionWithoutLinking.toAccountId)
-          alert('The destination account does not exist. Please refresh the page and try again.')
-          return
-        }
+      const destAccount = transactionWithoutLinking.toAccountId
+        ? appData.accounts.find(a => a.id === transactionWithoutLinking.toAccountId)
+        : null
+      if (transactionWithoutLinking.toAccountId && !destAccount) {
+        console.error('Destination account not found:', transactionWithoutLinking.toAccountId)
+        alert('The destination account does not exist. Please refresh the page and try again.')
+        return
       }
 
       // Generate IDs upfront for linking
       const mainTransactionId = generateId()
       const pairedTransactionId = generateId()
 
+      // Determine if we need to link to a paired transaction (for create_paired option)
+      const shouldCreatePaired = transactionWithoutLinking.toAccountId && linkingOption === 'create_paired'
+
+      // Build main transaction with proper linkedTransactionId
       const newTransaction: Transaction = {
         ...transactionWithoutLinking,
         id: mainTransactionId,
         categoryId,
         bucketId,
         reconciled: transactionWithoutLinking.reconciled ?? false,
+        // For create_paired, link to the paired transaction we'll create
+        // For link_existing, keep the linkedTransactionId from form
+        linkedTransactionId: shouldCreatePaired ? pairedTransactionId : transactionWithoutLinking.linkedTransactionId,
         createdAt: now,
         updatedAt: now,
       }
 
       // Save main transaction to database
       try {
-        databaseService.createTransaction({
+        await databaseService.createTransaction({
           id: newTransaction.id,
           profile_id: profileId,
           date: newTransaction.date,
@@ -497,147 +504,135 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         })
       } catch (error) {
         console.error('Failed to create transaction in database:', error)
+        return
       }
 
+      // Update source account balance
+      const newSourceBalance = account.balance + transactionWithoutLinking.amount
+      try {
+        await databaseService.updateAccount(account.id, { balance: newSourceBalance })
+      } catch (error) {
+        console.error('Failed to update account balance in database:', error)
+      }
+
+      // Variables for paired/linked transaction handling
+      let depositTransaction: Transaction | null = null
+      let destNewBalance = destAccount?.balance || 0
+
+      // Handle transfer linking
+      if (transactionWithoutLinking.toAccountId && destAccount) {
+        if (linkingOption === 'create_paired') {
+          // Find the category for the paired transaction (should match budget type)
+          let pairedCategoryId = categoryId
+          let pairedBucketId = bucketId
+
+          // If the category doesn't match the destination budget type, try to find a matching Transfer/Payment category
+          const pairedCategory = appData.categories.find(c => c.id === categoryId && c.budgetType === destAccount.budgetType)
+          if (!pairedCategory) {
+            // Look for Transfer/Payment category in destination budget
+            const transferCategory = appData.categories.find(
+              c => c.name === 'Transfer/Payment' && c.budgetType === destAccount.budgetType
+            )
+            if (transferCategory) {
+              pairedCategoryId = transferCategory.id
+              pairedBucketId = transferCategory.bucketId
+            }
+          }
+
+          // Create paired transaction and link both
+          depositTransaction = {
+            ...transactionWithoutLinking,
+            id: pairedTransactionId,
+            accountId: transactionWithoutLinking.toAccountId,
+            amount: Math.abs(transactionWithoutLinking.amount), // Positive amount for deposit
+            categoryId: pairedCategoryId,
+            bucketId: pairedBucketId,
+            budgetType: destAccount.budgetType,
+            toAccountId: undefined, // Don't create circular reference
+            linkedTransactionId: mainTransactionId, // Link to source transaction
+            reconciled: transactionWithoutLinking.reconciled ?? false,
+            description: transactionWithoutLinking.description || 'Transfer from ' + account?.name,
+            createdAt: now,
+            updatedAt: now,
+          }
+
+          // Save paired transaction to database
+          try {
+            await databaseService.createTransaction({
+              id: depositTransaction.id,
+              profile_id: profileId,
+              date: depositTransaction.date,
+              description: depositTransaction.description,
+              amount: depositTransaction.amount,
+              category_id: depositTransaction.categoryId,
+              bucket_id: depositTransaction.bucketId,
+              budget_type: depositTransaction.budgetType,
+              account_id: depositTransaction.accountId,
+              to_account_id: depositTransaction.toAccountId,
+              linked_transaction_id: depositTransaction.linkedTransactionId,
+              project_id: depositTransaction.projectId,
+              income_source_id: depositTransaction.incomeSourceId,
+              tax_deductible: depositTransaction.taxDeductible ? 1 : 0,
+              reconciled: depositTransaction.reconciled ? 1 : 0,
+              notes: depositTransaction.notes,
+            })
+          } catch (error) {
+            console.error('Failed to create paired transaction in database:', error)
+          }
+
+          // Update destination account balance
+          destNewBalance = destAccount.balance + Math.abs(transactionWithoutLinking.amount)
+          try {
+            await databaseService.updateAccount(destAccount.id, { balance: destNewBalance })
+          } catch (error) {
+            console.error('Failed to update destination account balance in database:', error)
+          }
+        } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
+          // Link to existing transaction - update the existing transaction to link back to main
+          try {
+            await databaseService.updateTransaction(transactionWithoutLinking.linkedTransactionId, {
+              linked_transaction_id: mainTransactionId,
+            })
+          } catch (error) {
+            console.error('Failed to update existing transaction link in database:', error)
+          }
+        }
+      }
+
+      // Now update state with all the changes
       setAppDataState((prev) => {
         const transactions = [...prev.transactions, newTransaction]
         let accounts = prev.accounts
 
-        // Update source account balance
-        const sourceAccount = accounts.find((a) => a.id === transactionWithoutLinking.accountId)
-        if (sourceAccount) {
-          const newBalance = sourceAccount.balance + transactionWithoutLinking.amount
-          accounts = accounts.map((a) =>
-            a.id === sourceAccount.id
-              ? { ...a, balance: newBalance, updatedAt: now }
-              : a
-          )
-          // Persist balance to database
-          try {
-            databaseService.updateAccount(sourceAccount.id, { balance: newBalance })
-          } catch (error) {
-            console.error('Failed to update account balance in database:', error)
-          }
-        }
+        // Update source account balance in state
+        accounts = accounts.map((a) =>
+          a.id === account.id
+            ? { ...a, balance: newSourceBalance, updatedAt: now }
+            : a
+        )
 
-        // Handle transfer linking
-        if (transactionWithoutLinking.toAccountId) {
-          const destAccount = accounts.find((a) => a.id === transactionWithoutLinking.toAccountId)
-          if (destAccount) {
-            if (linkingOption === 'create_paired') {
-              // Find the category for the paired transaction (should match budget type)
-              let pairedCategoryId = categoryId
-              let pairedBucketId = bucketId
+        // Handle transfer state updates
+        if (transactionWithoutLinking.toAccountId && destAccount) {
+          if (linkingOption === 'create_paired' && depositTransaction) {
+            // Add paired transaction to state
+            transactions.push(depositTransaction)
 
-              // If the category doesn't match the destination budget type, try to find a matching Transfer/Payment category
-              const pairedCategory = appData.categories.find(c => c.id === categoryId && c.budgetType === destAccount.budgetType)
-              if (!pairedCategory) {
-                // Look for Transfer/Payment category in destination budget
-                const transferCategory = appData.categories.find(
-                  c => c.name === 'Transfer/Payment' && c.budgetType === destAccount.budgetType
-                )
-                if (transferCategory) {
-                  pairedCategoryId = transferCategory.id
-                  pairedBucketId = transferCategory.bucketId
-                }
-              }
-
-              // Create paired transaction and link both
-              const depositTransaction: Transaction = {
-                ...transactionWithoutLinking,
-                id: pairedTransactionId,
-                accountId: transactionWithoutLinking.toAccountId,
-                amount: Math.abs(transactionWithoutLinking.amount), // Positive amount for deposit
-                categoryId: pairedCategoryId,
-                bucketId: pairedBucketId,
-                budgetType: destAccount.budgetType,
-                toAccountId: undefined, // Don't create circular reference
-                linkedTransactionId: mainTransactionId, // Link to source transaction
-                reconciled: transactionWithoutLinking.reconciled ?? false,
-                description: transactionWithoutLinking.description || 'Transfer from ' + sourceAccount?.name,
-                createdAt: now,
+            // Update destination account balance in state
+            accounts = accounts.map((a) =>
+              a.id === destAccount.id
+                ? { ...a, balance: destNewBalance, updatedAt: now }
+                : a
+            )
+          } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
+            // Update existing transaction in state to link back
+            const existingTxIndex = transactions.findIndex(t => t.id === transactionWithoutLinking.linkedTransactionId)
+            if (existingTxIndex >= 0) {
+              transactions[existingTxIndex] = {
+                ...transactions[existingTxIndex],
+                linkedTransactionId: mainTransactionId,
                 updatedAt: now,
               }
-              transactions.push(depositTransaction)
-
-              // Save paired transaction to database
-              try {
-                databaseService.createTransaction({
-                  id: depositTransaction.id,
-                  profile_id: profileId,
-                  date: depositTransaction.date,
-                  description: depositTransaction.description,
-                  amount: depositTransaction.amount,
-                  category_id: depositTransaction.categoryId,
-                  bucket_id: depositTransaction.bucketId,
-                  budget_type: depositTransaction.budgetType,
-                  account_id: depositTransaction.accountId,
-                  to_account_id: depositTransaction.toAccountId,
-                  linked_transaction_id: depositTransaction.linkedTransactionId,
-                  project_id: depositTransaction.projectId,
-                  income_source_id: depositTransaction.incomeSourceId,
-                  tax_deductible: depositTransaction.taxDeductible ? 1 : 0,
-                  reconciled: depositTransaction.reconciled ? 1 : 0,
-                  notes: depositTransaction.notes,
-                })
-              } catch (error) {
-                console.error('Failed to create paired transaction in database:', error)
-              }
-
-              // Update main transaction to link to paired transaction
-              const mainTxIndex = transactions.findIndex(t => t.id === mainTransactionId)
-              if (mainTxIndex >= 0) {
-                transactions[mainTxIndex] = {
-                  ...transactions[mainTxIndex],
-                  linkedTransactionId: pairedTransactionId,
-                }
-                // Update main transaction in database with link
-                try {
-                  databaseService.updateTransaction(mainTransactionId, {
-                    linked_transaction_id: pairedTransactionId,
-                  })
-                } catch (error) {
-                  console.error('Failed to update main transaction link in database:', error)
-                }
-              }
-
-              // Update destination account balance
-              const destNewBalance = destAccount.balance + Math.abs(transactionWithoutLinking.amount)
-              accounts = accounts.map((a) =>
-                a.id === destAccount.id
-                  ? { ...a, balance: destNewBalance, updatedAt: now }
-                  : a
-              )
-              // Persist destination account balance to database
-              try {
-                databaseService.updateAccount(destAccount.id, { balance: destNewBalance })
-              } catch (error) {
-                console.error('Failed to update destination account balance in database:', error)
-              }
-            } else if (linkingOption === 'link_existing' && transactionWithoutLinking.linkedTransactionId) {
-              // Link to existing transaction - update both
-              const existingTx = prev.transactions.find(t => t.id === transactionWithoutLinking.linkedTransactionId)
-              if (existingTx) {
-                // Update existing transaction to link back
-                const existingTxIndex = transactions.findIndex(t => t.id === existingTx.id)
-                if (existingTxIndex >= 0) {
-                  transactions[existingTxIndex] = {
-                    ...transactions[existingTxIndex],
-                    linkedTransactionId: mainTransactionId,
-                    updatedAt: now,
-                  }
-                  // Update in database
-                  try {
-                    databaseService.updateTransaction(existingTx.id, {
-                      linked_transaction_id: mainTransactionId,
-                    })
-                  } catch (error) {
-                    console.error('Failed to update existing transaction link in database:', error)
-                  }
-                }
-              }
             }
-            // If linkingOption is 'no_link', don't create paired transaction (no balance update for dest account)
           }
         }
 
@@ -687,7 +682,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateTransaction = useCallback(
-    (id: string, updates: Partial<Transaction>) => {
+    async (id: string, updates: Partial<Transaction>) => {
       // Update in database
       try {
         const dbUpdates: any = {}
@@ -706,7 +701,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (updates.reconciled !== undefined) dbUpdates.reconciled = updates.reconciled ? 1 : 0
         if (updates.notes !== undefined) dbUpdates.notes = updates.notes
 
-        databaseService.updateTransaction(id, dbUpdates)
+        await databaseService.updateTransaction(id, dbUpdates)
       } catch (error) {
         console.error('Failed to update transaction in database:', error)
       }
@@ -751,10 +746,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     [updateAccount]
   )
 
-  const deleteTransaction = useCallback((id: string) => {
+  const deleteTransaction = useCallback(async (id: string) => {
     // Delete from database
     try {
-      databaseService.deleteTransaction(id)
+      await databaseService.deleteTransaction(id)
     } catch (error) {
       console.error('Failed to delete transaction from database:', error)
     }

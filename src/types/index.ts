@@ -475,9 +475,9 @@ export interface BudgetContextState {
   deleteAccount: (id: string) => void
 
   // Transaction operations
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => void
-  updateTransaction: (id: string, updates: Partial<Transaction>) => void
-  deleteTransaction: (id: string) => void
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>
+  deleteTransaction: (id: string) => Promise<void>
 
   // Category operations
   addCategory: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => void

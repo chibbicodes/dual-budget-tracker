@@ -189,9 +189,9 @@ export default function Transactions() {
     return grouped
   }, [appData.categories, currentView, budgetFilter])
 
-  const handleAddTransaction = (transactionData: any) => {
+  const handleAddTransaction = async (transactionData: any) => {
     // BudgetContext's addTransaction now handles all linking logic
-    addTransaction(transactionData)
+    await addTransaction(transactionData)
     setIsAddModalOpen(false)
   }
 

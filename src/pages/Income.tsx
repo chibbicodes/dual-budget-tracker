@@ -32,77 +32,6 @@ function incomeSourceToLegacy(source: IncomeSource): IncomeType {
   }
 }
 
-// Helper function to calculate recurring income occurrences in a month
-function calculateRecurringOccurrences(income: IncomeType, monthDate: Date): number {
-  if (!income.isRecurring) {
-    // One-time income: check if expected date falls in this month
-    if (income.expectedDate) {
-      const expectedDate = parseISO(income.expectedDate + 'T12:00:00')
-      const monthStart = startOfMonth(monthDate)
-      const monthEnd = endOfMonth(monthDate)
-      return expectedDate >= monthStart && expectedDate <= monthEnd ? 1 : 0
-    }
-    return 0
-  }
-
-  const monthStart = startOfMonth(monthDate)
-  const monthEnd = endOfMonth(monthDate)
-
-  switch (income.recurringFrequency) {
-    case 'weekly':
-    case 'bi-weekly':
-    case 'every-15-days': {
-      // For these frequencies, we need to count actual occurrences
-      if (!income.expectedDate) {
-        // Fallback to old logic if no start date specified
-        const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
-        const interval = income.recurringFrequency === 'weekly' ? 7 :
-                        income.recurringFrequency === 'bi-weekly' ? 14 : 15
-        return Math.floor(daysInMonth / interval)
-      }
-
-      // Count actual occurrences starting from expected date
-      let count = 0
-      let currentDate = parseISO(income.expectedDate + 'T12:00:00')
-      const interval = income.recurringFrequency === 'weekly' ? 7 :
-                      income.recurringFrequency === 'bi-weekly' ? 14 : 15
-
-      // If start date is before this month, fast-forward to first occurrence in or after this month
-      while (currentDate < monthStart) {
-        currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
-      }
-
-      // Count occurrences that fall within this month
-      while (currentDate <= monthEnd) {
-        if (currentDate >= monthStart) {
-          count++
-        }
-        // Add interval days to get next occurrence
-        currentDate = new Date(currentDate.getTime() + interval * 24 * 60 * 60 * 1000)
-      }
-
-      return count
-    }
-    case 'monthly':
-    case 'same-day-each-month': {
-      // Check if this income source has started by the selected month
-      if (income.expectedDate) {
-        const startDate = parseISO(income.expectedDate + 'T12:00:00')
-
-        // If the start date is after this month, return 0
-        if (startDate > endOfMonth(monthDate)) {
-          return 0
-        }
-      }
-      // Once per month
-      return 1
-    }
-    default:
-      // Default to once per month if frequency is unknown
-      return 1
-  }
-}
-
 // Helper function to check if income has ended based on end conditions
 function hasIncomeEnded(income: IncomeType, checkDate: Date): boolean {
   if (!income.isRecurring || income.endCondition === 'none' || !income.endCondition) {
@@ -530,7 +459,7 @@ export default function Income() {
         incomeType: income.budgetType === 'household' ? 'salary' as const : 'services' as const,
         categoryId: income.categoryId,
         expectedAmount: income.expectedAmount || 0,
-        firstOccurrenceAmount: income.firstOccurrenceAmount || null,
+        firstOccurrenceAmount: income.firstOccurrenceAmount || undefined,
         frequency: income.isRecurring
           ? (income.recurringFrequency === 'bi-weekly' ? 'biweekly' as const
              : income.recurringFrequency === 'same-day-each-month' ? 'monthly' as const
@@ -538,8 +467,8 @@ export default function Income() {
           : 'irregular' as const,
         nextExpectedDate: income.expectedDate,
         endCondition: income.endCondition || 'none',
-        endDate: income.endDate || null,
-        totalOccurrences: income.totalOccurrences || null,
+        endDate: income.endDate || undefined,
+        totalOccurrences: income.totalOccurrences || undefined,
         clientSource: income.client,
       }
       await updateIncomeSource(editingIncome.id, updates)

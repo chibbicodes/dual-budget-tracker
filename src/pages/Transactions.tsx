@@ -1890,6 +1890,7 @@ function TransactionForm({
     categoryId: transaction?.categoryId || '',
     budgetType: transaction?.budgetType || defaultBudgetType,
     taxDeductible: transaction?.taxDeductible || false,
+    reconciled: transaction?.reconciled || false,
     incomeSourceId: transaction?.incomeSourceId || '',
     projectId: transaction?.projectId || '',
     notes: transaction?.notes || '',
@@ -2094,6 +2095,7 @@ function TransactionForm({
       categoryId: formData.categoryId || 'uncategorized',
       budgetType: formData.budgetType,
       taxDeductible: formData.taxDeductible,
+      reconciled: formData.reconciled,
       notes: formData.notes || undefined,
     }
 
@@ -2517,6 +2519,25 @@ function TransactionForm({
             </label>
           </div>
         )}
+
+        {/* Reconciled */}
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="reconciled"
+            checked={formData.reconciled}
+            onChange={(e) =>
+              setFormData({ ...formData, reconciled: e.target.checked })
+            }
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label
+            htmlFor="reconciled"
+            className="ml-2 text-sm font-medium text-gray-700"
+          >
+            Reconciled
+          </label>
+        </div>
       </div>
 
       {/* Notes */}

@@ -299,6 +299,7 @@ export default function Income() {
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState<IncomeType | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
+  const [showEndedIncome, setShowEndedIncome] = useState(false)
 
   // Generate month options (3 months prior to 3 months future)
   const monthOptions = useMemo(() => {
@@ -331,11 +332,17 @@ export default function Income() {
       income = income.filter((i) => i.budgetType === budgetFilter)
     }
 
-    // Convert to legacy format for display and sort
-    return income
-      .map(incomeSourceToLegacy)
-      .sort((a, b) => a.source.localeCompare(b.source))
-  }, [appData.incomeSources, currentView, budgetFilter])
+    // Convert to legacy format for display
+    let legacyIncome = income.map(incomeSourceToLegacy)
+
+    // Filter out ended income sources unless showEndedIncome is true
+    if (!showEndedIncome) {
+      legacyIncome = legacyIncome.filter((i) => !hasIncomeEnded(i, new Date()))
+    }
+
+    // Sort by source name
+    return legacyIncome.sort((a, b) => a.source.localeCompare(b.source))
+  }, [appData.incomeSources, currentView, budgetFilter, showEndedIncome])
 
   // Filter income sources for the selected month (only show sources expected in that month)
   const filteredIncomeForMonth = useMemo(() => {
@@ -835,6 +842,17 @@ export default function Income() {
             </div>
           )}
 
+          {/* Show Ended Income Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showEndedIncome}
+              onChange={(e) => setShowEndedIncome(e.target.checked)}
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Show Ended</span>
+          </label>
+
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
@@ -1077,13 +1095,20 @@ export default function Income() {
                           <BudgetBadge budgetType={income.budgetType} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              income.isRecurring ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {income.isRecurring ? 'Recurring' : 'One-time'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                income.isRecurring ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {income.isRecurring ? 'Recurring' : 'One-time'}
+                            </span>
+                            {hasIncomeEnded(income, new Date()) && (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                Ended
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatCurrency(income.expectedAmount || 0)}

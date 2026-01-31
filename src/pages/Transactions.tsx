@@ -16,7 +16,7 @@ import {
 import { formatCurrency } from '../utils/calculations'
 import { format, parseISO } from 'date-fns'
 import { exportToCSV, exportToPDF } from '../utils/export'
-import type { Transaction, BudgetType, Account } from '../types'
+import type { Transaction, BudgetType, Account, IncomeSource, Project } from '../types'
 
 type BudgetFilter = 'household' | 'business' | 'all'
 type TransactionTypeFilter = 'all' | 'income' | 'expense'

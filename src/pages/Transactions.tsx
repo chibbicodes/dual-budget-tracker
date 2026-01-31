@@ -195,10 +195,32 @@ export default function Transactions() {
     setIsAddModalOpen(false)
   }
 
-  const handleEditTransaction = (updates: Partial<Transaction>) => {
+  const handleEditTransaction = async (updates: Partial<Transaction>) => {
     if (!selectedTransaction) return
 
-    // Check if this transaction is linked
+    // Check if we're creating a NEW link (linkedTransactionId is being set but wasn't set before)
+    const isCreatingNewLink = updates.linkedTransactionId && !selectedTransaction.linkedTransactionId
+
+    if (isCreatingNewLink && updates.linkedTransactionId) {
+      console.log('Creating new link from edit:', {
+        currentTransaction: selectedTransaction.id,
+        linkingTo: updates.linkedTransactionId,
+      })
+
+      // Update current transaction with the new linkedTransactionId
+      await updateTransaction(selectedTransaction.id, updates)
+
+      // Update the target transaction to link back to this one
+      await updateTransaction(updates.linkedTransactionId, {
+        linkedTransactionId: selectedTransaction.id,
+      })
+
+      setIsEditModalOpen(false)
+      setSelectedTransaction(null)
+      return
+    }
+
+    // Check if this transaction is already linked
     if (selectedTransaction.linkedTransactionId) {
       const linkedTx = appData.transactions.find(t => t.id === selectedTransaction.linkedTransactionId)
       if (linkedTx) {
@@ -212,7 +234,7 @@ export default function Transactions() {
 
         if (updateBoth) {
           // Update both transactions with synced fields
-          updateTransaction(selectedTransaction.id, updates)
+          await updateTransaction(selectedTransaction.id, updates)
 
           // Create updates for linked transaction (sync certain fields)
           const linkedUpdates: Partial<Transaction> = {}
@@ -227,11 +249,11 @@ export default function Transactions() {
           if (updates.taxDeductible !== undefined) linkedUpdates.taxDeductible = updates.taxDeductible
 
           if (Object.keys(linkedUpdates).length > 0) {
-            updateTransaction(selectedTransaction.linkedTransactionId, linkedUpdates)
+            await updateTransaction(selectedTransaction.linkedTransactionId, linkedUpdates)
           }
         } else {
           // Update only this transaction
-          updateTransaction(selectedTransaction.id, updates)
+          await updateTransaction(selectedTransaction.id, updates)
         }
 
         setIsEditModalOpen(false)
@@ -241,7 +263,7 @@ export default function Transactions() {
     }
 
     // No linked transaction, proceed with normal update
-    updateTransaction(selectedTransaction.id, updates)
+    await updateTransaction(selectedTransaction.id, updates)
     setIsEditModalOpen(false)
     setSelectedTransaction(null)
   }

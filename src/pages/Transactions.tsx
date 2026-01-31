@@ -34,6 +34,7 @@ export default function Transactions() {
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>('all')
+  const [reconciledFilter, setReconciledFilter] = useState<'all' | 'reconciled' | 'unreconciled'>('all')
   const [searchText, setSearchText] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -98,6 +99,13 @@ export default function Transactions() {
       transactions = transactions.filter((t) => t.amount < 0)
     }
 
+    // Apply reconciled filter
+    if (reconciledFilter === 'reconciled') {
+      transactions = transactions.filter((t) => t.reconciled === true)
+    } else if (reconciledFilter === 'unreconciled') {
+      transactions = transactions.filter((t) => !t.reconciled)
+    }
+
     // Apply date range filter
     if (startDate) {
       transactions = transactions.filter((t) => t.date >= startDate)
@@ -125,6 +133,7 @@ export default function Transactions() {
     accountFilter,
     categoryFilter,
     transactionTypeFilter,
+    reconciledFilter,
     startDate,
     endDate,
     searchText,
@@ -978,6 +987,22 @@ export default function Transactions() {
               <option value="all">All Transactions</option>
               <option value="income">Income Only</option>
               <option value="expense">Expenses Only</option>
+            </select>
+          </div>
+
+          {/* Reconciled Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Reconciled Status
+            </label>
+            <select
+              value={reconciledFilter}
+              onChange={(e) => setReconciledFilter(e.target.value as 'all' | 'reconciled' | 'unreconciled')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              <option value="reconciled">Reconciled</option>
+              <option value="unreconciled">Unreconciled</option>
             </select>
           </div>
 

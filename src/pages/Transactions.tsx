@@ -210,10 +210,25 @@ export default function Transactions() {
       // Update current transaction with the new linkedTransactionId
       await updateTransaction(selectedTransaction.id, updates)
 
-      // Update the target transaction to link back to this one
-      await updateTransaction(updates.linkedTransactionId, {
-        linkedTransactionId: selectedTransaction.id,
-      })
+      // Find the linked transaction to get its budget type
+      const linkedTx = appData.transactions.find(t => t.id === updates.linkedTransactionId)
+      if (linkedTx) {
+        // Find the Transfer/Payment category for the linked transaction's budget type
+        const transferCategory = appData.categories.find(
+          c => c.name === 'Transfer/Payment' && c.budgetType === linkedTx.budgetType
+        )
+
+        // Update the target transaction to link back and change category to Transfer/Payment
+        const linkedUpdates: Partial<Transaction> = {
+          linkedTransactionId: selectedTransaction.id,
+        }
+        if (transferCategory) {
+          linkedUpdates.categoryId = transferCategory.id
+          linkedUpdates.bucketId = transferCategory.bucketId
+        }
+
+        await updateTransaction(updates.linkedTransactionId, linkedUpdates)
+      }
 
       setIsEditModalOpen(false)
       setSelectedTransaction(null)
@@ -1858,7 +1873,8 @@ function TransactionForm({
     incomeSourceId: transaction?.incomeSourceId || '',
     projectId: transaction?.projectId || '',
     notes: transaction?.notes || '',
-    linkingOption: 'create_paired' as 'create_paired' | 'link_existing' | 'no_link',
+    // If transaction already has a linkedTransactionId, show it as "link_existing"
+    linkingOption: (transaction?.linkedTransactionId ? 'link_existing' : 'create_paired') as 'create_paired' | 'link_existing' | 'no_link',
     linkedTransactionId: transaction?.linkedTransactionId || '',
   }))
 

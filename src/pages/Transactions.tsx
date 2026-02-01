@@ -389,9 +389,28 @@ export default function Transactions() {
     setIsBulkEditModalOpen(true)
   }
 
-  const handleBulkEdit = (updates: Partial<Transaction>) => {
+  const handleBulkEdit = (updates: Partial<Transaction> & { _transactionType?: 'income' | 'expense' }) => {
+    const { _transactionType, ...regularUpdates } = updates
+
     selectedTransactionIds.forEach((id) => {
-      updateTransaction(id, updates)
+      const transaction = appData.transactions.find(t => t.id === id)
+      if (!transaction) return
+
+      const finalUpdates = { ...regularUpdates }
+
+      // If transaction type is being changed, adjust the amount sign
+      if (_transactionType) {
+        const currentAmount = transaction.amount
+        const isCurrentlyIncome = currentAmount >= 0
+        const shouldBeIncome = _transactionType === 'income'
+
+        // Only change if the type is actually different
+        if (isCurrentlyIncome !== shouldBeIncome) {
+          finalUpdates.amount = -currentAmount // Flip the sign
+        }
+      }
+
+      updateTransaction(id, finalUpdates)
     })
     setSelectedTransactionIds(new Set())
     setIsBulkEditModalOpen(false)
@@ -2581,7 +2600,7 @@ interface BulkEditFormProps {
   categories: any[]
   incomeSources: IncomeSource[]
   projects: Project[]
-  onSubmit: (updates: Partial<Transaction>) => void
+  onSubmit: (updates: Partial<Transaction> & { _transactionType?: 'income' | 'expense' }) => void
   onCancel: () => void
 }
 
@@ -2590,6 +2609,7 @@ function BulkEditForm({ transactionCount, accounts, categories, incomeSources, p
     date?: string
     description?: string
     amount?: string
+    transactionType?: 'income' | 'expense'
     categoryId?: string
     accountId?: string
     budgetType?: BudgetType
@@ -2639,7 +2659,7 @@ function BulkEditForm({ transactionCount, accounts, categories, incomeSources, p
     e.preventDefault()
 
     // Only include fields that have been set
-    const updates: Partial<Transaction> = {}
+    const updates: Partial<Transaction> & { _transactionType?: 'income' | 'expense' } = {}
     if (formData.date) updates.date = formData.date
     if (formData.description) updates.description = formData.description
     if (formData.amount) {
@@ -2648,6 +2668,7 @@ function BulkEditForm({ transactionCount, accounts, categories, incomeSources, p
         updates.amount = amount
       }
     }
+    if (formData.transactionType) updates._transactionType = formData.transactionType
     if (formData.categoryId) updates.categoryId = formData.categoryId
     if (formData.accountId) updates.accountId = formData.accountId
     if (formData.budgetType) updates.budgetType = formData.budgetType
@@ -2738,6 +2759,25 @@ function BulkEditForm({ transactionCount, accounts, categories, incomeSources, p
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Transaction Type */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Transaction Type (optional)
+        </label>
+        <select
+          value={formData.transactionType || ''}
+          onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'income' | 'expense' || undefined })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Keep Current --</option>
+          <option value="income">Income (positive amount)</option>
+          <option value="expense">Expense (negative amount)</option>
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Changing this will flip the sign of the transaction amount
+        </p>
       </div>
 
       {/* Category */}

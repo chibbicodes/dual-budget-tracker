@@ -399,10 +399,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
       const now = new Date().toISOString()
 
-      // Extract linking option
+      // Extract linking option and transfer direction
       const linkingOption = (transaction as any).linkingOption || 'create_paired'
+      const transferDirection = (transaction as any).transferDirection || 'out'
       const transactionWithoutLinking = { ...transaction }
       delete (transactionWithoutLinking as any).linkingOption
+      delete (transactionWithoutLinking as any).transferDirection
 
       // Validate account exists
       const account = appData.accounts.find(a => a.id === transactionWithoutLinking.accountId)
@@ -522,32 +524,42 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       // Handle transfer linking
       if (transactionWithoutLinking.toAccountId && destAccount) {
         if (linkingOption === 'create_paired') {
-          // Find the Transfer income category for the paired/receiving transaction
-          // The receiving transaction (money coming in) should always use the Transfer income category
+          // Find the Transfer/Payment category for the paired/receiving transaction
+          // Both sides of a transfer should use Transfer/Payment (excludeFromBudget) so they
+          // don't count as income or expenses in budget calculations
           let pairedCategoryId = categoryId
           let pairedBucketId = bucketId
 
-          const transferIncomeCategory = appData.categories.find(
-            c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === destAccount.budgetType
+          const transferPaymentCategory = appData.categories.find(
+            c => c.name === 'Transfer/Payment' && c.excludeFromBudget && c.budgetType === destAccount.budgetType
           )
-          if (transferIncomeCategory) {
-            pairedCategoryId = transferIncomeCategory.id
-            pairedBucketId = transferIncomeCategory.bucketId
+          if (transferPaymentCategory) {
+            pairedCategoryId = transferPaymentCategory.id
+            pairedBucketId = transferPaymentCategory.bucketId
           }
 
           // Create paired transaction and link both
+          // For "transfer out": main = negative (withdrawal), paired = positive (deposit)
+          // For "transfer in": main = positive (deposit), paired = negative (withdrawal)
+          const pairedAmount = transferDirection === 'in'
+            ? -Math.abs(transactionWithoutLinking.amount)  // Paired is withdrawal from other account
+            : Math.abs(transactionWithoutLinking.amount)   // Paired is deposit to other account
+          const pairedDescription = transferDirection === 'in'
+            ? (transactionWithoutLinking.description || 'Transfer to ' + account?.name)
+            : (transactionWithoutLinking.description || 'Transfer from ' + account?.name)
+
           depositTransaction = {
             ...transactionWithoutLinking,
             id: pairedTransactionId,
             accountId: transactionWithoutLinking.toAccountId,
-            amount: Math.abs(transactionWithoutLinking.amount), // Positive amount for deposit
+            amount: pairedAmount,
             categoryId: pairedCategoryId,
             bucketId: pairedBucketId,
             budgetType: destAccount.budgetType,
             toAccountId: undefined, // Don't create circular reference
             linkedTransactionId: mainTransactionId, // Link to source transaction
             reconciled: transactionWithoutLinking.reconciled ?? false,
-            description: transactionWithoutLinking.description || 'Transfer from ' + account?.name,
+            description: pairedDescription,
             createdAt: now,
             updatedAt: now,
           }
@@ -576,8 +588,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
             console.error('Failed to create paired transaction in database:', error)
           }
 
-          // Update destination account balance
-          destNewBalance = destAccount.balance + Math.abs(transactionWithoutLinking.amount)
+          // Update destination account balance (paired amount has the correct sign)
+          destNewBalance = destAccount.balance + pairedAmount
           try {
             await databaseService.updateAccount(destAccount.id, { balance: destNewBalance })
           } catch (error) {
@@ -588,16 +600,16 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           // Find the linked transaction to get its budget type
           const linkedTx = appData.transactions.find(t => t.id === transactionWithoutLinking.linkedTransactionId)
 
-          // Find the Transfer income category for the linked transaction
+          // Find the Transfer/Payment category for the linked transaction
           const transferCategory = linkedTx ? appData.categories.find(
-            c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === linkedTx.budgetType
+            c => c.name === 'Transfer/Payment' && c.excludeFromBudget && c.budgetType === linkedTx.budgetType
           ) : null
 
           try {
             const updateData: any = {
               linked_transaction_id: mainTransactionId,
             }
-            // Update the receiving transaction's category to Transfer income category
+            // Update the receiving transaction's category to Transfer/Payment
             if (transferCategory) {
               updateData.category_id = transferCategory.id
               updateData.bucket_id = transferCategory.bucketId

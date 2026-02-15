@@ -208,10 +208,10 @@ export default function Transactions() {
       // Find the linked transaction to get its budget type
       const linkedTx = appData.transactions.find(t => t.id === updates.linkedTransactionId)
       if (linkedTx) {
-        // Find the Transfer income category for the linked transaction's budget type
-        // The receiving transaction (money-coming-in) should use the "Transfer" income category
+        // Find the Transfer/Payment category for the linked transaction's budget type
+        // Both sides of a transfer should use Transfer/Payment (excludeFromBudget)
         const transferCategory = appData.categories.find(
-          c => c.name === 'Transfer' && c.isIncomeCategory && c.budgetType === linkedTx.budgetType
+          c => c.name === 'Transfer/Payment' && c.excludeFromBudget && c.budgetType === linkedTx.budgetType
         )
 
         // Update the target transaction to link back and change category to Transfer
@@ -1904,6 +1904,8 @@ function TransactionForm({
     description: transaction?.description || '',
     amount: transaction?.amount ? Math.abs(transaction.amount).toString() : '',
     transactionType: transaction?.toAccountId ? 'transfer' : transaction?.amount ? (transaction.amount >= 0 ? 'income' : 'expense') : 'expense',
+    // For transfers: 'out' = money leaving this account, 'in' = money coming into this account
+    transferDirection: (transaction?.toAccountId && transaction?.amount && transaction.amount > 0 ? 'in' : 'out') as 'in' | 'out',
     accountId: transaction?.accountId || '',
     toAccountId: transaction?.toAccountId || '',
     categoryId: transaction?.categoryId || '',
@@ -1973,7 +1975,7 @@ function TransactionForm({
     return false
   }, [formData.transactionType, formData.toAccountId, formData.accountId, accounts])
 
-  // Find potential matching transactions for linking (opposite amount in destination account)
+  // Find potential matching transactions for linking (opposite amount in the other account)
   const potentialMatches = useMemo(() => {
     if (formData.transactionType !== 'transfer' || !formData.toAccountId || !formData.amount) {
       return []
@@ -1982,17 +1984,23 @@ function TransactionForm({
     const transferAmount = parseFloat(formData.amount)
     if (isNaN(transferAmount)) return []
 
-    // Look for transactions in the destination account with opposite amount
     const oppositeAmount = Math.abs(transferAmount)
 
     return appData.transactions
       .filter((t) => {
-        // Must be in the destination account
+        // Must be in the other account
         if (t.accountId !== formData.toAccountId) return false
 
-        // Must have opposite amount (positive, since we're looking for inflow to destination)
+        // Must have matching absolute amount
         if (Math.abs(t.amount) !== oppositeAmount) return false
-        if (t.amount <= 0) return false // Must be positive (inflow)
+
+        // For "transfer out": look for positive (inflow) transactions in destination
+        // For "transfer in": look for negative (outflow) transactions in source
+        if (formData.transferDirection === 'in') {
+          if (t.amount >= 0) return false // Must be negative (outflow from source)
+        } else {
+          if (t.amount <= 0) return false // Must be positive (inflow to destination)
+        }
 
         // Should not already be linked (unless it's the current transaction being edited)
         if (t.linkedTransactionId && t.id !== transaction?.linkedTransactionId) return false
@@ -2003,7 +2011,7 @@ function TransactionForm({
         return true
       })
       .sort((a, b) => b.date.localeCompare(a.date)) // Sort by date, newest first
-  }, [formData.transactionType, formData.toAccountId, formData.amount, appData.transactions, transaction])
+  }, [formData.transactionType, formData.transferDirection, formData.toAccountId, formData.amount, appData.transactions, transaction])
 
 
   // Show all accounts (cross-view access)
@@ -2103,7 +2111,9 @@ function TransactionForm({
     } else if (formData.transactionType === 'expense') {
       signedAmount = -Math.abs(amount)
     } else if (formData.transactionType === 'transfer') {
-      signedAmount = -Math.abs(amount) // Deduct from source account
+      // Transfer Out = money leaving this account (negative)
+      // Transfer In = money coming into this account (positive)
+      signedAmount = formData.transferDirection === 'in' ? Math.abs(amount) : -Math.abs(amount)
     }
 
     const transactionData: any = {
@@ -2128,9 +2138,10 @@ function TransactionForm({
       transactionData.projectId = formData.projectId
     }
 
-    // Add toAccountId and linking info for transfers
+    // Add toAccountId, direction, and linking info for transfers
     if (formData.transactionType === 'transfer' && formData.toAccountId) {
       transactionData.toAccountId = formData.toAccountId
+      transactionData.transferDirection = formData.transferDirection
 
       // Add linking information
       transactionData.linkingOption = formData.linkingOption
@@ -2217,6 +2228,39 @@ function TransactionForm({
               </span>
             </label>
           </div>
+
+          {/* Transfer Direction Toggle */}
+          {formData.transactionType === 'transfer' && (
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="text-sm text-gray-600">Direction:</span>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="transferDirection"
+                  value="out"
+                  checked={formData.transferDirection === 'out'}
+                  onChange={() => setFormData({ ...formData, transferDirection: 'out' })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">
+                  Transfer Out (money leaving this account)
+                </span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="transferDirection"
+                  value="in"
+                  checked={formData.transferDirection === 'in'}
+                  onChange={() => setFormData({ ...formData, transferDirection: 'in' })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">
+                  Transfer In (money coming into this account)
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* To/From (Vendor/Payee) */}
@@ -2284,7 +2328,7 @@ function TransactionForm({
         {/* Account */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {formData.transactionType === 'transfer' ? 'From Account *' : 'Account *'}
+            {formData.transactionType === 'transfer' ? (formData.transferDirection === 'out' ? 'From Account *' : 'To Account (receiving) *') : 'Account *'}
           </label>
           <select
             required
@@ -2301,11 +2345,11 @@ function TransactionForm({
           </select>
         </div>
 
-        {/* To Account (for transfers only) */}
+        {/* Other Account (for transfers only) */}
         {formData.transactionType === 'transfer' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              To Account *
+              {formData.transferDirection === 'out' ? 'To Account *' : 'From Account (source) *'}
             </label>
             <select
               required
@@ -2313,7 +2357,7 @@ function TransactionForm({
               onChange={(e) => setFormData({ ...formData, toAccountId: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">Select destination account...</option>
+              <option value="">{formData.transferDirection === 'out' ? 'Select destination account...' : 'Select source account...'}</option>
               {filteredAccounts
                 .filter((account) => account.id !== formData.accountId)
                 .map((account) => (

@@ -316,8 +316,10 @@ export default function Income() {
         const transDate = new Date(t.date)
 
         // Exclude transactions with categories marked as excludeFromBudget (e.g., transfers)
+        // but still include income categories (which have excludeFromBudget set to keep them
+        // out of expense budget calculations, but should still count as actual income here)
         const category = appData.categories.find((c) => c.id === t.categoryId)
-        if (category?.excludeFromBudget) return false
+        if (category?.excludeFromBudget && !category?.isIncomeCategory) return false
 
         // For transfers, check the destination account's budget type
         if (t.toAccountId) {
@@ -369,6 +371,10 @@ export default function Income() {
     appData.transactions
       .filter((t) => {
         const transDate = new Date(t.date)
+
+        // Exclude transactions with non-income categories marked as excludeFromBudget (e.g., transfers)
+        const category = appData.categories.find((c) => c.id === t.categoryId)
+        if (category?.excludeFromBudget && !category?.isIncomeCategory) return false
 
         // For transfers, check the destination account's budget type
         if (t.toAccountId) {

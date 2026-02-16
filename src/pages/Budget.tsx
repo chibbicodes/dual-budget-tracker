@@ -229,14 +229,18 @@ export default function Budget() {
       }
     })
 
-    // Variable expenses: suggested = category's historical % of total spending × projected income
-    // This gives each category a share of projected income proportional to its historical
-    // spending pattern, without being constrained by bucket percentage targets.
+    // Deduct total fixed expense suggestions from projected income before allocating to variable
+    let totalFixedSuggested = 0
+    suggestions.forEach((amount) => { totalFixedSuggested += amount })
+    const remainingForVariable = Math.max(projectedIncome - totalFixedSuggested, 0)
+
+    // Variable expenses: suggested = category's historical % of total spending × remaining income
+    // This ensures total suggestions don't exceed projected income.
     categories.forEach((category) => {
       if (!category.isFixedExpense) {
         const histPct = categoryHistPct.get(category.id) || 0
         if (histPct > 0) {
-          const suggested = histPct * projectedIncome
+          const suggested = histPct * remainingForVariable
           suggestions.set(category.id, Math.round(suggested * 100) / 100)
         } else {
           // No historical data — fall back to budgeted amount
@@ -284,6 +288,13 @@ export default function Budget() {
         return sum + (monthlyBudget?.amount ?? c.monthlyBudget)
       }, 0)
   }, [appData.categories, budgetType, selectedMonthString, getMonthlyBudget])
+
+  // Calculate total suggested amount (sum of all suggested budgets)
+  const totalSuggested = useMemo(() => {
+    let total = 0
+    suggestedBudgets.forEach((amount) => { total += amount })
+    return total
+  }, [suggestedBudgets])
 
   const handleStartEdit = (categoryId: string, currentBudget: number) => {
     setEditingCategory(categoryId)
@@ -701,6 +712,11 @@ export default function Budget() {
                           <td className="py-4 text-right">
                             <p className="text-sm text-purple-600 font-medium">
                               {formatCurrency(suggested)}
+                              {totalSuggested > 0 && (
+                                <span className="text-xs text-purple-400 ml-1">
+                                  ({((suggested / totalSuggested) * 100).toFixed(1)}%)
+                                </span>
+                              )}
                             </p>
                           </td>
                           <td className="py-4 text-right">
@@ -729,12 +745,22 @@ export default function Budget() {
                                 title="Click to edit budget"
                               >
                                 {formatCurrency(budgeted)}
+                                {totalBudgeted > 0 && (
+                                  <span className="text-xs text-gray-400 ml-1">
+                                    ({((budgeted / totalBudgeted) * 100).toFixed(1)}%)
+                                  </span>
+                                )}
                               </button>
                             )}
                           </td>
                           <td className="py-4 text-right">
                             <p className="text-sm text-red-600">
                               {formatCurrency(actual)}
+                              {budgetSummary.totalExpenses > 0 && actual > 0 && (
+                                <span className="text-xs text-red-400 ml-1">
+                                  ({((actual / budgetSummary.totalExpenses) * 100).toFixed(1)}%)
+                                </span>
+                              )}
                             </p>
                           </td>
                           <td className="py-4 text-right">

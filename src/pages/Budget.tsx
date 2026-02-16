@@ -269,6 +269,12 @@ export default function Budget() {
     }
   }, [budgetType])
 
+  // Projected income from configured income sources (for summary card)
+  const projectedIncome = useMemo(
+    () => getProjectedMonthlyIncome(appData.incomeSources, budgetType, selectedMonth),
+    [appData.incomeSources, budgetType, selectedMonth]
+  )
+
   // Calculate total budgeted amount for selected month
   const totalBudgeted = useMemo(() => {
     return appData.categories
@@ -513,11 +519,11 @@ export default function Budget() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm font-medium text-gray-600">Total Income</p>
-          <p className="text-2xl font-bold text-green-600 mt-2">
-            {formatCurrency(budgetSummary.totalIncome)}
+          <p className="text-sm font-medium text-gray-600">Total Expected Income</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">
+            {formatCurrency(projectedIncome)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
@@ -527,19 +533,25 @@ export default function Budget() {
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm font-medium text-gray-600">Actual Spent</p>
+          <p className="text-sm font-medium text-gray-600">Total Actual Income</p>
+          <p className="text-2xl font-bold text-green-600 mt-2">
+            {formatCurrency(budgetSummary.totalIncome)}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm font-medium text-gray-600">Total Actual Spent</p>
           <p className="text-2xl font-bold text-red-600 mt-2">
             {formatCurrency(budgetSummary.totalExpenses)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm font-medium text-gray-600">Remaining</p>
+          <p className="text-sm font-medium text-gray-600">Remaining in Budget</p>
           <p
             className={`text-2xl font-bold mt-2 ${
-              budgetSummary.remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'
+              totalBudgeted - budgetSummary.totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'
             }`}
           >
-            {formatCurrency(budgetSummary.remainingBudget)}
+            {formatCurrency(totalBudgeted - budgetSummary.totalExpenses)}
           </p>
         </div>
       </div>

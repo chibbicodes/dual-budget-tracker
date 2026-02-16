@@ -218,9 +218,6 @@ export default function Budget() {
     }
 
     // Fixed expenses: suggested = historical average, or fall back to budgeted amount
-    // Also accumulate fixed totals per bucket for step 5
-    const fixedTotalsByBucket = new Map<string, number>()
-
     categories.forEach((category) => {
       if (category.isFixedExpense) {
         const histAvg = categoryAvgs.get(category.id) || 0
@@ -228,77 +225,31 @@ export default function Budget() {
         const budgetedAmount = monthlyBudget?.amount ?? category.monthlyBudget
         const suggested = histAvg > 0 ? histAvg : budgetedAmount
         suggestions.set(category.id, Math.round(suggested * 100) / 100)
-
-        const existing = fixedTotalsByBucket.get(category.bucketId) || 0
-        fixedTotalsByBucket.set(category.bucketId, existing + suggested)
       }
     })
 
-    // Steps 4-6: For each bucket, allocate remaining amount to variable categories
-    const bucketIds = new Set(categories.map((c) => c.bucketId))
-
-    bucketIds.forEach((bucketId) => {
-      const bucketInfo = getBucketDisplayInfo(bucketId)
-      const bucketPct = (bucketInfo.percentage || 0) / 100
-
-      // Step 4: Bucket amount = projected income × bucket percentage
-      const bucketAmount = projectedIncome * bucketPct
-
-      // Step 5: Remaining = bucket amount - fixed expenses in this bucket
-      const fixedInBucket = fixedTotalsByBucket.get(bucketId) || 0
-      const remainingForVariable = Math.max(bucketAmount - fixedInBucket, 0)
-
-      const variableInBucket = categories.filter(
-        (c) => c.bucketId === bucketId && !c.isFixedExpense
-      )
-
-      if (variableInBucket.length === 0 || remainingForVariable <= 0) return
-
-      // Step 6: Proportional allocation based on historical spending share
-      const totalHistPctInBucket = variableInBucket.reduce(
-        (sum, c) => sum + (categoryHistPct.get(c.id) || 0), 0
-      )
-
-      if (totalHistPctInBucket > 0) {
-        variableInBucket.forEach((category) => {
-          const histPct = categoryHistPct.get(category.id) || 0
-          const proportionalShare = histPct / totalHistPctInBucket
-          const suggested = proportionalShare * remainingForVariable
+    // Variable expenses: suggested = category's historical % of total spending × projected income
+    // This gives each category a share of projected income proportional to its historical
+    // spending pattern, without being constrained by bucket percentage targets.
+    categories.forEach((category) => {
+      if (!category.isFixedExpense) {
+        const histPct = categoryHistPct.get(category.id) || 0
+        if (histPct > 0) {
+          const suggested = histPct * projectedIncome
           suggestions.set(category.id, Math.round(suggested * 100) / 100)
-        })
-      } else {
-        // No historical spending data — fall back to budgeted amounts or equal split
-        const fallbackSuggestions = new Map<string, number>()
-        let totalFallback = 0
-        variableInBucket.forEach((category) => {
-          const mb = getMonthlyBudget(selectedMonthString, category.id)
-          const amount = mb?.amount ?? category.monthlyBudget
-          fallbackSuggestions.set(category.id, amount)
-          totalFallback += amount
-        })
-
-        if (totalFallback > 0 && totalFallback > remainingForVariable) {
-          variableInBucket.forEach((category) => {
-            const raw = fallbackSuggestions.get(category.id) || 0
-            const normalized = (raw / totalFallback) * remainingForVariable
-            suggestions.set(category.id, Math.round(normalized * 100) / 100)
-          })
-        } else if (totalFallback > 0) {
-          variableInBucket.forEach((category) => {
-            const raw = fallbackSuggestions.get(category.id) || 0
-            suggestions.set(category.id, Math.round(raw * 100) / 100)
-          })
         } else {
-          const equalShare = remainingForVariable / variableInBucket.length
-          variableInBucket.forEach((category) => {
-            suggestions.set(category.id, Math.round(equalShare * 100) / 100)
-          })
+          // No historical data — fall back to budgeted amount
+          const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
+          const budgetedAmount = monthlyBudget?.amount ?? category.monthlyBudget
+          if (budgetedAmount > 0) {
+            suggestions.set(category.id, Math.round(budgetedAmount * 100) / 100)
+          }
         }
       }
     })
 
     return suggestions
-  }, [appData.transactions, appData.categories, appData.incomeSources, budgetType, selectedMonth, selectedMonthString, getMonthlyBudget, appData.settings.bucketCustomization, appData.settings.householdTargets, appData.monthlyBudgets])
+  }, [appData.transactions, appData.categories, appData.incomeSources, budgetType, selectedMonth, selectedMonthString, getMonthlyBudget, appData.monthlyBudgets])
 
   // Get buckets for this budget type
   const buckets = useMemo(() => {

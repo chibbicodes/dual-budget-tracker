@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dual-budget/shared": "workspace:*",
+    "@dual-budget/shared": "*",
     "@react-native-firebase/app": "^21.6.1",
     "@react-native-firebase/auth": "^21.6.1",
     "@react-native-firebase/firestore": "^21.6.1",

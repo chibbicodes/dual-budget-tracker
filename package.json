@@ -33,7 +33,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@dual-budget/shared": "workspace:*",
+    "@dual-budget/shared": "*",
     "better-sqlite3": "^12.6.2",
     "date-fns": "^3.0.6",
     "firebase": "^12.8.0",

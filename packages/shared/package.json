@@ -1,0 +1,26 @@
+{
+  "name": "@dual-budget/shared",
+  "version": "1.0.0",
+  "description": "Shared business logic for Dual Budget Tracker (desktop + mobile)",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "date-fns": "^3.0.6"
+  },
+  "peerDependencies": {
+    "firebase": "^12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "firebase": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

@@ -4,6 +4,10 @@
   "description": "Comprehensive Personal & Business Budget Tracker with dual-budget support",
   "type": "module",
   "main": "dist-electron/main.js",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "vite",
     "dev:electron": "vite",
@@ -29,6 +33,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@dual-budget/shared": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "date-fns": "^3.0.6",
     "firebase": "^12.8.0",

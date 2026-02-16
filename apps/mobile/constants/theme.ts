@@ -1,0 +1,72 @@
+export const Colors = {
+  light: {
+    text: '#1f2937',
+    textSecondary: '#6b7280',
+    background: '#f3f4f6',
+    surface: '#ffffff',
+    card: '#ffffff',
+    primary: '#2563eb',
+    primaryLight: '#dbeafe',
+    success: '#16a34a',
+    successLight: '#dcfce7',
+    danger: '#dc2626',
+    dangerLight: '#fee2e2',
+    warning: '#d97706',
+    warningLight: '#fef3c7',
+    purple: '#7c3aed',
+    purpleLight: '#ede9fe',
+    border: '#e5e7eb',
+    borderLight: '#f3f4f6',
+    household: '#2563eb',
+    business: '#16a34a',
+  },
+  dark: {
+    text: '#f9fafb',
+    textSecondary: '#9ca3af',
+    background: '#111827',
+    surface: '#1f2937',
+    card: '#1f2937',
+    primary: '#3b82f6',
+    primaryLight: '#1e3a5f',
+    success: '#22c55e',
+    successLight: '#14532d',
+    danger: '#ef4444',
+    dangerLight: '#450a0a',
+    warning: '#f59e0b',
+    warningLight: '#451a03',
+    purple: '#8b5cf6',
+    purpleLight: '#2e1065',
+    border: '#374151',
+    borderLight: '#1f2937',
+    household: '#3b82f6',
+    business: '#22c55e',
+  },
+}
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+}
+
+export const FontSize = {
+  xs: 11,
+  sm: 13,
+  md: 15,
+  lg: 17,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+}
+
+export const BorderRadius = {
+  sm: 6,
+  md: 10,
+  lg: 16,
+  xl: 24,
+  pill: 9999,
+  full: 9999,
+}

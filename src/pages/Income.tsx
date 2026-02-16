@@ -315,12 +315,6 @@ export default function Income() {
       .filter((t) => {
         const transDate = new Date(t.date)
 
-        // Exclude transactions categorized as transfers (Transfer/Payment category)
-        // Only exclude by category name, not the excludeFromBudget flag
-        const category = appData.categories.find((c) => c.id === t.categoryId)
-        const categoryName = category?.name?.toLowerCase() || ''
-        if (categoryName === 'transfer' || categoryName === 'transfer/payment') return false
-
         // For transfers, check the destination account's budget type
         if (t.toAccountId) {
           const toAccount = appData.accounts.find(a => a.id === t.toAccountId)
@@ -371,11 +365,6 @@ export default function Income() {
     appData.transactions
       .filter((t) => {
         const transDate = new Date(t.date)
-
-        // Exclude transactions categorized as transfers (Transfer/Payment category)
-        const category = appData.categories.find((c) => c.id === t.categoryId)
-        const categoryName = category?.name?.toLowerCase() || ''
-        if (categoryName === 'transfer' || categoryName === 'transfer/payment') return false
 
         // For transfers, check the destination account's budget type
         if (t.toAccountId) {

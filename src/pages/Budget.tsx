@@ -1,6 +1,7 @@
 import { useBudget } from '../contexts/BudgetContext'
 import { useMemo, useState } from 'react'
 import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
+import { getProjectedMonthlyIncome } from '../utils/incomeCalculations'
 import { getAllBuckets } from '../data/defaultCategories'
 import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2, Archive, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, addMonths, subMonths, startOfMonth, parseISO } from 'date-fns'
@@ -176,76 +177,8 @@ export default function Budget() {
       })
     }
 
-    // ===== DIAGNOSTIC: Trace the data pipeline =====
-    console.group('🔍 SUGGESTED BUDGET DIAGNOSTIC')
-
-    // Show what calculateBudgetSummary returns for each historical month
-    console.log('Selected month:', format(selectedMonth, 'yyyy-MM'))
-    console.log('Budget type:', budgetType)
-    console.log('Total transactions in appData:', appData.transactions.length)
-    console.log('Categories being evaluated:', categories.length)
-
-    // Pick a sample variable category to trace
-    const sampleVariable = categories.find((c) => !c.isFixedExpense)
-    const sampleFixed = categories.find((c) => c.isFixedExpense)
-    if (sampleVariable) console.log('Sample VARIABLE category:', sampleVariable.name, '| id:', sampleVariable.id, '| bucket:', sampleVariable.bucketId, '| isFixedExpense:', sampleVariable.isFixedExpense)
-    if (sampleFixed) console.log('Sample FIXED category:', sampleFixed.name, '| id:', sampleFixed.id, '| bucket:', sampleFixed.bucketId, '| isFixedExpense:', sampleFixed.isFixedExpense)
-
-    // Show raw historical data for each month
-    historicalSummaries.forEach((s) => {
-      console.group(`Month: ${s.month}`)
-      console.log('totalIncome:', s.totalIncome, '| totalExpenses:', s.totalExpenses)
-      if (sampleVariable) {
-        console.log(`  ${sampleVariable.name} actual:`, s.categoryActuals.get(sampleVariable.id) ?? 'NOT IN MAP')
-      }
-      if (sampleFixed) {
-        console.log(`  ${sampleFixed.name} actual:`, s.categoryActuals.get(sampleFixed.id) ?? 'NOT IN MAP')
-      }
-      // Show all non-zero category actuals
-      const nonZero: string[] = []
-      s.categoryActuals.forEach((val, key) => {
-        if (val > 0) {
-          const cat = appData.categories.find((c) => c.id === key)
-          nonZero.push(`${cat?.name || key}: $${val.toFixed(2)}`)
-        }
-      })
-      console.log('  Non-zero actuals:', nonZero.length > 0 ? nonZero.join(', ') : 'NONE')
-      console.groupEnd()
-    })
-
-    // Also check: what does the CURRENT month's budget summary show?
-    console.log('Current month budgetSummary.totalIncome:', budgetSummary.totalIncome)
-    console.log('Current month budgetSummary.totalExpenses:', budgetSummary.totalExpenses)
-
-    // Check raw transactions: are expenses negative or positive?
-    const sampleExpenseTransactions = appData.transactions
-      .filter((t) => t.budgetType === budgetType)
-      .slice(0, 10)
-    console.log('Sample transactions (first 10):')
-    sampleExpenseTransactions.forEach((t) => {
-      const cat = appData.categories.find((c) => c.id === t.categoryId)
-      console.log(`  ${t.date} | ${t.description?.substring(0, 30)} | amount: ${t.amount} | category: ${cat?.name} | isIncome: ${cat?.isIncomeCategory}`)
-    })
-
-    console.groupEnd()
-    // ===== END DIAGNOSTIC =====
-
-    // Projected income: current month's actual income, or average of historical income
-    const monthsWithIncome = historicalSummaries.filter((s) => s.totalIncome > 0)
-    const avgIncome =
-      monthsWithIncome.length > 0
-        ? monthsWithIncome.reduce((sum, s) => sum + s.totalIncome, 0) / monthsWithIncome.length
-        : 0
-    const projectedIncome = budgetSummary.totalIncome > 0 ? budgetSummary.totalIncome : avgIncome
-
-    // ===== DIAGNOSTIC: Income pipeline =====
-    console.group('🔍 INCOME & SPENDING PIPELINE')
-    console.log('avgIncome:', avgIncome)
-    console.log('budgetSummary.totalIncome (current month):', budgetSummary.totalIncome)
-    console.log('projectedIncome:', projectedIncome)
-    if (projectedIncome <= 0) console.log('⚠️ EARLY RETURN: projectedIncome <= 0')
-    console.groupEnd()
-    // ===== END DIAGNOSTIC =====
+    // Use projected income from configured income sources (not actual transactions)
+    const projectedIncome = getProjectedMonthlyIncome(appData.incomeSources, budgetType, selectedMonth)
 
     if (projectedIncome <= 0) {
       return suggestions
@@ -284,22 +217,6 @@ export default function Budget() {
       })
     }
 
-    // ===== DIAGNOSTIC: Steps 1-3 =====
-    console.group('🔍 STEPS 1-3: Averages & Percentages')
-    if (sampleVariable) {
-      console.log(`Step 1 - ${sampleVariable.name} categoryAvg:`, categoryAvgs.get(sampleVariable.id))
-    }
-    if (sampleFixed) {
-      console.log(`Step 1 - ${sampleFixed.name} categoryAvg:`, categoryAvgs.get(sampleFixed.id))
-    }
-    console.log('Step 2 - avgTotalMonthlySpending:', avgTotalMonthlySpending)
-    console.log('Step 2 - monthsWithSpending count:', monthsWithSpending.length)
-    if (sampleVariable) {
-      console.log(`Step 3 - ${sampleVariable.name} histPct:`, categoryHistPct.get(sampleVariable.id) ?? 'NOT SET (avgTotalMonthlySpending was 0)')
-    }
-    console.groupEnd()
-    // ===== END DIAGNOSTIC =====
-
     // Fixed expenses: suggested = historical average, or fall back to budgeted amount
     // Also accumulate fixed totals per bucket for step 5
     const fixedTotalsByBucket = new Map<string, number>()
@@ -316,20 +233,6 @@ export default function Budget() {
         fixedTotalsByBucket.set(category.bucketId, existing + suggested)
       }
     })
-
-    // ===== DIAGNOSTIC: Fixed expenses =====
-    console.group('🔍 FIXED EXPENSES per bucket')
-    fixedTotalsByBucket.forEach((total, bucketId) => {
-      console.log(`  Bucket "${bucketId}": fixedTotal = $${total.toFixed(2)}`)
-    })
-    if (sampleFixed) {
-      const histAvg = categoryAvgs.get(sampleFixed.id) || 0
-      const mb = getMonthlyBudget(selectedMonthString, sampleFixed.id)
-      const budgetedAmount = mb?.amount ?? sampleFixed.monthlyBudget
-      console.log(`  ${sampleFixed.name}: histAvg=${histAvg}, budgetedAmount=${budgetedAmount}, suggested=${histAvg > 0 ? histAvg : budgetedAmount}`)
-    }
-    console.groupEnd()
-    // ===== END DIAGNOSTIC =====
 
     // Steps 4-6: For each bucket, allocate remaining amount to variable categories
     const bucketIds = new Set(categories.map((c) => c.bucketId))
@@ -348,17 +251,6 @@ export default function Budget() {
       const variableInBucket = categories.filter(
         (c) => c.bucketId === bucketId && !c.isFixedExpense
       )
-
-      // ===== DIAGNOSTIC: Bucket allocation =====
-      console.group(`🔍 BUCKET "${bucketId}" allocation`)
-      console.log(`  bucketPct: ${bucketPct * 100}%`)
-      console.log(`  bucketAmount: $${bucketAmount.toFixed(2)} (projectedIncome $${projectedIncome.toFixed(2)} × ${bucketPct * 100}%)`)
-      console.log(`  fixedInBucket: $${fixedInBucket.toFixed(2)}`)
-      console.log(`  remainingForVariable: $${remainingForVariable.toFixed(2)}`)
-      console.log(`  variableInBucket count: ${variableInBucket.length}`)
-      if (remainingForVariable <= 0) console.log(`  ⚠️ REMAINING <= 0: Variable categories in this bucket will get $0`)
-      console.groupEnd()
-      // ===== END DIAGNOSTIC =====
 
       if (variableInBucket.length === 0 || remainingForVariable <= 0) return
 
@@ -406,7 +298,7 @@ export default function Budget() {
     })
 
     return suggestions
-  }, [appData.transactions, appData.categories, budgetType, selectedMonth, selectedMonthString, budgetSummary.totalIncome, getMonthlyBudget, appData.settings.bucketCustomization, appData.settings.householdTargets, appData.monthlyBudgets])
+  }, [appData.transactions, appData.categories, appData.incomeSources, budgetType, selectedMonth, selectedMonthString, getMonthlyBudget, appData.settings.bucketCustomization, appData.settings.householdTargets, appData.monthlyBudgets])
 
   // Get buckets for this budget type
   const buckets = useMemo(() => {

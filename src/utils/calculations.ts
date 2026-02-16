@@ -10,7 +10,7 @@ import type {
   MonthlyBudget,
 } from '../types'
 import { getAllBuckets } from '../data/defaultCategories'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
 
 /**
  * Calculate account summary (total assets, liabilities, net worth)
@@ -73,7 +73,7 @@ export function calculateBudgetSummary(
 
   // Filter transactions for current month and budget type
   const monthTransactions = transactions.filter((t) => {
-    const transDate = new Date(t.date)
+    const transDate = parseISO(t.date)
     return (
       t.budgetType === budgetType &&
       transDate >= monthStart &&
@@ -82,10 +82,11 @@ export function calculateBudgetSummary(
   })
 
   // Calculate totals (exclude transactions with excludeFromBudget categories)
-  // This applies to both income and expenses (e.g., transfers shouldn't count as income or expenses)
+  // Transfers and similar categories are excluded, but income categories
+  // (which also have excludeFromBudget) are kept so totalIncome is correct.
   const includedTransactions = monthTransactions.filter((t) => {
     const category = categories.find((c) => c.id === t.categoryId)
-    return !category?.excludeFromBudget
+    return !category?.excludeFromBudget || category?.isIncomeCategory
   })
 
   const totalIncome = includedTransactions
@@ -202,7 +203,7 @@ export function getTopSpendingCategories(
 
   // Filter transactions for current month and budget type
   const monthTransactions = transactions.filter((t) => {
-    const transDate = new Date(t.date)
+    const transDate = parseISO(t.date)
     return (
       t.budgetType === budgetType &&
       t.amount < 0 && // Only expenses

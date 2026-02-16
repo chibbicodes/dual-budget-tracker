@@ -81,12 +81,17 @@ export function calculateBudgetSummary(
     )
   })
 
-  // Calculate totals (exclude transactions with excludeFromBudget categories)
-  // Transfers and similar categories are excluded, but income categories
-  // (which also have excludeFromBudget) are kept so totalIncome is correct.
+  // Calculate totals (exclude transfers and budget-excluded categories)
+  // Categories named transfer, transfer/payment, or containing "exclude from"
+  // in the name are always excluded. Income categories (which also have
+  // excludeFromBudget) are kept so totalIncome is correct.
+  const EXCLUDED_NAMES = ['transfer', 'transfer/payment']
   const includedTransactions = monthTransactions.filter((t) => {
     const category = categories.find((c) => c.id === t.categoryId)
-    return !category?.excludeFromBudget || category?.isIncomeCategory
+    const categoryName = category?.name?.toLowerCase() || ''
+    if (EXCLUDED_NAMES.includes(categoryName) || categoryName.includes('exclude from')) return false
+    if (category?.excludeFromBudget && !category?.isIncomeCategory) return false
+    return true
   })
 
   const totalIncome = includedTransactions

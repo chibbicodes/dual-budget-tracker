@@ -81,25 +81,22 @@ export function calculateBudgetSummary(
     )
   })
 
-  // Resolve category for each transaction and exclude budget-excluded categories.
-  // Use category type (income vs expense) instead of amount sign to classify,
-  // since CSV imports may store expenses as positive amounts.
-  const txWithCategory = monthTransactions
-    .map((t) => ({
-      ...t,
-      resolvedCategory: categories.find((c) => c.id === t.categoryId),
-    }))
-    .filter((t) => !t.resolvedCategory?.excludeFromBudget)
+  // Calculate totals (exclude transactions with excludeFromBudget categories)
+  // This applies to both income and expenses (e.g., transfers shouldn't count as income or expenses)
+  const includedTransactions = monthTransactions.filter((t) => {
+    const category = categories.find((c) => c.id === t.categoryId)
+    return !category?.excludeFromBudget
+  })
 
-  const includedTransactions = txWithCategory
+  const totalIncome = includedTransactions
+    .filter((t) => t.amount > 0)
+    .reduce((sum, t) => sum + t.amount, 0)
 
-  const totalIncome = txWithCategory
-    .filter((t) => t.resolvedCategory?.isIncomeCategory)
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
-  const totalExpenses = txWithCategory
-    .filter((t) => t.resolvedCategory && !t.resolvedCategory.isIncomeCategory)
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  const totalExpenses = Math.abs(
+    includedTransactions
+      .filter((t) => t.amount < 0)
+      .reduce((sum, t) => sum + t.amount, 0)
+  )
 
   const remainingBudget = totalIncome - totalExpenses
 
@@ -119,12 +116,14 @@ export function calculateBudgetSummary(
     const targetAmount = ((bucket.targetPercentage || 0) / 100) * totalIncome
 
     // Calculate actual amount spent in this bucket (only included transactions)
-    // Use Math.abs to capture spending regardless of amount sign
     const bucketTransactions = includedTransactions.filter((t) =>
       bucketCategories.some((c) => c.id === t.categoryId)
     )
-    const actualAmount = bucketTransactions
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    const actualAmount = Math.abs(
+      bucketTransactions
+        .filter((t) => t.amount < 0)
+        .reduce((sum, t) => sum + t.amount, 0)
+    )
 
     // Calculate category breakdown
     const categoryBreakdown: CategoryBreakdown[] = bucketCategories.map(
@@ -132,8 +131,11 @@ export function calculateBudgetSummary(
         const categoryTransactions = bucketTransactions.filter(
           (t) => t.categoryId === category.id
         )
-        const actual = categoryTransactions
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+        const actual = Math.abs(
+          categoryTransactions
+            .filter((t) => t.amount < 0)
+            .reduce((sum, t) => sum + t.amount, 0)
+        )
 
         // Use monthly budget override if available, otherwise use default
         const monthlyBudget = monthlyBudgets?.find(

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import {calculateBudgetSummary, formatCurrency } from '../utils/calculations'
 import { getAllBuckets } from '../data/defaultCategories'
 import { Edit, Check, X, AlertCircle, Plus, Trash2, Settings2, Archive, ChevronLeft, ChevronRight } from 'lucide-react'
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns'
+import { format, addMonths, subMonths, startOfMonth, parseISO } from 'date-fns'
 import { exportToCSV, exportToPDF } from '../utils/export'
 import ExportButtons from '../components/ExportButtons'
 import type { BudgetType, Category, BucketId } from '../types'
@@ -134,103 +134,67 @@ export default function Budget() {
     [appData.transactions, appData.categories, budgetType, selectedMonth, appData.monthlyBudgets]
   )
 
-  // Calculate suggested budgets based on last 6 months of spending and income
+  // Calculate suggested budgets based on last 6 months of spending
+  // Uses calculateBudgetSummary for each historical month — same function that
+  // computes the budget page numbers — so the data is guaranteed to match.
   const suggestedBudgets = useMemo(() => {
     const suggestions = new Map<string, number>()
     const categories = appData.categories.filter(
       (c) => c.budgetType === budgetType && c.isActive && !c.isIncomeCategory && !c.excludeFromBudget
     )
 
-    // Get last 6 months of historical data (both expenses by category AND income)
-    const last6Months: {
-      [month: string]: {
-        totalIncome: number
-        byCategory: Map<string, number>
-      }
-    } = {}
+    // Get budget summaries for each of the last 6 months (relative to selected month)
+    const historicalSummaries: Array<{
+      month: string
+      totalIncome: number
+      totalExpenses: number
+      categoryActuals: Map<string, number>
+    }> = []
 
     for (let i = 1; i <= 6; i++) {
       const monthDate = subMonths(startOfMonth(selectedMonth), i)
-      const monthStr = format(monthDate, 'yyyy-MM')
-      const monthStart = startOfMonth(monthDate)
-      const monthEnd = endOfMonth(monthDate)
+      const summary = calculateBudgetSummary(
+        appData.transactions,
+        appData.categories,
+        budgetType,
+        monthDate,
+        appData.monthlyBudgets
+      )
 
-      const monthTransactions = appData.transactions.filter((t) => {
-        const tDate = parseISO(t.date)
-        return (
-          t.budgetType === budgetType &&
-          tDate >= monthStart &&
-          tDate <= monthEnd
-        )
+      const categoryActuals = new Map<string, number>()
+      summary.bucketBreakdown.forEach((bucket) => {
+        bucket.categories.forEach((cat) => {
+          categoryActuals.set(cat.categoryId, cat.actual)
+        })
       })
 
-      // Resolve category for each transaction once
-      const txWithCategory = monthTransactions.map((t) => ({
-        ...t,
-        category: appData.categories.find((c) => c.id === t.categoryId),
-      }))
-
-      // Calculate income using income-categorized transactions (not amount sign,
-      // since CSV imports may store expenses as positive amounts)
-      const totalIncome = txWithCategory
-        .filter((t) => t.category?.isIncomeCategory && !t.category?.excludeFromBudget)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
-      // Calculate expenses by category using non-income categories (not amount sign).
-      // This correctly captures expenses regardless of whether they were imported
-      // as negative or positive amounts.
-      const byCategory = new Map<string, number>()
-      txWithCategory.forEach((t) => {
-        if (!t.category || t.category.isIncomeCategory || t.category.excludeFromBudget) return
-        const existing = byCategory.get(t.categoryId) || 0
-        byCategory.set(t.categoryId, existing + Math.abs(t.amount))
+      historicalSummaries.push({
+        month: format(monthDate, 'yyyy-MM'),
+        totalIncome: summary.totalIncome,
+        totalExpenses: summary.totalExpenses,
+        categoryActuals,
       })
-
-      // Include all months (even those with no data) for proper averaging
-      last6Months[monthStr] = { totalIncome, byCategory }
     }
 
-    const allMonths = Object.keys(last6Months)
-    if (allMonths.length === 0) {
-      return suggestions
-    }
-
-    // Calculate average income over the last 6 months (excluding $0 income months) for projected income
-    const monthsWithIncome = allMonths.filter((m) => last6Months[m].totalIncome > 0)
+    // Projected income: current month's actual income, or average of historical income
+    const monthsWithIncome = historicalSummaries.filter((s) => s.totalIncome > 0)
     const avgIncome =
       monthsWithIncome.length > 0
-        ? monthsWithIncome.reduce((sum, m) => sum + last6Months[m].totalIncome, 0) / monthsWithIncome.length
+        ? monthsWithIncome.reduce((sum, s) => sum + s.totalIncome, 0) / monthsWithIncome.length
         : 0
-
-    // Projected income: use current month's actual income, fall back to historical average
     const projectedIncome = budgetSummary.totalIncome > 0 ? budgetSummary.totalIncome : avgIncome
-
-    // Step 2: Calculate average total monthly spending (expenses) over the last 6 months
-    const monthlyTotalSpending = new Map<string, number>()
-    allMonths.forEach((month) => {
-      let totalExpenses = 0
-      last6Months[month].byCategory.forEach((amount) => {
-        totalExpenses += amount
-      })
-      monthlyTotalSpending.set(month, totalExpenses)
-    })
-    const monthsWithSpending = allMonths.filter((m) => (monthlyTotalSpending.get(m) || 0) > 0)
-    const avgTotalMonthlySpending =
-      monthsWithSpending.length > 0
-        ? monthsWithSpending.reduce((sum, m) => sum + (monthlyTotalSpending.get(m) || 0), 0) / monthsWithSpending.length
-        : 0
 
     if (projectedIncome <= 0) {
       return suggestions
     }
 
-    // Step 1: Calculate per-category average spending (excluding $0 months for each category)
+    // Step 1: Category average spending (excluding months with $0 in that category)
     const categoryAvgs = new Map<string, number>()
     categories.forEach((category) => {
       let totalSpent = 0
       let monthsCount = 0
-      allMonths.forEach((month) => {
-        const spent = last6Months[month].byCategory.get(category.id) || 0
+      historicalSummaries.forEach((s) => {
+        const spent = s.categoryActuals.get(category.id) || 0
         if (spent > 0) {
           totalSpent += spent
           monthsCount++
@@ -239,8 +203,14 @@ export default function Budget() {
       categoryAvgs.set(category.id, monthsCount > 0 ? totalSpent / monthsCount : 0)
     })
 
-    // Step 3: Calculate historical percentage of spending for each variable category
-    // (category average spending / average total monthly spending)
+    // Step 2: Average total monthly spending
+    const monthsWithSpending = historicalSummaries.filter((s) => s.totalExpenses > 0)
+    const avgTotalMonthlySpending =
+      monthsWithSpending.length > 0
+        ? monthsWithSpending.reduce((sum, s) => sum + s.totalExpenses, 0) / monthsWithSpending.length
+        : 0
+
+    // Step 3: Historical percentage of spending for each variable category
     const categoryHistPct = new Map<string, number>()
     if (avgTotalMonthlySpending > 0) {
       categories.forEach((category) => {
@@ -251,20 +221,18 @@ export default function Budget() {
       })
     }
 
-    // Fixed expenses: suggested = actual amount spent (historical average, since it doesn't change)
+    // Fixed expenses: suggested = historical average, or fall back to budgeted amount
     // Also accumulate fixed totals per bucket for step 5
     const fixedTotalsByBucket = new Map<string, number>()
 
     categories.forEach((category) => {
       if (category.isFixedExpense) {
         const histAvg = categoryAvgs.get(category.id) || 0
-        // Use historical average if available, otherwise fall back to budgeted amount
         const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
         const budgetedAmount = monthlyBudget?.amount ?? category.monthlyBudget
         const suggested = histAvg > 0 ? histAvg : budgetedAmount
         suggestions.set(category.id, Math.round(suggested * 100) / 100)
 
-        // Accumulate fixed totals per bucket
         const existing = fixedTotalsByBucket.get(category.bucketId) || 0
         fixedTotalsByBucket.set(category.bucketId, existing + suggested)
       }
@@ -274,7 +242,6 @@ export default function Budget() {
     const bucketIds = new Set(categories.map((c) => c.bucketId))
 
     bucketIds.forEach((bucketId) => {
-      // Get bucket target percentage (respects user customizations)
       const bucketInfo = getBucketDisplayInfo(bucketId)
       const bucketPct = (bucketInfo.percentage || 0) / 100
 
@@ -285,16 +252,13 @@ export default function Budget() {
       const fixedInBucket = fixedTotalsByBucket.get(bucketId) || 0
       const remainingForVariable = Math.max(bucketAmount - fixedInBucket, 0)
 
-      // Get variable categories in this bucket
       const variableInBucket = categories.filter(
         (c) => c.bucketId === bucketId && !c.isFixedExpense
       )
 
       if (variableInBucket.length === 0 || remainingForVariable <= 0) return
 
-      // Step 6: Determine each variable category's proportional share of
-      // all variable categories in this bucket, then allocate that share
-      // of the remaining bucket amount.
+      // Step 6: Proportional allocation based on historical spending share
       const totalHistPctInBucket = variableInBucket.reduce(
         (sum, c) => sum + (categoryHistPct.get(c.id) || 0), 0
       )
@@ -307,8 +271,7 @@ export default function Budget() {
           suggestions.set(category.id, Math.round(suggested * 100) / 100)
         })
       } else {
-        // No historical spending data for any variable category in this bucket —
-        // fall back to budgeted amounts or equal split
+        // No historical spending data — fall back to budgeted amounts or equal split
         const fallbackSuggestions = new Map<string, number>()
         let totalFallback = 0
         variableInBucket.forEach((category) => {
@@ -319,7 +282,6 @@ export default function Budget() {
         })
 
         if (totalFallback > 0 && totalFallback > remainingForVariable) {
-          // Normalize fallback amounts to fit within remaining
           variableInBucket.forEach((category) => {
             const raw = fallbackSuggestions.get(category.id) || 0
             const normalized = (raw / totalFallback) * remainingForVariable
@@ -331,7 +293,6 @@ export default function Budget() {
             suggestions.set(category.id, Math.round(raw * 100) / 100)
           })
         } else {
-          // No budgets set either — equal split
           const equalShare = remainingForVariable / variableInBucket.length
           variableInBucket.forEach((category) => {
             suggestions.set(category.id, Math.round(equalShare * 100) / 100)
@@ -341,7 +302,7 @@ export default function Budget() {
     })
 
     return suggestions
-  }, [appData.transactions, appData.categories, budgetType, selectedMonth, selectedMonthString, budgetSummary.totalIncome, getMonthlyBudget, appData.settings.bucketCustomization, appData.settings.householdTargets])
+  }, [appData.transactions, appData.categories, budgetType, selectedMonth, selectedMonthString, budgetSummary.totalIncome, getMonthlyBudget, appData.settings.bucketCustomization, appData.settings.householdTargets, appData.monthlyBudgets])
 
   // Get buckets for this budget type
   const buckets = useMemo(() => {

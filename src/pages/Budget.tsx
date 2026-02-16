@@ -164,22 +164,24 @@ export default function Budget() {
         )
       })
 
-      // Calculate income (positive amounts, excluding budget-excluded categories)
-      const totalIncome = monthTransactions
-        .filter((t) => {
-          const category = appData.categories.find((c) => c.id === t.categoryId)
-          return t.amount > 0 && !category?.excludeFromBudget
-        })
-        .reduce((sum, t) => sum + t.amount, 0)
+      // Resolve category for each transaction once
+      const txWithCategory = monthTransactions.map((t) => ({
+        ...t,
+        category: appData.categories.find((c) => c.id === t.categoryId),
+      }))
 
-      // Calculate expenses by category (negative amounts, excluding budget-excluded categories)
-      const expenseTransactions = monthTransactions.filter((t) => {
-        const category = appData.categories.find((c) => c.id === t.categoryId)
-        return t.amount < 0 && !category?.excludeFromBudget
-      })
+      // Calculate income using income-categorized transactions (not amount sign,
+      // since CSV imports may store expenses as positive amounts)
+      const totalIncome = txWithCategory
+        .filter((t) => t.category?.isIncomeCategory && !t.category?.excludeFromBudget)
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
 
+      // Calculate expenses by category using non-income categories (not amount sign).
+      // This correctly captures expenses regardless of whether they were imported
+      // as negative or positive amounts.
       const byCategory = new Map<string, number>()
-      expenseTransactions.forEach((t) => {
+      txWithCategory.forEach((t) => {
+        if (!t.category || t.category.isIncomeCategory || t.category.excludeFromBudget) return
         const existing = byCategory.get(t.categoryId) || 0
         byCategory.set(t.categoryId, existing + Math.abs(t.amount))
       })

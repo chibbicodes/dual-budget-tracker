@@ -280,7 +280,14 @@ export default function Budget() {
 
       variableInBucket.forEach((category) => {
         const histPct = categoryHistPct.get(category.id) || 0
-        const raw = histPct * remainingForVariable
+        let raw: number
+        if (histPct > 0) {
+          raw = histPct * remainingForVariable
+        } else {
+          // Fall back to budgeted amount when no historical data
+          const mb = getMonthlyBudget(selectedMonthString, category.id)
+          raw = mb?.amount ?? category.monthlyBudget
+        }
         rawSuggestions.set(category.id, raw)
         totalRawSuggested += raw
       })

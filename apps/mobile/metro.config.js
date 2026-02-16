@@ -20,4 +20,14 @@ config.resolver.nodeModulesPaths = [
 // 3. Force Metro to resolve (sub)dependencies only from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = true;
 
+// 4. Exclude Electron/Vite desktop directories from Metro bundling
+const exclusionList = require('metro-config/src/defaults/exclusionList');
+config.resolver.blockList = exclusionList([
+  new RegExp(path.resolve(monorepoRoot, 'dist-electron').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'electron').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'src').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'build').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'scripts').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+]);
+
 module.exports = config;

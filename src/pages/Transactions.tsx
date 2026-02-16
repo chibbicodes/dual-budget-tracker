@@ -2021,12 +2021,13 @@ function TransactionForm({
   const filteredCategories = categories.filter((c) => {
     if (c.budgetType !== formData.budgetType || !c.isActive) return false
 
-    // Show only income categories for income transactions
-    if (formData.transactionType === 'income') {
+    // Show income categories for income transactions and transfer-in
+    if (formData.transactionType === 'income' ||
+        (formData.transactionType === 'transfer' && formData.transferDirection === 'in')) {
       return c.isIncomeCategory === true
     }
 
-    // For transfers and expenses, show all non-income categories (including Transfer/Payment)
+    // For transfer-out and expenses, show all non-income categories (including Transfer/Payment)
     return !c.isIncomeCategory
   })
 

@@ -217,13 +217,14 @@ export default function Budget() {
       })
     }
 
-    // Fixed expenses: suggested = historical average, or fall back to budgeted amount
+    // Fixed expenses: suggested = previous month's actual, or fall back to budgeted amount
+    const prevMonth = historicalSummaries[0] // index 0 = 1 month prior
     categories.forEach((category) => {
       if (category.isFixedExpense) {
-        const histAvg = categoryAvgs.get(category.id) || 0
+        const prevActual = prevMonth?.categoryActuals.get(category.id) || 0
         const monthlyBudget = getMonthlyBudget(selectedMonthString, category.id)
         const budgetedAmount = monthlyBudget?.amount ?? category.monthlyBudget
-        const suggested = histAvg > 0 ? histAvg : budgetedAmount
+        const suggested = prevActual > 0 ? prevActual : budgetedAmount
         suggestions.set(category.id, Math.round(suggested * 100) / 100)
       }
     })

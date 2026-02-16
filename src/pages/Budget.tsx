@@ -193,7 +193,7 @@ export default function Budget() {
       return suggestions
     }
 
-    // Step 2: Calculate average income over the last 6 months (excluding $0 income months)
+    // Calculate average income over the last 6 months (excluding $0 income months) for projected income
     const monthsWithIncome = allMonths.filter((m) => last6Months[m].totalIncome > 0)
     const avgIncome =
       monthsWithIncome.length > 0
@@ -202,6 +202,21 @@ export default function Budget() {
 
     // Projected income: use current month's actual income, fall back to historical average
     const projectedIncome = budgetSummary.totalIncome > 0 ? budgetSummary.totalIncome : avgIncome
+
+    // Step 2: Calculate average total monthly spending (expenses) over the last 6 months
+    const monthlyTotalSpending = new Map<string, number>()
+    allMonths.forEach((month) => {
+      let totalExpenses = 0
+      last6Months[month].byCategory.forEach((amount) => {
+        totalExpenses += amount
+      })
+      monthlyTotalSpending.set(month, totalExpenses)
+    })
+    const monthsWithSpending = allMonths.filter((m) => (monthlyTotalSpending.get(m) || 0) > 0)
+    const avgTotalMonthlySpending =
+      monthsWithSpending.length > 0
+        ? monthsWithSpending.reduce((sum, m) => sum + (monthlyTotalSpending.get(m) || 0), 0) / monthsWithSpending.length
+        : 0
 
     if (projectedIncome <= 0) {
       return suggestions
@@ -222,13 +237,14 @@ export default function Budget() {
       categoryAvgs.set(category.id, monthsCount > 0 ? totalSpent / monthsCount : 0)
     })
 
-    // Step 3: Calculate historical percentage of income for each variable category
+    // Step 3: Calculate historical percentage of spending for each variable category
+    // (category average spending / average total monthly spending)
     const categoryHistPct = new Map<string, number>()
-    if (avgIncome > 0) {
+    if (avgTotalMonthlySpending > 0) {
       categories.forEach((category) => {
         if (!category.isFixedExpense) {
           const avg = categoryAvgs.get(category.id) || 0
-          categoryHistPct.set(category.id, avg / avgIncome)
+          categoryHistPct.set(category.id, avg / avgTotalMonthlySpending)
         }
       })
     }
@@ -274,36 +290,51 @@ export default function Budget() {
 
       if (variableInBucket.length === 0 || remainingForVariable <= 0) return
 
-      // Step 6: Allocate using historical percentages
-      let totalRawSuggested = 0
-      const rawSuggestions = new Map<string, number>()
+      // Step 6: Determine each variable category's proportional share of
+      // all variable categories in this bucket, then allocate that share
+      // of the remaining bucket amount.
+      const totalHistPctInBucket = variableInBucket.reduce(
+        (sum, c) => sum + (categoryHistPct.get(c.id) || 0), 0
+      )
 
-      variableInBucket.forEach((category) => {
-        const histPct = categoryHistPct.get(category.id) || 0
-        let raw: number
-        if (histPct > 0) {
-          raw = histPct * remainingForVariable
-        } else {
-          // Fall back to budgeted amount when no historical data
-          const mb = getMonthlyBudget(selectedMonthString, category.id)
-          raw = mb?.amount ?? category.monthlyBudget
-        }
-        rawSuggestions.set(category.id, raw)
-        totalRawSuggested += raw
-      })
-
-      // If total raw suggestions exceed remaining bucket, normalize proportionally
-      if (totalRawSuggested > remainingForVariable && totalRawSuggested > 0) {
+      if (totalHistPctInBucket > 0) {
         variableInBucket.forEach((category) => {
-          const raw = rawSuggestions.get(category.id) || 0
-          const normalized = (raw / totalRawSuggested) * remainingForVariable
-          suggestions.set(category.id, Math.round(normalized * 100) / 100)
+          const histPct = categoryHistPct.get(category.id) || 0
+          const proportionalShare = histPct / totalHistPctInBucket
+          const suggested = proportionalShare * remainingForVariable
+          suggestions.set(category.id, Math.round(suggested * 100) / 100)
         })
       } else {
+        // No historical spending data for any variable category in this bucket —
+        // fall back to budgeted amounts or equal split
+        const fallbackSuggestions = new Map<string, number>()
+        let totalFallback = 0
         variableInBucket.forEach((category) => {
-          const raw = rawSuggestions.get(category.id) || 0
-          suggestions.set(category.id, Math.round(raw * 100) / 100)
+          const mb = getMonthlyBudget(selectedMonthString, category.id)
+          const amount = mb?.amount ?? category.monthlyBudget
+          fallbackSuggestions.set(category.id, amount)
+          totalFallback += amount
         })
+
+        if (totalFallback > 0 && totalFallback > remainingForVariable) {
+          // Normalize fallback amounts to fit within remaining
+          variableInBucket.forEach((category) => {
+            const raw = fallbackSuggestions.get(category.id) || 0
+            const normalized = (raw / totalFallback) * remainingForVariable
+            suggestions.set(category.id, Math.round(normalized * 100) / 100)
+          })
+        } else if (totalFallback > 0) {
+          variableInBucket.forEach((category) => {
+            const raw = fallbackSuggestions.get(category.id) || 0
+            suggestions.set(category.id, Math.round(raw * 100) / 100)
+          })
+        } else {
+          // No budgets set either — equal split
+          const equalShare = remainingForVariable / variableInBucket.length
+          variableInBucket.forEach((category) => {
+            suggestions.set(category.id, Math.round(equalShare * 100) / 100)
+          })
+        }
       }
     })
 

@@ -723,9 +723,13 @@ export default function Budget() {
                                 />
                               </div>
                             ) : (
-                              <p className="text-sm font-medium text-gray-900">
+                              <button
+                                onClick={() => handleStartEdit(category.id, budgeted)}
+                                className="text-sm font-medium text-gray-900 hover:text-blue-600 cursor-pointer hover:underline"
+                                title="Click to edit budget"
+                              >
                                 {formatCurrency(budgeted)}
-                              </p>
+                              </button>
                             )}
                           </td>
                           <td className="py-4 text-right">
@@ -795,15 +799,6 @@ export default function Budget() {
                               </div>
                             ) : (
                               <div className="flex items-center justify-end space-x-2">
-                                <button
-                                  onClick={() =>
-                                    handleStartEdit(category.id, category.monthlyBudget)
-                                  }
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Quick edit budget amount"
-                                >
-                                  <Edit className="w-5 h-5" />
-                                </button>
                                 <button
                                   onClick={() => handleOpenEditModal(category)}
                                   className="text-gray-600 hover:text-gray-800"

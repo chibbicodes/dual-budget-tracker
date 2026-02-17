@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, R
 import type {
   Account, Transaction, Category, IncomeSource, Project,
   ProjectTypeConfig, ProjectStatusConfig, AppSettings, MonthlyBudget,
-  BudgetSummary,
+  BudgetSummary, AutoCategorizationRule,
 } from '@dual-budget/shared'
 import {
   calculateBudgetSummary,
@@ -18,6 +18,19 @@ import { useProfile } from './ProfileContext'
 
 type BudgetType = 'household' | 'business'
 
+interface AppDataType {
+  accounts: Account[]
+  transactions: Transaction[]
+  categories: Category[]
+  incomeSources: IncomeSource[]
+  monthlyBudgets: MonthlyBudget[]
+  autoCategorization: AutoCategorizationRule[]
+  projects: Project[]
+  projectTypes: ProjectTypeConfig[]
+  projectStatuses: ProjectStatusConfig[]
+  settings: AppSettings | null
+}
+
 interface BudgetContextType {
   // Current state
   budgetType: BudgetType
@@ -25,7 +38,10 @@ interface BudgetContextType {
   selectedMonth: Date
   setSelectedMonth: (date: Date) => void
 
-  // Data
+  // Unfiltered data (used by screens that do their own filtering)
+  appData: AppDataType
+
+  // Filtered data (pre-filtered by budgetType)
   accounts: Account[]
   transactions: Transaction[]
   categories: Category[]
@@ -72,6 +88,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const [projectStatuses, setProjectStatuses] = useState<ProjectStatusConfig[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [monthlyBudgets, setMonthlyBudgets] = useState<MonthlyBudget[]>([])
+  const [autoCategorization, setAutoCategorization] = useState<AutoCategorizationRule[]>([])
 
   const selectedMonthString = format(selectedMonth, 'yyyy-MM')
 
@@ -130,6 +147,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     setMonthlyBudgets(raw.map(convertDbMonthlyBudget))
   }, [profileId, selectedMonthString, budgetType])
 
+  const refreshAutoCategorization = useCallback(async () => {
+    if (!profileId) return
+    const raw = await databaseService.getAutoCategorizationRules(profileId)
+    setAutoCategorization(raw as AutoCategorizationRule[])
+  }, [profileId])
+
   const refreshAll = useCallback(async () => {
     if (!profileId) return
     setIsLoading(true)
@@ -144,11 +167,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         refreshProjectStatuses(),
         refreshSettings(),
         refreshMonthlyBudgets(),
+        refreshAutoCategorization(),
       ])
     } finally {
       setIsLoading(false)
     }
-  }, [profileId, refreshAccounts, refreshTransactions, refreshCategories, refreshIncomeSources, refreshProjects, refreshProjectTypes, refreshProjectStatuses, refreshSettings, refreshMonthlyBudgets])
+  }, [profileId, refreshAccounts, refreshTransactions, refreshCategories, refreshIncomeSources, refreshProjects, refreshProjectTypes, refreshProjectStatuses, refreshSettings, refreshMonthlyBudgets, refreshAutoCategorization])
 
   // Load data when profile changes
   useEffect(() => {
@@ -165,6 +189,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       setProjectStatuses([])
       setSettings(null)
       setMonthlyBudgets([])
+      setAutoCategorization([])
       setIsLoading(false)
     }
   }, [profileId]) // only re-run when profileId changes, not refreshAll
@@ -212,6 +237,23 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     [filteredIncomeSources, selectedMonth]
   )
 
+  // Unfiltered data object for screens that do their own filtering
+  const appData: AppDataType = useMemo(
+    () => ({
+      accounts,
+      transactions,
+      categories,
+      incomeSources,
+      monthlyBudgets,
+      autoCategorization,
+      projects,
+      projectTypes,
+      projectStatuses,
+      settings,
+    }),
+    [accounts, transactions, categories, incomeSources, monthlyBudgets, autoCategorization, projects, projectTypes, projectStatuses, settings]
+  )
+
   return (
     <BudgetContext.Provider
       value={{
@@ -219,6 +261,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         setBudgetType,
         selectedMonth,
         setSelectedMonth,
+        appData,
         accounts: filteredAccounts,
         transactions: filteredTransactions,
         categories: filteredCategories,

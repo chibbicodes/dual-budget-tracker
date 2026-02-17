@@ -1,5 +1,5 @@
 import { initializeApp, FirebaseApp } from 'firebase/app'
-import { getAuth, Auth } from 'firebase/auth'
+import { getAuth, initializeAuth, Auth, Persistence } from 'firebase/auth'
 import { getFirestore, Firestore } from 'firebase/firestore'
 
 /**
@@ -15,6 +15,11 @@ export interface FirebaseConfig {
   appId?: string
 }
 
+export interface FirebaseInitOptions {
+  config: FirebaseConfig
+  persistence?: Persistence
+}
+
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let db: Firestore | null = null
@@ -23,9 +28,19 @@ let configured = false
 /**
  * Initialize Firebase with config provided by the host app.
  * Must be called once at app startup.
+ *
+ * Pass `persistence` on React Native to use AsyncStorage-backed persistence
+ * instead of the default memory-only persistence.
  */
-export function initializeFirebase(config: FirebaseConfig): void {
+export function initializeFirebase(
+  configOrOptions: FirebaseConfig | FirebaseInitOptions,
+): void {
   if (configured) return
+
+  const config =
+    'config' in configOrOptions ? configOrOptions.config : configOrOptions
+  const persistence =
+    'config' in configOrOptions ? configOrOptions.persistence : undefined
 
   if (!config.apiKey || !config.authDomain || !config.projectId) {
     console.warn('Firebase not configured — cloud sync will be disabled')
@@ -34,7 +49,9 @@ export function initializeFirebase(config: FirebaseConfig): void {
 
   try {
     app = initializeApp(config)
-    auth = getAuth(app)
+    auth = persistence
+      ? initializeAuth(app, { persistence })
+      : getAuth(app)
     db = getFirestore(app)
     configured = true
     console.log('Firebase initialized successfully')

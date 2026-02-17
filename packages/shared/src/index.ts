@@ -49,7 +49,7 @@ export {
   auth as firebaseAuth,
   db as firebaseDb,
 } from './services/firebase/config'
-export type { FirebaseConfig } from './services/firebase/config'
+export type { FirebaseConfig, FirebaseInitOptions } from './services/firebase/config'
 
 export {
   signUp,

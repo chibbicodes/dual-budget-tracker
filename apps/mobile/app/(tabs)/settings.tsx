@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../contexts/ProfileContext'
 import { useBudget } from '../../contexts/BudgetContext'
+import { useSync } from '../../hooks/useSync'
 import { databaseService } from '../../services/database'
 import { formatCurrency } from '@dual-budget/shared'
 import { Spacing, FontSize, BorderRadius } from '../../constants/theme'
@@ -24,9 +25,14 @@ export default function SettingsScreen() {
   const { user, isFirebaseReady } = useAuth()
   const { activeProfile, profiles } = useProfile()
   const { settings, refreshAll } = useBudget()
+  const { syncNow, isSyncing, lastSyncedAt } = useSync()
 
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  // Auto-sync on first load when signed in
+  useEffect(() => {
+    if (user && activeProfile && !lastSyncedAt && !isSyncing) {
+      syncNow(activeProfile.id).then(() => refreshAll())
+    }
+  }, [user, activeProfile?.id])
 
   if (!settings || !activeProfile) {
     return (
@@ -81,18 +87,11 @@ export default function SettingsScreen() {
   }
 
   // Sync actions
-  const handleSyncNow = async () => {
-    if (!user) return
-    setIsSyncing(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setLastSyncedAt(new Date().toISOString())
-    } catch (error) {
-      console.error('Sync failed:', error)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
+  const handleSyncNow = useCallback(async () => {
+    if (!user || !activeProfile) return
+    await syncNow(activeProfile.id)
+    refreshAll()
+  }, [user, activeProfile, syncNow, refreshAll])
 
   // Danger zone actions
   const handleClearData = () => {

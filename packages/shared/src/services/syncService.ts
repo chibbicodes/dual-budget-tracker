@@ -417,10 +417,12 @@ class SyncService {
       }
 
       const cloudAccounts = await getRecordsFromCloud('accounts', profileId)
+      let created = 0, updated = 0, skipped = 0
 
       for (const cloudAccount of cloudAccounts) {
         // Only sync accounts that belong to this profile
         if (cloudAccount.profileId !== profileId) {
+          skipped++
           continue
         }
 
@@ -452,6 +454,7 @@ class SyncService {
               deletedAt: cloudAccount.deletedAt || null,
               updatedAt: cloudAccount.updatedAt,
             })
+            updated++
           } else {
             // Create new account
             await this.db.createAccountForSync({
@@ -471,9 +474,13 @@ class SyncService {
               createdAt: cloudAccount.createdAt,
               updatedAt: cloudAccount.updatedAt,
             })
+            created++
           }
+        } else {
+          skipped++
         }
       }
+      console.log(`Pull accounts (${profileId}): ${created} created, ${updated} updated, ${skipped} skipped`)
     } catch (error) {
       console.error('Failed to pull accounts:', error)
       throw error
@@ -493,6 +500,7 @@ class SyncService {
       }
 
       const cloudCategories = await getRecordsFromCloud('categories', profileId)
+      let catWritten = 0
 
       for (const cloudCategory of cloudCategories) {
         // Only sync categories that belong to this profile
@@ -550,8 +558,10 @@ class SyncService {
               updatedAt: cloudCategory.updatedAt,
             })
           }
+          catWritten++
         }
       }
+      console.log(`Pull categories (${profileId}): ${catWritten} written of ${cloudCategories.length}`)
     } catch (error) {
       console.error('Failed to pull categories:', error)
       throw error
@@ -571,6 +581,7 @@ class SyncService {
       }
 
       const cloudTransactions = await getRecordsFromCloud('transactions', profileId)
+      let txWritten = 0
 
       for (const cloudTransaction of cloudTransactions) {
         // Only sync transactions that belong to this profile
@@ -627,8 +638,10 @@ class SyncService {
               notes: cloudTransaction.notes,
             })
           }
+          txWritten++
         }
       }
+      console.log(`Pull transactions (${profileId}): ${txWritten} written of ${cloudTransactions.length}`)
     } catch (error) {
       console.error('Failed to pull transactions:', error)
       throw error

@@ -19,11 +19,21 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
-// 3. Force single copies of react/react-native to avoid duplicate React instances
-//    (root has react 18.x for Electron, mobile needs react 19.x)
-config.resolver.extraNodeModules = {
-  react: path.dirname(require.resolve('react/package.json')),
-  'react-native': path.dirname(require.resolve('react-native/package.json')),
+// 3. Deduplicate react — the root has React 18.x (Electron) and mobile needs
+//    React 19.x. Packages hoisted to root (like @react-navigation/core) resolve
+//    React 18 via standard node_modules lookup. resolveRequest intercepts ALL
+//    react imports and forces them to the mobile app's React 19.
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'react' || moduleName.startsWith('react/')) {
+    try {
+      // require.resolve runs from apps/mobile/, so it finds React 19.x
+      return { type: 'sourceFile', filePath: require.resolve(moduleName) };
+    } catch {}
+  }
+  // Use the default resolver for everything else
+  const resolve = defaultResolveRequest || context.resolveRequest;
+  return resolve(context, moduleName, platform);
 };
 
 // 4. Block Electron/desktop directories from Metro resolution as a safety net

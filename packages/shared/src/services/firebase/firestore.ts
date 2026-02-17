@@ -149,6 +149,7 @@ export async function getRecordsFromCloud(
     )
 
     const snapshot = await getDocs(q)
+    console.log(`Cloud query ${collectionName} (profileId=${profileId}): ${snapshot.size} record(s)`)
     return snapshot.docs.map((doc) => {
       const data = doc.data()
       return {

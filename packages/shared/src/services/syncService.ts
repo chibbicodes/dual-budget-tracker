@@ -65,12 +65,14 @@ export interface DatabaseAdapter {
   getProjectTypes(profileId: string): Promise<any[]>
   getProjectTypesForSync(profileId: string): Promise<any[]>
   getProjectType(id: string): Promise<any>
+  getProjectTypeForSync(id: string): Promise<any>
   updateProjectType(id: string, updates: any): Promise<any>
   createProjectType(projectType: any): Promise<any>
   deleteProjectType(id: string): Promise<any>
   getProjectStatuses(profileId: string): Promise<any[]>
   getProjectStatusesForSync(profileId: string): Promise<any[]>
   getProjectStatus(id: string): Promise<any>
+  getProjectStatusForSync(id: string): Promise<any>
   updateProjectStatus(id: string, updates: any): Promise<any>
   createProjectStatus(status: any): Promise<any>
   deleteProjectStatus(id: string): Promise<any>
@@ -599,7 +601,7 @@ class SyncService {
           new Date(cloudTransaction.updatedAt) > new Date(localTransaction.updated_at)
         ) {
           if (localTransaction) {
-            // Update existing (and resurrect if soft-deleted)
+            // Update existing, preserving cloud deletion status
             await this.db.updateTransaction(cloudTransaction.id, {
               date: cloudTransaction.date,
               description: cloudTransaction.description,
@@ -615,10 +617,10 @@ class SyncService {
               tax_deductible: cloudTransaction.taxDeductible,
               reconciled: cloudTransaction.reconciled,
               notes: cloudTransaction.notes,
-              deleted_at: null,
+              deleted_at: cloudTransaction.deletedAt || null,
             })
-          } else {
-            // Create new
+          } else if (!cloudTransaction.deletedAt) {
+            // Only create locally if the cloud record is not deleted
             await this.db.createTransaction({
               id: cloudTransaction.id,
               profile_id: profileId,
@@ -678,7 +680,7 @@ class SyncService {
           new Date(cloudIncomeSource.updatedAt) > new Date(localIncomeSource.updated_at)
         ) {
           if (localIncomeSource) {
-            // Update existing (and resurrect if soft-deleted)
+            // Update existing, preserving cloud deletion status
             await this.db.updateIncomeSource(cloudIncomeSource.id, {
               name: cloudIncomeSource.name,
               budget_type: cloudIncomeSource.budgetType,
@@ -693,10 +695,10 @@ class SyncService {
               total_occurrences: cloudIncomeSource.totalOccurrences || null,
               client_source: cloudIncomeSource.clientSource,
               is_active: cloudIncomeSource.isActive,
-              deleted_at: null,
+              deleted_at: cloudIncomeSource.deletedAt || null,
             })
-          } else {
-            // Create new
+          } else if (!cloudIncomeSource.deletedAt) {
+            // Only create locally if the cloud record is not deleted
             await this.db.createIncomeSource({
               id: cloudIncomeSource.id,
               profile_id: profileId,
@@ -753,7 +755,7 @@ class SyncService {
           new Date(cloudProject.updatedAt) > new Date(localProject.updated_at)
         ) {
           if (localProject) {
-            // Update existing (and resurrect if soft-deleted)
+            // Update existing, preserving cloud deletion status
             await this.db.updateProject(cloudProject.id, {
               name: cloudProject.name,
               budget_type: cloudProject.budgetType,
@@ -765,10 +767,10 @@ class SyncService {
               date_completed: cloudProject.dateCompleted,
               commission_paid: cloudProject.commissionPaid,
               notes: cloudProject.notes,
-              deleted_at: null,
+              deleted_at: cloudProject.deletedAt || null,
             })
-          } else {
-            // Create new
+          } else if (!cloudProject.deletedAt) {
+            // Only create locally if the cloud record is not deleted
             await this.db.createProject({
               id: cloudProject.id,
               profile_id: profileId,
@@ -812,7 +814,7 @@ class SyncService {
           continue
         }
 
-        const localProjectType = await this.db.getProjectType(cloudProjectType.id)
+        const localProjectType = await this.db.getProjectTypeForSync(cloudProjectType.id)
 
         // Compare timestamps - update if cloud is newer
         if (
@@ -822,14 +824,15 @@ class SyncService {
           new Date(cloudProjectType.updatedAt) > new Date(localProjectType.updated_at)
         ) {
           if (localProjectType) {
-            // Update existing
+            // Update existing, preserving cloud deletion status
             await this.db.updateProjectType(cloudProjectType.id, {
               name: cloudProjectType.name,
               budget_type: cloudProjectType.budgetType,
               allowed_statuses: cloudProjectType.allowedStatuses,
+              deleted_at: cloudProjectType.deletedAt || null,
             })
-          } else {
-            // Create new
+          } else if (!cloudProjectType.deletedAt) {
+            // Only create locally if the cloud record is not deleted
             await this.db.createProjectType({
               id: cloudProjectType.id,
               profile_id: profileId,
@@ -866,7 +869,7 @@ class SyncService {
           continue
         }
 
-        const localProjectStatus = await this.db.getProjectStatus(cloudProjectStatus.id)
+        const localProjectStatus = await this.db.getProjectStatusForSync(cloudProjectStatus.id)
 
         // Compare timestamps - update if cloud is newer
         if (
@@ -876,13 +879,14 @@ class SyncService {
           new Date(cloudProjectStatus.updatedAt) > new Date(localProjectStatus.updated_at)
         ) {
           if (localProjectStatus) {
-            // Update existing
+            // Update existing, preserving cloud deletion status
             await this.db.updateProjectStatus(cloudProjectStatus.id, {
               name: cloudProjectStatus.name,
               description: cloudProjectStatus.description,
+              deleted_at: cloudProjectStatus.deletedAt || null,
             })
-          } else {
-            // Create new
+          } else if (!cloudProjectStatus.deletedAt) {
+            // Only create locally if the cloud record is not deleted
             await this.db.createProjectStatus({
               id: cloudProjectStatus.id,
               profile_id: profileId,

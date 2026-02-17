@@ -1105,6 +1105,23 @@ export class DatabaseService implements DatabaseAdapter {
     return result
   }
 
+  async getProjectTypeForSync(id: string): Promise<any> {
+    const result = this.db.getFirstSync(
+      'SELECT * FROM project_types WHERE id = ?',
+      [id]
+    ) as any
+
+    if (result && result.allowed_statuses && typeof result.allowed_statuses === 'string') {
+      try {
+        result.allowed_statuses = JSON.parse(result.allowed_statuses)
+      } catch {
+        result.allowed_statuses = []
+      }
+    }
+
+    return result
+  }
+
   async createProjectType(projectType: any): Promise<any> {
     const now = new Date().toISOString()
 
@@ -1183,6 +1200,13 @@ export class DatabaseService implements DatabaseAdapter {
   async getProjectStatus(id: string): Promise<any> {
     return this.db.getFirstSync(
       'SELECT * FROM project_statuses WHERE id = ? AND deleted_at IS NULL',
+      [id]
+    )
+  }
+
+  async getProjectStatusForSync(id: string): Promise<any> {
+    return this.db.getFirstSync(
+      'SELECT * FROM project_statuses WHERE id = ?',
       [id]
     )
   }

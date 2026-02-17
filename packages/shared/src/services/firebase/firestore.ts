@@ -74,7 +74,6 @@ export async function syncRecordToCloud(
     }
 
     await setDoc(recordRef, firestoreData, { merge: true })
-    console.log(`Synced ${collectionName}/${record.id} to cloud`)
   } catch (error) {
     console.error(`Failed to sync ${collectionName}/${record.id}:`, error)
     throw error

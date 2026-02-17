@@ -3,6 +3,14 @@ import * as SecureStore from 'expo-secure-store'
 import type { Profile } from '@dual-budget/shared'
 import { databaseService } from '../services/database'
 
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 interface ProfileContextType {
   profiles: Profile[]
   activeProfile: Profile | null
@@ -49,7 +57,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
       // Auto-create a default profile on first launch
       if (loaded.length === 0) {
-        const id = crypto.randomUUID()
+        const id = generateUUID()
         const result = await databaseService.createProfile({ id, name: 'Personal' })
         const defaultProfile: Profile = {
           id: result.id,
@@ -74,7 +82,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [loadProfiles])
 
   const createProfile = useCallback(async (name: string, description?: string) => {
-    const result = await databaseService.createProfile({ id: crypto.randomUUID(), name, description })
+    const result = await databaseService.createProfile({ id: generateUUID(), name, description })
     const profile: Profile = {
       id: result.id,
       name: result.name,

@@ -1,6 +1,14 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite'
 import type { DatabaseAdapter } from '@dual-budget/shared'
 
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 /**
  * Mobile SQLite database service for Dual Budget Tracker
  * Uses expo-sqlite to provide a local SQLite database with the same schema as the desktop app.
@@ -798,7 +806,7 @@ export class DatabaseService implements DatabaseAdapter {
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        transaction.id ?? crypto.randomUUID(),
+        transaction.id ?? generateUUID(),
         transaction.profile_id,
         transaction.date,
         transaction.description,
@@ -895,7 +903,7 @@ export class DatabaseService implements DatabaseAdapter {
         client_source, is_active, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        source.id ?? crypto.randomUUID(),
+        source.id ?? generateUUID(),
         source.profile_id,
         source.name,
         source.budget_type,
@@ -990,7 +998,7 @@ export class DatabaseService implements DatabaseAdapter {
         commission_paid, notes, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        project.id ?? crypto.randomUUID(),
+        project.id ?? generateUUID(),
         project.profile_id,
         project.name,
         project.budget_type,
@@ -1106,7 +1114,7 @@ export class DatabaseService implements DatabaseAdapter {
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        projectType.id ?? crypto.randomUUID(),
+        projectType.id ?? generateUUID(),
         projectType.profile_id,
         projectType.name,
         projectType.budget_type,
@@ -1187,7 +1195,7 @@ export class DatabaseService implements DatabaseAdapter {
         id, profile_id, name, description, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)`,
       [
-        status.id ?? crypto.randomUUID(),
+        status.id ?? generateUUID(),
         status.profile_id,
         status.name,
         status.description ?? null,
@@ -1259,7 +1267,7 @@ export class DatabaseService implements DatabaseAdapter {
 
   async createMonthlyBudget(budget: any): Promise<any> {
     const now = new Date().toISOString()
-    const id = budget.id ?? crypto.randomUUID()
+    const id = budget.id ?? generateUUID()
 
     this.db.runSync(
       `INSERT INTO monthly_budgets (
@@ -1335,7 +1343,7 @@ export class DatabaseService implements DatabaseAdapter {
 
   async createAutoCategorizationRule(rule: any): Promise<any> {
     const now = new Date().toISOString()
-    const id = rule.id ?? crypto.randomUUID()
+    const id = rule.id ?? generateUUID()
 
     this.db.runSync(
       `INSERT INTO auto_categorization_rules (

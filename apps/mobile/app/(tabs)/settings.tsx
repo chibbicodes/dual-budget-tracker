@@ -23,14 +23,14 @@ export default function SettingsScreen() {
   const { colors } = useTheme()
   const router = useRouter()
   const { user, isFirebaseReady } = useAuth()
-  const { activeProfile, profiles } = useProfile()
+  const { activeProfile, profiles, refreshProfiles, switchProfile } = useProfile()
   const { settings, refreshAll } = useBudget()
   const { syncNow, isSyncing, lastSyncedAt } = useSync()
 
   // Auto-sync on first load when signed in
   useEffect(() => {
     if (user && activeProfile && !lastSyncedAt && !isSyncing) {
-      syncNow(activeProfile.id).then(() => refreshAll())
+      syncNow(activeProfile.id).then(() => { refreshProfiles(); refreshAll() })
     }
   }, [user, activeProfile?.id])
 
@@ -90,8 +90,9 @@ export default function SettingsScreen() {
   const handleSyncNow = useCallback(async () => {
     if (!user || !activeProfile) return
     await syncNow(activeProfile.id)
+    await refreshProfiles()
     refreshAll()
-  }, [user, activeProfile, syncNow, refreshAll])
+  }, [user, activeProfile, syncNow, refreshProfiles, refreshAll])
 
   // Danger zone actions
   const handleClearData = () => {

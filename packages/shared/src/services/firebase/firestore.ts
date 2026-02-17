@@ -166,6 +166,34 @@ export async function getRecordsFromCloud(
 }
 
 /**
+ * Get all records from a Firestore collection (no profileId filter).
+ * Used to discover cloud profiles on a new device.
+ */
+export async function getAllRecordsFromCloud(
+  collectionName: string
+): Promise<SyncableRecord[]> {
+  try {
+    const userCollection = getUserCollection(collectionName)
+    const q = query(userCollection, orderBy('updatedAt', 'desc'))
+
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        ...data,
+        id: doc.id,
+        updatedAt: data.updatedAt
+          ? fromFirestoreTimestamp(data.updatedAt)
+          : undefined,
+      } as SyncableRecord
+    })
+  } catch (error) {
+    console.error(`Failed to get all ${collectionName} records:`, error)
+    throw error
+  }
+}
+
+/**
  * Delete a record from Firestore
  */
 export async function deleteRecordFromCloud(

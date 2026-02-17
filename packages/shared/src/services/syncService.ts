@@ -1,6 +1,7 @@
 import {
   syncRecordToCloud,
   getRecordsFromCloud,
+  getAllRecordsFromCloud,
   subscribeToCollection,
   deleteAllRecordsFromCloud,
 } from './firebase/firestore'
@@ -27,6 +28,7 @@ export interface SyncProgress {
 export interface DatabaseAdapter {
   getAllProfiles(): Promise<any[]>
   getProfile(id: string): Promise<any>
+  createProfile(profile: any): Promise<any>
   updateProfile(id: string, updates: any): Promise<any>
   getAccounts(profileId: string): Promise<any[]>
   getAccountsForSync(profileId: string): Promise<any[]>
@@ -370,13 +372,24 @@ class SyncService {
       for (const cloudProfile of cloudProfiles) {
         const localProfile = await this.db.getProfile(cloudProfile.id)
 
-        // Compare timestamps - update if cloud is newer
-        if (
-          !localProfile ||
+        if (!localProfile) {
+          // Profile doesn't exist locally (new device) — create it
+          console.log(`Creating local profile from cloud: ${cloudProfile.id} (${cloudProfile.name})`)
+          await this.db.createProfile({
+            id: cloudProfile.id,
+            name: cloudProfile.name,
+            description: cloudProfile.description,
+            password_hash: cloudProfile.passwordHash,
+            password_hint: cloudProfile.passwordHint,
+            created_at: cloudProfile.createdAt,
+            updated_at: cloudProfile.updatedAt,
+          })
+        } else if (
           !localProfile.updated_at ||
           !cloudProfile.updatedAt ||
           new Date(cloudProfile.updatedAt) > new Date(localProfile.updated_at)
         ) {
+          // Compare timestamps - update if cloud is newer
           await this.db.updateProfile(cloudProfile.id, {
             name: cloudProfile.name,
             description: cloudProfile.description,
@@ -1042,70 +1055,83 @@ class SyncService {
       await this.syncProjectStatuses(profileId)
 
       // Step 2: Pull remote changes from cloud
-      // Important: Pull in dependency order (parent tables before child tables)
+      // First, discover all cloud profiles for this user account.
+      // On a new device the local profileId won't match the cloud profileId,
+      // so we need to pull data for every cloud profile we find.
       this.notifyProgress({
         status: 'syncing',
-        message: 'Pulling profiles...',
+        message: 'Discovering cloud profiles...',
         current: 9,
         total: totalSteps,
       })
-      await this.pullProfiles(profileId)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling project statuses...',
-        current: 10,
-        total: totalSteps,
-      })
-      await this.pullProjectStatuses(profileId)
+      const cloudProfiles = await getAllRecordsFromCloud('profiles')
+      const cloudProfileIds = cloudProfiles.map((p) => p.id)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling project types...',
-        current: 11,
-        total: totalSteps,
-      })
-      await this.pullProjectTypes(profileId)
+      // Build the set of profile IDs to pull: always include local, plus any cloud-only ones
+      const profileIdsToPull = new Set([profileId, ...cloudProfileIds])
+      console.log(`Found ${cloudProfiles.length} cloud profile(s), pulling for ${profileIdsToPull.size} profile(s)`)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling accounts...',
-        current: 12,
-        total: totalSteps,
-      })
-      await this.pullAccounts(profileId)
+      for (const pullId of profileIdsToPull) {
+        // Ensure each cloud profile exists locally before pulling its child data
+        await this.pullProfiles(pullId)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling categories...',
-        current: 13,
-        total: totalSteps,
-      })
-      await this.pullCategories(profileId)
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling project statuses...',
+          current: 10,
+          total: totalSteps,
+        })
+        await this.pullProjectStatuses(pullId)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling income sources...',
-        current: 14,
-        total: totalSteps,
-      })
-      await this.pullIncomeSources(profileId)
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling project types...',
+          current: 11,
+          total: totalSteps,
+        })
+        await this.pullProjectTypes(pullId)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling projects...',
-        current: 15,
-        total: totalSteps,
-      })
-      await this.pullProjects(profileId)
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling accounts...',
+          current: 12,
+          total: totalSteps,
+        })
+        await this.pullAccounts(pullId)
 
-      this.notifyProgress({
-        status: 'syncing',
-        message: 'Pulling transactions...',
-        current: 16,
-        total: totalSteps,
-      })
-      await this.pullTransactions(profileId)
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling categories...',
+          current: 13,
+          total: totalSteps,
+        })
+        await this.pullCategories(pullId)
+
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling income sources...',
+          current: 14,
+          total: totalSteps,
+        })
+        await this.pullIncomeSources(pullId)
+
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling projects...',
+          current: 15,
+          total: totalSteps,
+        })
+        await this.pullProjects(pullId)
+
+        this.notifyProgress({
+          status: 'syncing',
+          message: 'Pulling transactions...',
+          current: 16,
+          total: totalSteps,
+        })
+        await this.pullTransactions(pullId)
+      }
 
       // Store last synced timestamp
       this.storage.setItem('lastSyncedAt', new Date().toISOString())

@@ -69,6 +69,7 @@ export {
   syncRecordsToCloud,
   getRecordFromCloud,
   getRecordsFromCloud,
+  getAllRecordsFromCloud,
   deleteRecordFromCloud,
   deleteAllRecordsFromCloud,
   subscribeToCollection,

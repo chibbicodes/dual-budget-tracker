@@ -1,15 +1,13 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
-// Find the project and workspace directories
 const projectRoot = __dirname;
-// This can be replaced with `auto` to automatically find the workspace root
 const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// 1. Only watch the shared package and root node_modules (NOT the entire monorepo root,
-//    which would pull in dist-electron/, electron/, src/ etc.)
+// 1. Only watch the shared package and root node_modules (NOT the entire monorepo
+//    root, which would pull in dist-electron/, electron/, src/ etc.)
 config.watchFolders = [
   path.resolve(monorepoRoot, 'packages', 'shared'),
   path.resolve(monorepoRoot, 'node_modules'),
@@ -21,7 +19,14 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
-// 3. Force Metro to resolve (sub)dependencies only from the `nodeModulesPaths`
-config.resolver.disableHierarchicalLookup = true;
+// 3. Block Electron/desktop directories from Metro resolution as a safety net
+const exclusionList = require('metro-config/src/defaults/exclusionList');
+config.resolver.blockList = exclusionList([
+  /[/\\]dist-electron[/\\].*/,
+  /[/\\]electron[/\\].*/,
+  new RegExp('^' + path.resolve(monorepoRoot, 'src').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp('^' + path.resolve(monorepoRoot, 'build').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp('^' + path.resolve(monorepoRoot, 'scripts').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+]);
 
 module.exports = config;

@@ -45,11 +45,29 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     ;(async () => {
-      const loaded = await loadProfiles()
+      let loaded = await loadProfiles()
+
+      // Auto-create a default profile on first launch
+      if (loaded.length === 0) {
+        const id = crypto.randomUUID()
+        const result = await databaseService.createProfile({ id, name: 'Personal' })
+        const defaultProfile: Profile = {
+          id: result.id,
+          name: result.name,
+          description: result.description,
+          createdAt: result.created_at,
+          updatedAt: result.updated_at,
+          lastAccessedAt: result.last_accessed_at,
+        }
+        loaded = [defaultProfile]
+        setProfiles(loaded)
+      }
+
       const savedId = await SecureStore.getItemAsync('active-profile-id')
       const match = loaded.find((p) => p.id === savedId) || loaded[0]
       if (match) {
         setActiveProfile(match)
+        await SecureStore.setItemAsync('active-profile-id', match.id)
       }
       setIsLoading(false)
     })()

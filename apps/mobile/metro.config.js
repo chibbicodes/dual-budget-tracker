@@ -8,8 +8,12 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// 1. Watch all files within the monorepo
-config.watchFolders = [monorepoRoot];
+// 1. Only watch the shared package and root node_modules (NOT the entire monorepo root,
+//    which would pull in dist-electron/, electron/, src/ etc.)
+config.watchFolders = [
+  path.resolve(monorepoRoot, 'packages', 'shared'),
+  path.resolve(monorepoRoot, 'node_modules'),
+];
 
 // 2. Let Metro know where to resolve packages and in what order
 config.resolver.nodeModulesPaths = [
@@ -19,15 +23,5 @@ config.resolver.nodeModulesPaths = [
 
 // 3. Force Metro to resolve (sub)dependencies only from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = true;
-
-// 4. Exclude Electron/Vite desktop directories from Metro bundling
-const exclusionList = require('metro-config/src/defaults/exclusionList');
-config.resolver.blockList = exclusionList([
-  new RegExp(path.resolve(monorepoRoot, 'dist-electron').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp(path.resolve(monorepoRoot, 'electron').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp(path.resolve(monorepoRoot, 'src').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp(path.resolve(monorepoRoot, 'build').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp(path.resolve(monorepoRoot, 'scripts').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-]);
 
 module.exports = config;

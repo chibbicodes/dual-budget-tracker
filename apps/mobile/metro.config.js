@@ -20,13 +20,12 @@ config.resolver.nodeModulesPaths = [
 ];
 
 // 3. Block Electron/desktop directories from Metro resolution as a safety net
-const exclusionList = require('metro-config/src/defaults/exclusionList');
-config.resolver.blockList = exclusionList([
+config.resolver.blockList = [
   /[/\\]dist-electron[/\\].*/,
   /[/\\]electron[/\\].*/,
-  new RegExp('^' + path.resolve(monorepoRoot, 'src').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp('^' + path.resolve(monorepoRoot, 'build').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-  new RegExp('^' + path.resolve(monorepoRoot, 'scripts').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
-]);
+  new RegExp(path.resolve(monorepoRoot, 'src').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'build').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+  new RegExp(path.resolve(monorepoRoot, 'scripts').replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'),
+];
 
 module.exports = config;

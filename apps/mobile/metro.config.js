@@ -19,7 +19,14 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
-// 3. Block Electron/desktop directories from Metro resolution as a safety net
+// 3. Force single copies of react/react-native to avoid duplicate React instances
+//    (root has react 18.x for Electron, mobile needs react 19.x)
+config.resolver.extraNodeModules = {
+  react: path.dirname(require.resolve('react/package.json')),
+  'react-native': path.dirname(require.resolve('react-native/package.json')),
+};
+
+// 4. Block Electron/desktop directories from Metro resolution as a safety net
 config.resolver.blockList = [
   /[/\\]dist-electron[/\\].*/,
   /[/\\]electron[/\\].*/,

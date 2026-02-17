@@ -1131,6 +1131,8 @@ class SyncService {
           total: totalSteps,
         })
         await this.pullTransactions(pullId)
+
+        console.log(`Finished pulling all data for profile ${pullId}`)
       }
 
       // Store last synced timestamp

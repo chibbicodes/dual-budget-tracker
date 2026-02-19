@@ -1427,16 +1427,25 @@ export class DatabaseService implements DatabaseAdapter {
    * Clear all data for a profile (keeps the profile itself)
    */
   async clearProfileData(profileId: string): Promise<void> {
-    // Delete in order to avoid foreign key issues
-    this.db.runSync('DELETE FROM transactions WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM monthly_budgets WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM projects WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM project_types WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM project_statuses WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM income_sources WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM accounts WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM categories WHERE profile_id = ?', [profileId])
-    this.db.runSync('DELETE FROM auto_categorization_rules WHERE profile_id = ?', [profileId])
+    // Temporarily disable FK constraints for bulk delete since synced data
+    // may have cross-profile FK references (e.g., projects from profile B
+    // referencing project_types from profile A)
+    this.db.runSync('PRAGMA foreign_keys = OFF')
+
+    try {
+      // Delete in child-to-parent order
+      this.db.runSync('DELETE FROM transactions WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM monthly_budgets WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM auto_categorization_rules WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM projects WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM income_sources WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM project_types WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM project_statuses WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM accounts WHERE profile_id = ?', [profileId])
+      this.db.runSync('DELETE FROM categories WHERE profile_id = ?', [profileId])
+    } finally {
+      this.db.runSync('PRAGMA foreign_keys = ON')
+    }
 
     // Reset settings to defaults
     this.db.runSync(

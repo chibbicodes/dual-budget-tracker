@@ -136,22 +136,32 @@ export default function IncomeScreen() {
     [appData.incomeSources, budgetType, selectedMonth]
   )
 
-  // Actual income from transactions this month
+  // Actual income from transactions this month (excluding transfers)
   const actualIncome = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth)
     const monthEnd = endOfMonth(selectedMonth)
+    const EXCLUDED_NAMES = ['transfer', 'transfer/payment']
     return appData.transactions
       .filter((t) => {
         const transDate = parseISO(t.date)
-        return (
-          t.budgetType === budgetType &&
-          t.amount > 0 &&
-          transDate >= monthStart &&
-          transDate <= monthEnd
-        )
+        if (
+          t.budgetType !== budgetType ||
+          t.amount <= 0 ||
+          transDate < monthStart ||
+          transDate > monthEnd
+        ) {
+          return false
+        }
+        // Exclude transfer categories from income calculation
+        const category = appData.categories.find((c) => c.id === t.categoryId)
+        const categoryName = category?.name?.toLowerCase() || ''
+        if (EXCLUDED_NAMES.includes(categoryName) || categoryName.includes('exclude from')) {
+          return false
+        }
+        return true
       })
       .reduce((sum, t) => sum + t.amount, 0)
-  }, [appData.transactions, budgetType, selectedMonth])
+  }, [appData.transactions, appData.categories, budgetType, selectedMonth])
 
   // All income sources for the selected budget type
   const allSources = useMemo(

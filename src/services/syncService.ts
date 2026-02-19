@@ -297,6 +297,31 @@ class SyncService {
   }
 
   /**
+   * Sync monthly budgets to cloud
+   */
+  private async syncMonthlyBudgets(profileId: string): Promise<void> {
+    try {
+      const monthlyBudgets = await databaseService.getMonthlyBudgets(profileId)
+
+      for (const budget of monthlyBudgets as any[]) {
+        await syncRecordToCloud('monthlyBudgets', {
+          id: budget.id,
+          profileId: budget.profile_id,
+          month: budget.month,
+          budgetType: budget.budget_type,
+          categoryId: budget.category_id,
+          amount: budget.amount,
+          createdAt: budget.created_at,
+          updatedAt: budget.updated_at,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to sync monthly budgets:', error)
+      throw error
+    }
+  }
+
+  /**
    * Pull profiles from cloud and update local database
    */
   private async pullProfiles(profileId: string): Promise<void> {
@@ -809,6 +834,47 @@ class SyncService {
   }
 
   /**
+   * Pull monthly budgets from cloud and update local database
+   */
+  private async pullMonthlyBudgets(profileId: string): Promise<void> {
+    try {
+      const localProfile = await databaseService.getProfile(profileId)
+      if (!localProfile) {
+        console.warn(`Profile ${profileId} not found locally, skipping monthly budget pull`)
+        return
+      }
+
+      const cloudBudgets = await getRecordsFromCloud('monthlyBudgets', profileId)
+      const localBudgets = await databaseService.getMonthlyBudgets(profileId)
+      const localMap = new Map((localBudgets as any[]).map((b: any) => [b.id, b]))
+
+      for (const cloudBudget of cloudBudgets) {
+        if (cloudBudget.profileId !== profileId) continue
+
+        const localBudget = localMap.get(cloudBudget.id)
+
+        if (
+          !localBudget ||
+          !localBudget.updated_at ||
+          !cloudBudget.updatedAt ||
+          new Date(cloudBudget.updatedAt) > new Date(localBudget.updated_at)
+        ) {
+          await databaseService.upsertMonthlyBudget({
+            profile_id: profileId,
+            month: cloudBudget.month,
+            budget_type: cloudBudget.budgetType,
+            category_id: cloudBudget.categoryId,
+            amount: cloudBudget.amount,
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to pull monthly budgets:', error)
+      throw error
+    }
+  }
+
+  /**
    * Clean up orphaned data from deleted profiles
    * This removes any accounts, categories, transactions, etc. that belong to profiles that no longer exist
    */
@@ -910,7 +976,7 @@ class SyncService {
       this.notifyProgress({ status: 'syncing', message: 'Cleaning up orphaned data...' })
       await this.cleanupOrphanedData()
 
-      const totalSteps = 16 // 8 push + 8 pull
+      const totalSteps = 18 // 9 push + 9 pull
 
       // Step 1: Push local changes to cloud
       this.notifyProgress({
@@ -977,12 +1043,24 @@ class SyncService {
       })
       await this.syncProjectStatuses(profileId)
 
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Syncing monthly budgets...',
+        current: 9,
+        total: totalSteps,
+      })
+      try {
+        await this.syncMonthlyBudgets(profileId)
+      } catch (error) {
+        console.warn('Monthly budgets push failed (non-fatal, may need Firestore index):', error)
+      }
+
       // Step 2: Pull remote changes from cloud
       // Important: Pull in dependency order (parent tables before child tables)
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling profiles...',
-        current: 9,
+        current: 10,
         total: totalSteps,
       })
       await this.pullProfiles(profileId)
@@ -990,7 +1068,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling project statuses...',
-        current: 10,
+        current: 11,
         total: totalSteps,
       })
       await this.pullProjectStatuses(profileId)
@@ -998,7 +1076,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling project types...',
-        current: 11,
+        current: 12,
         total: totalSteps,
       })
       await this.pullProjectTypes(profileId)
@@ -1006,7 +1084,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling accounts...',
-        current: 12,
+        current: 13,
         total: totalSteps,
       })
       await this.pullAccounts(profileId)
@@ -1014,7 +1092,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling categories...',
-        current: 13,
+        current: 14,
         total: totalSteps,
       })
       await this.pullCategories(profileId)
@@ -1022,7 +1100,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling income sources...',
-        current: 14,
+        current: 15,
         total: totalSteps,
       })
       await this.pullIncomeSources(profileId)
@@ -1030,7 +1108,7 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling projects...',
-        current: 15,
+        current: 16,
         total: totalSteps,
       })
       await this.pullProjects(profileId)
@@ -1038,10 +1116,22 @@ class SyncService {
       this.notifyProgress({
         status: 'syncing',
         message: 'Pulling transactions...',
-        current: 16,
+        current: 17,
         total: totalSteps,
       })
       await this.pullTransactions(profileId)
+
+      this.notifyProgress({
+        status: 'syncing',
+        message: 'Pulling monthly budgets...',
+        current: 18,
+        total: totalSteps,
+      })
+      try {
+        await this.pullMonthlyBudgets(profileId)
+      } catch (error) {
+        console.warn('Monthly budgets pull failed (non-fatal, may need Firestore index):', error)
+      }
 
       // Store last synced timestamp
       localStorage.setItem('lastSyncedAt', new Date().toISOString())

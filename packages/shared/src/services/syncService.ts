@@ -1154,7 +1154,11 @@ class SyncService {
         current: 9,
         total: totalSteps,
       })
-      await this.syncMonthlyBudgets(profileId)
+      try {
+        await this.syncMonthlyBudgets(profileId)
+      } catch (error) {
+        console.warn('Monthly budgets push failed (non-fatal, may need Firestore index):', error)
+      }
 
       // Step 2: Pull remote changes from cloud
       // First, discover all cloud profiles for this user account.
@@ -1240,7 +1244,11 @@ class SyncService {
           current: 18,
           total: totalSteps,
         })
-        await this.pullMonthlyBudgets(pullId)
+        try {
+          await this.pullMonthlyBudgets(pullId)
+        } catch (error) {
+          console.warn('Monthly budgets pull failed (non-fatal, may need Firestore index):', error)
+        }
 
         console.log(`Finished pulling all data for profile ${pullId}`)
       }

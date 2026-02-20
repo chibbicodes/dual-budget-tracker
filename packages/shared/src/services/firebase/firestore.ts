@@ -56,7 +56,9 @@ function fromFirestoreTimestamp(timestamp: Timestamp): string {
 }
 
 /**
- * Sync a single record to Firestore
+ * Sync a single record to Firestore.
+ * Only writes if the local record is newer than the cloud version
+ * to prevent overwriting changes made on other devices.
  */
 export async function syncRecordToCloud(
   collectionName: string,
@@ -65,6 +67,23 @@ export async function syncRecordToCloud(
   try {
     const userCollection = getUserCollection(collectionName)
     const recordRef = doc(userCollection, record.id)
+
+    // Check if the cloud version is newer — if so, skip push
+    if (record.updatedAt) {
+      const cloudDoc = await getDoc(recordRef)
+      if (cloudDoc.exists()) {
+        const cloudData = cloudDoc.data()
+        if (cloudData.updatedAt) {
+          const cloudTime = cloudData.updatedAt instanceof Timestamp
+            ? cloudData.updatedAt.toDate()
+            : new Date(cloudData.updatedAt)
+          const localTime = new Date(record.updatedAt)
+          if (cloudTime >= localTime) {
+            return // Cloud is newer or same, skip push
+          }
+        }
+      }
+    }
 
     // Convert dates to Firestore Timestamps
     const firestoreData: DocumentData = {

@@ -19,7 +19,7 @@ import {
 } from 'date-fns'
 import {
   getProjectedMonthlyIncome,
-  getExpectedDatesForMonth,
+  getExpectedAmountForMonth,
   incomeSourceToLegacy,
   formatCurrency,
 } from '@dual-budget/shared'
@@ -141,14 +141,11 @@ export default function IncomeScreen() {
   // Per-source breakdown: expected and actual for the month
   const sourceBreakdown = useMemo(() => {
     return allSources.map((source) => {
-      // Expected for this month
+      // Expected for this month (uses firstOccurrenceAmount when applicable)
       let expectedForMonth = 0
       if (source.isActive) {
         const legacy = incomeSourceToLegacy(source)
-        const dates = getExpectedDatesForMonth(legacy, selectedMonth)
-        if (dates.length > 0) {
-          expectedForMonth = source.expectedAmount * dates.length
-        }
+        expectedForMonth = getExpectedAmountForMonth(legacy, selectedMonth)
       }
 
       // Actual received: transactions linked to this income source

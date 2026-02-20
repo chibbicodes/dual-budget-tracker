@@ -70,6 +70,11 @@ interface BudgetContextType {
   deleteTransaction: (id: string) => Promise<void>
   updateIncomeSource: (id: string, updates: Record<string, any>) => Promise<void>
 
+  // Monthly Budgets
+  getMonthlyBudget: (month: string, categoryId: string) => MonthlyBudget | undefined
+  addMonthlyBudget: (data: Record<string, any>) => Promise<void>
+  updateMonthlyBudget: (id: string, updates: Record<string, any>) => Promise<void>
+
   // Loading
   isLoading: boolean
 }
@@ -219,9 +224,35 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     if (updates.expectedAmount !== undefined) dbUpdates.expected_amount = updates.expectedAmount
     if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency
     if (updates.nextExpectedDate !== undefined) dbUpdates.next_expected_date = updates.nextExpectedDate
+    if (updates.clientSource !== undefined) dbUpdates.client_source = updates.clientSource
+    if (updates.incomeType !== undefined) dbUpdates.income_type = updates.incomeType
+    if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId
+    if (updates.budgetType !== undefined) dbUpdates.budget_type = updates.budgetType
     await databaseService.updateIncomeSource(id, dbUpdates)
     await refreshIncomeSources()
   }, [profileId, refreshIncomeSources])
+
+  const getMonthlyBudget = useCallback((month: string, categoryId: string): MonthlyBudget | undefined => {
+    return monthlyBudgets.find((mb) => mb.month === month && mb.categoryId === categoryId)
+  }, [monthlyBudgets])
+
+  const addMonthlyBudget = useCallback(async (data: Record<string, any>) => {
+    if (!profileId) return
+    await databaseService.createMonthlyBudget({
+      profile_id: profileId,
+      month: data.month,
+      budget_type: data.budgetType,
+      category_id: data.categoryId,
+      amount: data.amount,
+    })
+    await refreshMonthlyBudgets()
+  }, [profileId, refreshMonthlyBudgets])
+
+  const updateMonthlyBudget = useCallback(async (id: string, updates: Record<string, any>) => {
+    if (!profileId) return
+    await databaseService.updateMonthlyBudget(id, updates)
+    await refreshMonthlyBudgets()
+  }, [profileId, refreshMonthlyBudgets])
 
   const refreshAll = useCallback(async () => {
     if (!profileId) return
@@ -353,6 +384,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         updateTransaction,
         deleteTransaction,
         updateIncomeSource,
+        getMonthlyBudget,
+        addMonthlyBudget,
+        updateMonthlyBudget,
         isLoading,
       }}
     >

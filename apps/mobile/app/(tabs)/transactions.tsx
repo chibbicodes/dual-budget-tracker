@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  ScrollView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import {
@@ -29,6 +30,9 @@ import { QuickAddFAB } from '../../components/QuickAddFAB'
 import { EmptyState } from '../../components/EmptyState'
 import { Spacing, FontSize, BorderRadius } from '../../constants/theme'
 
+type TransactionTypeFilter = 'all' | 'income' | 'expense'
+type ReconciledFilter = 'all' | 'reconciled' | 'unreconciled'
+
 export default function TransactionsScreen() {
   const { colors } = useTheme()
   const haptics = useHaptics()
@@ -40,6 +44,13 @@ export default function TransactionsScreen() {
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
   const [searchText, setSearchText] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter states
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>('all')
+  const [reconciledFilter, setReconciledFilter] = useState<ReconciledFilter>('all')
 
   const handlePreviousMonth = useCallback(() => {
     setSelectedMonth((prev) => startOfMonth(subMonths(prev, 1)))
@@ -48,6 +59,39 @@ export default function TransactionsScreen() {
   const handleNextMonth = useCallback(() => {
     setSelectedMonth((prev) => startOfMonth(addMonths(prev, 1)))
   }, [])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (categoryFilter !== 'all') count++
+    if (accountFilter !== 'all') count++
+    if (typeFilter !== 'all') count++
+    if (reconciledFilter !== 'all') count++
+    return count
+  }, [categoryFilter, accountFilter, typeFilter, reconciledFilter])
+
+  const clearFilters = useCallback(() => {
+    setCategoryFilter('all')
+    setAccountFilter('all')
+    setTypeFilter('all')
+    setReconciledFilter('all')
+  }, [])
+
+  // Available categories and accounts for filters
+  const availableCategories = useMemo(
+    () =>
+      appData.categories
+        .filter((c) => c.budgetType === budgetType && c.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [appData.categories, budgetType]
+  )
+
+  const availableAccounts = useMemo(
+    () =>
+      appData.accounts
+        .filter((a) => a.budgetType === budgetType && !a.deletedAt)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [appData.accounts, budgetType]
+  )
 
   const filteredTransactions = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth)
@@ -59,12 +103,16 @@ export default function TransactionsScreen() {
         const transDate = parseISO(t.date)
         if (t.budgetType !== budgetType) return false
         if (transDate < monthStart || transDate > monthEnd) return false
-        if (
-          lowerSearch &&
-          !t.description.toLowerCase().includes(lowerSearch)
-        ) {
+        if (lowerSearch && !t.description.toLowerCase().includes(lowerSearch) &&
+            !(t.notes && t.notes.toLowerCase().includes(lowerSearch))) {
           return false
         }
+        if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) return false
+        if (accountFilter !== 'all' && t.accountId !== accountFilter) return false
+        if (typeFilter === 'income' && t.amount <= 0) return false
+        if (typeFilter === 'expense' && t.amount >= 0) return false
+        if (reconciledFilter === 'reconciled' && !t.reconciled) return false
+        if (reconciledFilter === 'unreconciled' && t.reconciled) return false
         return true
       })
       .sort((a, b) => {
@@ -72,7 +120,7 @@ export default function TransactionsScreen() {
         if (dateCompare !== 0) return dateCompare
         return b.createdAt.localeCompare(a.createdAt)
       })
-  }, [appData.transactions, budgetType, selectedMonth, searchText])
+  }, [appData.transactions, budgetType, selectedMonth, searchText, categoryFilter, accountFilter, typeFilter, reconciledFilter])
 
   const getCategoryName = useCallback(
     (categoryId: string) => {
@@ -80,6 +128,14 @@ export default function TransactionsScreen() {
       return cat ? cat.name : 'Uncategorized'
     },
     [appData.categories]
+  )
+
+  const getAccountName = useCallback(
+    (accountId: string) => {
+      const acc = appData.accounts.find((a) => a.id === accountId)
+      return acc ? acc.name : ''
+    },
+    [appData.accounts]
   )
 
   const handleDelete = useCallback(
@@ -107,8 +163,6 @@ export default function TransactionsScreen() {
   const handleRefresh = useCallback(async () => {
     if (!user) return
     setRefreshing(true)
-    // Trigger sync -- the BudgetContext/sync service handles the actual logic
-    // We simply wait a moment and then stop the refreshing indicator
     await new Promise((resolve) => setTimeout(resolve, 1500))
     setRefreshing(false)
   }, [user])
@@ -141,6 +195,32 @@ export default function TransactionsScreen() {
   )
 
   const keyExtractor = useCallback((item: Transaction) => item.id, [])
+
+  const FilterChip = useCallback(
+    ({ label, isActive, onPress }: { label: string; isActive: boolean; onPress: () => void }) => (
+      <Pressable
+        style={[
+          styles.filterChip,
+          {
+            backgroundColor: isActive ? colors.primary : colors.surface,
+            borderColor: isActive ? colors.primary : colors.border,
+          },
+        ]}
+        onPress={onPress}
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            { color: isActive ? '#ffffff' : colors.text },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    ),
+    [colors]
+  )
 
   const ListHeaderComponent = useMemo(
     () => (
@@ -241,6 +321,85 @@ export default function TransactionsScreen() {
           />
         </View>
 
+        {/* Filter Toggle */}
+        <View style={styles.filterToggleRow}>
+          <Pressable
+            style={[styles.filterToggle, { backgroundColor: colors.surface }]}
+            onPress={() => setShowFilters((prev) => !prev)}
+          >
+            <Text style={[styles.filterToggleText, { color: colors.primary }]}>
+              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </Text>
+            <Text style={[styles.filterArrow, { color: colors.primary }]}>
+              {showFilters ? '\u25B2' : '\u25BC'}
+            </Text>
+          </Pressable>
+          {activeFilterCount > 0 && (
+            <Pressable onPress={clearFilters} style={styles.clearButton}>
+              <Text style={[styles.clearButtonText, { color: colors.danger }]}>
+                Clear All
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Expandable Filters */}
+        {showFilters && (
+          <View style={[styles.filtersContainer, { backgroundColor: colors.surface }]}>
+            {/* Transaction Type Filter */}
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Type
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              <FilterChip label="All" isActive={typeFilter === 'all'} onPress={() => setTypeFilter('all')} />
+              <FilterChip label="Income" isActive={typeFilter === 'income'} onPress={() => setTypeFilter('income')} />
+              <FilterChip label="Expenses" isActive={typeFilter === 'expense'} onPress={() => setTypeFilter('expense')} />
+            </ScrollView>
+
+            {/* Reconciled Filter */}
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Status
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              <FilterChip label="All" isActive={reconciledFilter === 'all'} onPress={() => setReconciledFilter('all')} />
+              <FilterChip label="Reconciled" isActive={reconciledFilter === 'reconciled'} onPress={() => setReconciledFilter('reconciled')} />
+              <FilterChip label="Unreconciled" isActive={reconciledFilter === 'unreconciled'} onPress={() => setReconciledFilter('unreconciled')} />
+            </ScrollView>
+
+            {/* Account Filter */}
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Account
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              <FilterChip label="All Accounts" isActive={accountFilter === 'all'} onPress={() => setAccountFilter('all')} />
+              {availableAccounts.map((acc) => (
+                <FilterChip
+                  key={acc.id}
+                  label={acc.name}
+                  isActive={accountFilter === acc.id}
+                  onPress={() => setAccountFilter(acc.id)}
+                />
+              ))}
+            </ScrollView>
+
+            {/* Category Filter */}
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Category
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              <FilterChip label="All Categories" isActive={categoryFilter === 'all'} onPress={() => setCategoryFilter('all')} />
+              {availableCategories.map((cat) => (
+                <FilterChip
+                  key={cat.id}
+                  label={cat.name}
+                  isActive={categoryFilter === cat.id}
+                  onPress={() => setCategoryFilter(cat.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Result Count */}
         <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
           {filteredTransactions.length} transaction
@@ -253,9 +412,19 @@ export default function TransactionsScreen() {
       budgetType,
       selectedMonth,
       searchText,
+      showFilters,
+      activeFilterCount,
+      typeFilter,
+      reconciledFilter,
+      accountFilter,
+      categoryFilter,
+      availableAccounts,
+      availableCategories,
       filteredTransactions.length,
       handlePreviousMonth,
       handleNextMonth,
+      FilterChip,
+      clearFilters,
     ]
   )
 
@@ -264,13 +433,13 @@ export default function TransactionsScreen() {
       <EmptyState
         title="No Transactions"
         message={
-          searchText
-            ? 'No transactions match your search. Try a different term.'
+          searchText || activeFilterCount > 0
+            ? 'No transactions match your filters. Try adjusting them.'
             : 'No transactions for this month yet. Tap the + button to add one.'
         }
       />
     ),
-    [searchText]
+    [searchText, activeFilterCount]
   )
 
   return (
@@ -362,6 +531,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
     minHeight: 44,
+  },
+  filterToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  filterToggleText: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    marginRight: Spacing.xs,
+  },
+  filterArrow: {
+    fontSize: FontSize.xs,
+  },
+  clearButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  clearButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  filtersContainer: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  filterLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    marginBottom: Spacing.xs,
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    marginRight: Spacing.xs,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  filterChipText: {
+    fontSize: FontSize.sm,
+    fontWeight: '500',
   },
   resultCount: {
     fontSize: FontSize.sm,

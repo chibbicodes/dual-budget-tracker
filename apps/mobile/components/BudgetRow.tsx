@@ -109,6 +109,7 @@ export function BudgetRow({
 const styles = StyleSheet.create({
   row: {
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
   },
   nameCol: {

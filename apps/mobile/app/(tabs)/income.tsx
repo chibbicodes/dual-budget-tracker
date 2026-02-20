@@ -69,39 +69,6 @@ function getIncomeTypeLabel(
   return BUSINESS_TYPE_LABELS[incomeType as BusinessIncomeType] || incomeType
 }
 
-interface IncomeGroup {
-  type: string
-  label: string
-  sources: IncomeSource[]
-}
-
-function groupSourcesByType(
-  sources: IncomeSource[],
-  budgetType: BudgetType
-): IncomeGroup[] {
-  const groups = new Map<string, IncomeSource[]>()
-
-  sources.forEach((source) => {
-    const type = source.incomeType
-    if (!groups.has(type)) {
-      groups.set(type, [])
-    }
-    groups.get(type)!.push(source)
-  })
-
-  return Array.from(groups.entries())
-    .map(([type, groupSources]) => ({
-      type,
-      label: getIncomeTypeLabel(type, budgetType),
-      sources: groupSources.sort((a, b) => {
-        // Active sources first, then alphabetically
-        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
-        return a.name.localeCompare(b.name)
-      }),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label))
-}
-
 export default function IncomeScreen() {
   const { colors } = useTheme()
   const router = useRouter()
@@ -121,7 +88,6 @@ export default function IncomeScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    // Data is reactive from context; simulate a brief refresh
     setTimeout(() => setRefreshing(false), 500)
   }, [])
 
@@ -137,31 +103,34 @@ export default function IncomeScreen() {
   )
 
   // Actual income from transactions this month (excluding transfers)
-  const actualIncome = useMemo(() => {
+  const EXCLUDED_NAMES = useMemo(() => ['transfer', 'transfer/payment'], [])
+
+  const incomeTransactions = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth)
     const monthEnd = endOfMonth(selectedMonth)
-    const EXCLUDED_NAMES = ['transfer', 'transfer/payment']
-    return appData.transactions
-      .filter((t) => {
-        const transDate = parseISO(t.date)
-        if (
-          t.budgetType !== budgetType ||
-          t.amount <= 0 ||
-          transDate < monthStart ||
-          transDate > monthEnd
-        ) {
-          return false
-        }
-        // Exclude transfer categories from income calculation
-        const category = appData.categories.find((c) => c.id === t.categoryId)
-        const categoryName = category?.name?.toLowerCase() || ''
-        if (EXCLUDED_NAMES.includes(categoryName) || categoryName.includes('exclude from')) {
-          return false
-        }
-        return true
-      })
-      .reduce((sum, t) => sum + t.amount, 0)
-  }, [appData.transactions, appData.categories, budgetType, selectedMonth])
+    return appData.transactions.filter((t) => {
+      const transDate = parseISO(t.date)
+      if (
+        t.budgetType !== budgetType ||
+        t.amount <= 0 ||
+        transDate < monthStart ||
+        transDate > monthEnd
+      ) {
+        return false
+      }
+      const category = appData.categories.find((c) => c.id === t.categoryId)
+      const categoryName = category?.name?.toLowerCase() || ''
+      if (EXCLUDED_NAMES.includes(categoryName) || categoryName.includes('exclude from')) {
+        return false
+      }
+      return true
+    })
+  }, [appData.transactions, appData.categories, budgetType, selectedMonth, EXCLUDED_NAMES])
+
+  const actualIncome = useMemo(
+    () => incomeTransactions.reduce((sum, t) => sum + t.amount, 0),
+    [incomeTransactions]
+  )
 
   // All income sources for the selected budget type
   const allSources = useMemo(
@@ -169,28 +138,48 @@ export default function IncomeScreen() {
     [appData.incomeSources, budgetType]
   )
 
-  // Active income sources only (for expected dates computation)
-  const activeSources = useMemo(
-    () => allSources.filter((s) => s.isActive),
-    [allSources]
-  )
+  // Per-source breakdown: expected and actual for the month
+  const sourceBreakdown = useMemo(() => {
+    return allSources.map((source) => {
+      // Expected for this month
+      let expectedForMonth = 0
+      if (source.isActive) {
+        const legacy = incomeSourceToLegacy(source)
+        const dates = getExpectedDatesForMonth(legacy, selectedMonth)
+        if (dates.length > 0) {
+          expectedForMonth = source.expectedAmount * dates.length
+        }
+      }
 
-  // Group sources by income type
-  const groupedSources = useMemo(
-    () => groupSourcesByType(allSources, budgetType),
-    [allSources, budgetType]
-  )
+      // Actual received: transactions linked to this income source
+      const actualForSource = incomeTransactions
+        .filter((t) => t.incomeSourceId === source.id)
+        .reduce((sum, t) => sum + t.amount, 0)
 
-  // Pre-compute expected dates for each source
-  const expectedDatesMap = useMemo(() => {
-    const map = new Map<string, Date[]>()
-    allSources.forEach((source) => {
-      const legacy = incomeSourceToLegacy(source)
-      const dates = getExpectedDatesForMonth(legacy, selectedMonth)
-      map.set(source.id, dates)
+      return {
+        source,
+        expected: expectedForMonth,
+        actual: actualForSource,
+      }
+    }).sort((a, b) => {
+      // Active sources first, then by name
+      if (a.source.isActive !== b.source.isActive) return a.source.isActive ? -1 : 1
+      return a.source.name.localeCompare(b.source.name)
     })
-    return map
-  }, [allSources, selectedMonth])
+  }, [allSources, incomeTransactions, selectedMonth])
+
+  // Uncategorized income: transactions with positive amount but no income source
+  const uncategorizedIncome = useMemo(() => {
+    const sourceIds = new Set(allSources.map((s) => s.id))
+    return incomeTransactions.filter(
+      (t) => !t.incomeSourceId || !sourceIds.has(t.incomeSourceId)
+    )
+  }, [incomeTransactions, allSources])
+
+  const uncategorizedTotal = useMemo(
+    () => uncategorizedIncome.reduce((sum, t) => sum + t.amount, 0),
+    [uncategorizedIncome]
+  )
 
   const handleToggleActive = useCallback(
     (source: IncomeSource) => {
@@ -199,25 +188,23 @@ export default function IncomeScreen() {
     [updateIncomeSource]
   )
 
+  const handleEditSource = useCallback(
+    (source: IncomeSource) => {
+      router.push(`/income/${source.id}`)
+    },
+    [router]
+  )
+
   const handleAddIncome = useCallback(() => {
     router.push('/income/add')
   }, [router])
 
-  const nextExpectedDateLabel = useCallback(
-    (source: IncomeSource): string | null => {
-      const dates = expectedDatesMap.get(source.id)
-      if (dates && dates.length > 0) {
-        // Find the next upcoming date (or the first one)
-        const now = new Date()
-        const upcoming = dates.find((d) => d >= now) || dates[0]
-        return format(upcoming, 'MMM d, yyyy')
-      }
-      if (source.nextExpectedDate) {
-        return format(parseISO(source.nextExpectedDate), 'MMM d, yyyy')
-      }
-      return null
+  const getCategoryName = useCallback(
+    (categoryId: string) => {
+      const cat = appData.categories.find((c) => c.id === categoryId)
+      return cat ? cat.name : 'Uncategorized'
     },
-    [expectedDatesMap]
+    [appData.categories]
   )
 
   return (
@@ -335,132 +322,134 @@ export default function IncomeScreen() {
           />
         </ScrollView>
 
-        {/* Income Sources Grouped by Type */}
-        {groupedSources.length === 0 ? (
+        {/* Income Breakdown by Source */}
+        {sourceBreakdown.length === 0 ? (
           <EmptyState
             title="No Income Sources"
             message={`You haven't added any ${budgetType} income sources yet. Tap the + button to add your first income source.`}
           />
         ) : (
-          groupedSources.map((group) => (
-            <View
-              key={group.type}
-              style={[styles.groupSection, { backgroundColor: colors.surface }]}
-            >
-              {/* Group Header */}
-              <View
-                style={[
-                  styles.groupHeader,
-                  { borderBottomColor: colors.border },
-                ]}
-              >
-                <Text style={[styles.groupTitle, { color: colors.text }]}>
-                  {group.label}
-                </Text>
-                <Text style={[styles.groupCount, { color: colors.textSecondary }]}>
-                  {group.sources.length} source
-                  {group.sources.length !== 1 ? 's' : ''}
-                </Text>
-              </View>
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Income by Source
+            </Text>
 
-              {/* Source Rows */}
-              {group.sources.map((source, index) => {
-                const nextDate = nextExpectedDateLabel(source)
-                return (
-                  <View
-                    key={source.id}
+            {/* Header Row */}
+            <View style={[styles.breakdownHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.headerText, styles.headerName, { color: colors.textSecondary }]}>
+                Source
+              </Text>
+              <Text style={[styles.headerText, styles.headerNum, { color: colors.textSecondary }]}>
+                Expected
+              </Text>
+              <Text style={[styles.headerText, styles.headerNum, { color: colors.textSecondary }]}>
+                Actual
+              </Text>
+              <View style={styles.headerToggle} />
+            </View>
+
+            {sourceBreakdown.map((item, index) => {
+              const diff = item.actual - item.expected
+              return (
+                <Pressable
+                  key={item.source.id}
+                  style={[
+                    styles.breakdownRow,
+                    index < sourceBreakdown.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.borderLight,
+                    },
+                  ]}
+                  onPress={() => handleEditSource(item.source)}
+                >
+                  <View style={styles.breakdownName}>
+                    <Text
+                      style={[
+                        styles.sourceName,
+                        {
+                          color: item.source.isActive
+                            ? colors.text
+                            : colors.textSecondary,
+                        },
+                        !item.source.isActive && styles.sourceNameInactive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.source.name}
+                    </Text>
+                    <Text style={[styles.sourceFrequency, { color: colors.textSecondary }]}>
+                      {FREQUENCY_LABELS[item.source.frequency]}
+                      {item.source.clientSource ? ` \u00B7 ${item.source.clientSource}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={[styles.breakdownAmount, { color: colors.primary }]}>
+                    {formatCurrency(item.expected)}
+                  </Text>
+                  <Text
                     style={[
-                      styles.sourceRow,
-                      index < group.sources.length - 1 && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.borderLight,
-                      },
+                      styles.breakdownAmount,
+                      { color: item.actual > 0 ? colors.success : colors.textSecondary },
                     ]}
                   >
-                    <View style={styles.sourceInfo}>
-                      {/* Name + Inactive Badge */}
-                      <View style={styles.sourceNameRow}>
-                        <Text
-                          style={[
-                            styles.sourceName,
-                            {
-                              color: source.isActive
-                                ? colors.text
-                                : colors.textSecondary,
-                            },
-                            !source.isActive && styles.sourceNameInactive,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {source.name}
-                        </Text>
-                        {!source.isActive && (
-                          <View
-                            style={[
-                              styles.inactiveBadge,
-                              { backgroundColor: colors.warningLight },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.inactiveBadgeText,
-                                { color: colors.warning },
-                              ]}
-                            >
-                              Inactive
-                            </Text>
-                          </View>
-                        )}
-                      </View>
+                    {formatCurrency(item.actual)}
+                  </Text>
+                  <Switch
+                    value={item.source.isActive}
+                    onValueChange={() => handleToggleActive(item.source)}
+                    trackColor={{
+                      false: colors.border,
+                      true: colors.primaryLight,
+                    }}
+                    thumbColor={
+                      item.source.isActive ? colors.primary : colors.textSecondary
+                    }
+                    style={styles.toggleSwitch}
+                  />
+                </Pressable>
+              )
+            })}
+          </View>
+        )}
 
-                      {/* Frequency */}
-                      <Text
-                        style={[
-                          styles.sourceFrequency,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {FREQUENCY_LABELS[source.frequency]}
-                        {source.clientSource ? ` \u00B7 ${source.clientSource}` : ''}
-                      </Text>
-
-                      {/* Amount + Next Expected Date */}
-                      <View style={styles.sourceDetailsRow}>
-                        <Text
-                          style={[styles.sourceAmount, { color: colors.success }]}
-                        >
-                          {formatCurrency(source.expectedAmount)}
-                        </Text>
-                        {nextDate && (
-                          <Text
-                            style={[
-                              styles.sourceNextDate,
-                              { color: colors.textSecondary },
-                            ]}
-                          >
-                            Next: {nextDate}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Active/Inactive Toggle */}
-                    <Switch
-                      value={source.isActive}
-                      onValueChange={() => handleToggleActive(source)}
-                      trackColor={{
-                        false: colors.border,
-                        true: colors.primaryLight,
-                      }}
-                      thumbColor={
-                        source.isActive ? colors.primary : colors.textSecondary
-                      }
-                    />
-                  </View>
-                )
-              })}
+        {/* Uncategorized Income */}
+        {uncategorizedIncome.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <View style={styles.uncategorizedHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.warning, marginBottom: 0 }]}>
+                Unlinked Income
+              </Text>
+              <Text style={[styles.uncategorizedTotal, { color: colors.warning }]}>
+                {formatCurrency(uncategorizedTotal)}
+              </Text>
             </View>
-          ))
+            <Text style={[styles.uncategorizedHint, { color: colors.textSecondary }]}>
+              These income transactions are not linked to any income source.
+            </Text>
+            {uncategorizedIncome.map((t, index) => (
+              <View
+                key={t.id}
+                style={[
+                  styles.uncategorizedRow,
+                  index < uncategorizedIncome.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.borderLight,
+                  },
+                ]}
+              >
+                <View style={styles.uncategorizedInfo}>
+                  <Text style={[styles.uncategorizedDesc, { color: colors.text }]} numberOfLines={1}>
+                    {t.description}
+                  </Text>
+                  <Text style={[styles.uncategorizedMeta, { color: colors.textSecondary }]}>
+                    {format(parseISO(t.date), 'MMM d')} \u00B7 {getCategoryName(t.categoryId)}
+                  </Text>
+                </View>
+                <Text style={[styles.uncategorizedAmount, { color: colors.success }]}>
+                  {formatCurrency(t.amount)}
+                </Text>
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -535,40 +524,47 @@ const styles = StyleSheet.create({
   cardSpacer: {
     width: Spacing.sm,
   },
-  groupSection: {
+  section: {
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-    overflow: 'hidden',
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: Spacing.md,
-    borderBottomWidth: 1,
+    marginBottom: Spacing.md,
   },
-  groupTitle: {
+  sectionTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
+    marginBottom: Spacing.md,
   },
-  groupCount: {
-    fontSize: FontSize.sm,
-    fontWeight: '500',
-  },
-  sourceRow: {
+  breakdownHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    marginBottom: Spacing.xs,
   },
-  sourceInfo: {
+  headerText: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  headerName: {
     flex: 1,
-    marginRight: Spacing.md,
   },
-  sourceNameRow: {
+  headerNum: {
+    width: 72,
+    textAlign: 'right',
+  },
+  headerToggle: {
+    width: 51,
+    marginLeft: Spacing.sm,
+  },
+  breakdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    paddingVertical: Spacing.sm + 2,
+  },
+  breakdownName: {
+    flex: 1,
+    marginRight: Spacing.sm,
   },
   sourceName: {
     fontSize: FontSize.md,
@@ -578,31 +574,53 @@ const styles = StyleSheet.create({
   sourceNameInactive: {
     textDecorationLine: 'line-through',
   },
-  inactiveBadge: {
-    marginLeft: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  inactiveBadgeText: {
+  sourceFrequency: {
     fontSize: FontSize.xs,
+    marginTop: 1,
+  },
+  breakdownAmount: {
+    width: 72,
+    textAlign: 'right',
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
-  sourceFrequency: {
-    fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
+  toggleSwitch: {
+    marginLeft: Spacing.sm,
   },
-  sourceDetailsRow: {
+  uncategorizedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xs,
   },
-  sourceAmount: {
-    fontSize: FontSize.md,
+  uncategorizedTotal: {
+    fontSize: FontSize.lg,
     fontWeight: '700',
+  },
+  uncategorizedHint: {
+    fontSize: FontSize.sm,
+    marginBottom: Spacing.md,
+  },
+  uncategorizedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 2,
+  },
+  uncategorizedInfo: {
+    flex: 1,
     marginRight: Spacing.md,
   },
-  sourceNextDate: {
-    fontSize: FontSize.sm,
+  uncategorizedDesc: {
+    fontSize: FontSize.md,
+    fontWeight: '500',
+  },
+  uncategorizedMeta: {
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  uncategorizedAmount: {
+    fontSize: FontSize.md,
+    fontWeight: '700',
   },
   fab: {
     position: 'absolute',

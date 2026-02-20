@@ -75,16 +75,22 @@ export default function DashboardScreen() {
       }, 0)
   }, [appData.categories, appData.monthlyBudgets, budgetType, selectedMonth])
 
-  const topCategories = useMemo(
-    () =>
-      getTopSpendingCategories(
-        appData.transactions,
-        appData.categories,
-        budgetType,
-        5
-      ),
-    [appData.transactions, appData.categories, budgetType]
-  )
+  const topCategories = useMemo(() => {
+    const EXCLUDED_NAMES = ['transfer', 'transfer/payment']
+    const filtered = getTopSpendingCategories(
+      appData.transactions,
+      appData.categories,
+      budgetType,
+      10
+    ).filter((item) => {
+      const name = item.category.name.toLowerCase()
+      if (EXCLUDED_NAMES.includes(name)) return false
+      if (name.includes('exclude from')) return false
+      if (item.category.excludeFromBudget) return false
+      return true
+    })
+    return filtered.slice(0, 5)
+  }, [appData.transactions, appData.categories, budgetType])
 
   const remainingInBudget = totalBudgeted - summary.totalExpenses
 
@@ -200,6 +206,42 @@ export default function DashboardScreen() {
             color={remainingInBudget >= 0 ? colors.success : colors.danger}
           />
         </ScrollView>
+
+        {/* Accounts Overview */}
+        {appData.accounts.filter((a) => a.budgetType === budgetType && !a.deletedAt).length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Accounts
+            </Text>
+            {appData.accounts
+              .filter((a) => a.budgetType === budgetType && !a.deletedAt)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((account, index, arr) => (
+                <View
+                  key={account.id}
+                  style={[
+                    styles.accountRow,
+                    index < arr.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.borderLight,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1}>
+                    {account.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.accountBalance,
+                      { color: account.balance >= 0 ? colors.success : colors.danger },
+                    ]}
+                  >
+                    {formatCurrency(account.balance)}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        )}
 
         {/* Top Spending Categories */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -362,6 +404,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   spendingAmount: {
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm + 2,
+  },
+  accountName: {
+    fontSize: FontSize.md,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  accountBalance: {
     fontSize: FontSize.md,
     fontWeight: '700',
   },

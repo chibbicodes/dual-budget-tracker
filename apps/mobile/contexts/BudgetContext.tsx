@@ -334,8 +334,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   )
 
   const projectedIncome = useMemo(
-    () => getProjectedMonthlyIncome(filteredIncomeSources, selectedMonth),
-    [filteredIncomeSources, selectedMonth]
+    () => getProjectedMonthlyIncome(filteredIncomeSources, budgetType, selectedMonth),
+    [filteredIncomeSources, budgetType, selectedMonth]
   )
 
   // Unfiltered data object for screens that do their own filtering

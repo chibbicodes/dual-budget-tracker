@@ -336,6 +336,11 @@ ipcMain.handle('db:getProjectType', async (_event, id: string) => {
   return databaseService.getProjectType(id)
 })
 
+ipcMain.handle('db:getProjectTypeForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectTypeForSync(id)
+})
+
 ipcMain.handle('db:createProjectType', async (_event, projectType: any) => {
   await databaseServicePromise
   return databaseService.createProjectType(projectType)
@@ -355,6 +360,11 @@ ipcMain.handle('db:deleteProjectType', async (_event, id: string) => {
 ipcMain.handle('db:getProjectStatus', async (_event, id: string) => {
   await databaseServicePromise
   return databaseService.getProjectStatus(id)
+})
+
+ipcMain.handle('db:getProjectStatusForSync', async (_event, id: string) => {
+  await databaseServicePromise
+  return databaseService.getProjectStatusForSync(id)
 })
 
 ipcMain.handle('db:createProjectStatus', async (_event, status: any) => {

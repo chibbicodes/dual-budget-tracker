@@ -65,6 +65,7 @@ declare global {
         getProjectTypes: (profileId: string, budgetType?: string) => Promise<any[]>
         getProjectTypesForSync: (profileId: string) => Promise<any[]>
         getProjectType: (id: string) => Promise<any>
+        getProjectTypeForSync: (id: string) => Promise<any>
         createProjectType: (projectType: any) => Promise<any>
         updateProjectType: (id: string, updates: any) => Promise<any>
         deleteProjectType: (id: string) => Promise<void>
@@ -72,6 +73,7 @@ declare global {
         getProjectStatuses: (profileId: string) => Promise<any[]>
         getProjectStatusesForSync: (profileId: string) => Promise<any[]>
         getProjectStatus: (id: string) => Promise<any>
+        getProjectStatusForSync: (id: string) => Promise<any>
         createProjectStatus: (status: any) => Promise<any>
         updateProjectStatus: (id: string, updates: any) => Promise<any>
         deleteProjectStatus: (id: string) => Promise<void>

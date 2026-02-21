@@ -512,6 +512,16 @@ class DatabaseClient {
   }
 
   /**
+   * Get a project type by ID for sync (including soft-deleted)
+   */
+  getProjectTypeForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectTypeForSync(id)
+    }
+    return null
+  }
+
+  /**
    * Create a new project type
    */
   createProjectType(projectType: any) {
@@ -566,6 +576,16 @@ class DatabaseClient {
   getProjectStatus(id: string) {
     if (window.electronAPI?.database) {
       return window.electronAPI.database.getProjectStatus(id)
+    }
+    return null
+  }
+
+  /**
+   * Get a project status by ID for sync (including soft-deleted)
+   */
+  getProjectStatusForSync(id: string) {
+    if (window.electronAPI?.database) {
+      return window.electronAPI.database.getProjectStatusForSync(id)
     }
     return null
   }

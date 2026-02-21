@@ -1225,6 +1225,19 @@ class DatabaseService {
   }
 
   /**
+   * Get a project type by ID for sync (including soft-deleted)
+   */
+  getProjectTypeForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM project_types WHERE id = ?')
+    const result: any = stmt.get(id)
+    if (result && result.allowed_statuses) {
+      result.allowed_statuses = JSON.parse(result.allowed_statuses)
+    }
+    return result
+  }
+
+  /**
    * Update a project type
    */
   updateProjectType(id: string, updates: Record<string, any>) {
@@ -1319,6 +1332,15 @@ class DatabaseService {
   getProjectStatus(id: string) {
     const db = this.getDb()
     const stmt = db.prepare('SELECT * FROM project_statuses WHERE id = ? AND deleted_at IS NULL')
+    return stmt.get(id)
+  }
+
+  /**
+   * Get a project status by ID for sync (including soft-deleted)
+   */
+  getProjectStatusForSync(id: string) {
+    const db = this.getDb()
+    const stmt = db.prepare('SELECT * FROM project_statuses WHERE id = ?')
     return stmt.get(id)
   }
 

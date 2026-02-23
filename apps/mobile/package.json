@@ -5,7 +5,9 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "prebuild": "expo prebuild --platform ios --clean",
     "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device",
     "build:ios": "eas build --platform ios",
     "typecheck": "tsc --noEmit"
   },
